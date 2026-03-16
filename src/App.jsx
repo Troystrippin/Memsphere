@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { supabase, isSupabaseConfigured } from "./lib/supabase";
+import { supabase, isSupabaseConfigured, testSupabaseConnection } from "./lib/supabase";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -29,10 +29,13 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
   const [initialRedirectDone, setInitialRedirectDone] = useState(false);
+  const [authError, setAuthError] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   const hasProcessedSignIn = useRef(false);
   const authInitialized = useRef(false);
   const navigationInProgress = useRef(false);
+  const fetchRetryCount = useRef(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,6 +46,7 @@ function App() {
       console.error("Supabase is not configured properly");
       setConfigError(true);
       setLoading(false);
+      setAuthChecked(true);
       return;
     }
 
@@ -50,39 +54,59 @@ function App() {
       try {
         console.log("🔍 Initializing auth...");
         
-        // Get session from localStorage first
-        const storedSession = localStorage.getItem('sb-session');
-        if (storedSession) {
-          try {
-            const parsed = JSON.parse(storedSession);
-            if (parsed?.user) {
-              console.log("📦 Found stored session for:", parsed.user.email);
-              setSession(parsed);
-            }
-          } catch (e) {
-            console.error("Error parsing stored session:", e);
-          }
+        // Test Supabase connection first
+        const isConnected = await testSupabaseConnection();
+        if (!isConnected) {
+          console.error("❌ Cannot connect to Supabase");
+          setAuthError("Cannot connect to database");
+          setLoading(false);
+          setAuthChecked(true);
+          return;
         }
-
+        
+        // Get actual session from Supabase
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error("Error getting session:", error);
+          localStorage.removeItem('sb-session');
+          setAuthError(error.message);
+          setLoading(false);
+          setAuthChecked(true);
+          return;
         }
 
         console.log("📦 Initial session:", session?.user?.email || "No session");
-        setSession(session);
-
+        
         if (session?.user) {
-          console.log("👤 User found in session, fetching role for:", session.user.email);
+          // Validate that the session is still valid
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          
+          if (userError || !userData?.user) {
+            console.log("❌ Session is invalid, clearing...");
+            localStorage.removeItem('sb-session');
+            setSession(null);
+            setLoading(false);
+            setAuthChecked(true);
+            return;
+          }
+          
+          setSession(session);
+          console.log("👤 Valid session found for:", session.user.email);
           await fetchUserRole(session.user.id);
         } else {
-          console.log("👤 No user in session");
+          console.log("👤 No valid session");
+          localStorage.removeItem('sb-session');
+          setSession(null);
           setLoading(false);
+          setAuthChecked(true);
         }
       } catch (error) {
         console.error("Error in auth initialization:", error);
+        localStorage.removeItem('sb-session');
+        setAuthError(error.message);
         setLoading(false);
+        setAuthChecked(true);
       }
     };
 
@@ -92,36 +116,52 @@ function App() {
       async (event, session) => {
         console.log("🔄 Auth state changed - event:", event, "email:", session?.user?.email);
 
-        // Update session state
         setSession(session);
 
-        // Handle sign in
         if (event === "SIGNED_IN" && session?.user) {
           console.log("✅ User signed in:", session.user.email);
           hasProcessedSignIn.current = true;
           setInitialRedirectDone(false);
+          setAuthError(null);
           setLoading(true);
-          await fetchUserRole(session.user.id);
+          try {
+            await fetchUserRole(session.user.id);
+          } catch (error) {
+            console.error("Error in sign in flow:", error);
+            setLoading(false);
+          }
         }
-        // Handle token refresh
         else if (event === "TOKEN_REFRESHED") {
           console.log("🔄 Token refreshed");
           if (session?.user) {
-            await fetchUserRole(session.user.id);
+            try {
+              await fetchUserRole(session.user.id);
+            } catch (error) {
+              console.error("Error in token refresh:", error);
+              setLoading(false);
+            }
           }
         }
-        // Handle sign out - add a small delay to prevent race conditions
         else if (event === "SIGNED_OUT") {
           console.log("👤 User signed out");
-          // Clear state after a small delay
-          setTimeout(() => {
-            setUserRole(null);
-            setSession(null);
-            setLoading(false);
-            setInitialRedirectDone(false);
-            hasProcessedSignIn.current = false;
-            navigationInProgress.current = false;
-          }, 100);
+          localStorage.removeItem('sb-session');
+          setUserRole(null);
+          setSession(null);
+          setAuthError(null);
+          setLoading(false);
+          setInitialRedirectDone(false);
+          hasProcessedSignIn.current = false;
+          navigationInProgress.current = false;
+          fetchRetryCount.current = 0;
+          
+          // Navigate to home page on sign out
+          navigate("/", { replace: true });
+        }
+        else if (event === "USER_UPDATED") {
+          console.log("👤 User updated");
+          if (session?.user) {
+            await fetchUserRole(session.user.id);
+          }
         }
       }
     );
@@ -130,22 +170,38 @@ function App() {
       subscription.unsubscribe();
       authInitialized.current = false;
     };
-  }, []);
+  }, [navigate]);
 
   const fetchUserRole = async (userId) => {
+    fetchRetryCount.current = 0;
+    
     try {
       console.log("🔍 Fetching role for user ID:", userId);
 
-      const { data, error } = await supabase
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Fetch timeout")), 5000)
+      );
+
+      const fetchPromise = supabase
         .from("profiles")
         .select("id, email, role, first_name, last_name")
         .eq("id", userId)
         .maybeSingle();
 
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
       if (error) {
         console.error("❌ Error fetching user role:", error);
+        // If we get a permission error, maybe the session is invalid
+        if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+          console.log("❌ JWT error - session may be invalid");
+          localStorage.removeItem('sb-session');
+          setSession(null);
+        }
         setUserRole("client");
+        setAuthError("Error loading user profile");
         setLoading(false);
+        setAuthChecked(true);
         return;
       }
 
@@ -153,6 +209,7 @@ function App() {
         console.log("📊 Full profile data:", data);
         console.log("✅ User role from database:", data?.role);
         setUserRole(data?.role || "client");
+        setAuthError(null);
       } else {
         console.log("⚠️ No profile found, defaulting to client role");
         setUserRole("client");
@@ -160,20 +217,40 @@ function App() {
     } catch (error) {
       console.error("❌ Error in fetchUserRole:", error);
       setUserRole("client");
+      setAuthError(error.message);
+      
+      if (fetchRetryCount.current < 2) {
+        fetchRetryCount.current++;
+        console.log(`🔄 Retrying fetchUserRole (attempt ${fetchRetryCount.current + 1}/3)...`);
+        setTimeout(() => {
+          fetchUserRole(userId);
+        }, 1000 * fetchRetryCount.current);
+        return;
+      }
     } finally {
       console.log("✅ Setting loading to false");
       setLoading(false);
+      setAuthChecked(true);
     }
   };
 
-  // Handle initial redirect
+  // Handle initial redirect - ONLY when logged in with valid session
   useEffect(() => {
-    if (loading || !session || !userRole) {
-      console.log("⏳ Waiting for navigation conditions:", {
-        loading,
-        hasSession: !!session,
-        hasRole: !!userRole,
-      });
+    // Don't redirect if still loading or auth not checked
+    if (loading || !authChecked) {
+      console.log("⏳ Still loading or auth not checked, waiting before redirect check...");
+      return;
+    }
+
+    // Don't redirect if no session (not logged in)
+    if (!session) {
+      console.log("⏳ No session, staying on current page");
+      return;
+    }
+
+    // Don't redirect if no role yet
+    if (!userRole) {
+      console.log("⏳ No role yet, waiting...");
       return;
     }
 
@@ -187,6 +264,7 @@ function App() {
 
     const publicPaths = ["/login", "/", "/register", "/forgot-password", "/about"];
     
+    // Only redirect if on a public path AND logged in with valid session
     if (publicPaths.includes(currentPath)) {
       navigationInProgress.current = true;
       let destination;
@@ -201,28 +279,88 @@ function App() {
 
       console.log(`🏠 Redirecting from ${currentPath} to ${destination}`);
 
-      setTimeout(() => {
-        navigate(destination, { replace: true });
-        setInitialRedirectDone(true);
-        
-        setTimeout(() => {
-          navigationInProgress.current = false;
-        }, 500);
-      }, 100);
+      navigate(destination, { replace: true });
+      setInitialRedirectDone(true);
+      navigationInProgress.current = false;
     } else {
       setInitialRedirectDone(true);
     }
-  }, [loading, session, userRole, navigate, initialRedirectDone]);
+  }, [loading, session, userRole, navigate, initialRedirectDone, authChecked]);
 
+  // Debug logging
   useEffect(() => {
     console.log("📊 App State Update:", {
       loading,
+      authChecked,
       session: session?.user?.email,
       userRole,
       path: window.location.pathname,
       initialRedirectDone,
+      authError,
     });
-  }, [loading, session, userRole, initialRedirectDone]);
+  }, [loading, authChecked, session, userRole, initialRedirectDone, authError]);
+
+  // Don't render anything until auth is checked
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="loading-spinner mx-auto"></div>
+          <p className="mt-4">Loading application...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (configError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500 text-white">
+        <h1 className="text-3xl font-bold mb-4">Configuration Error</h1>
+        <p className="mb-4">
+          Supabase is not configured properly. Please check your environment
+          variables.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 bg-white text-purple-600 rounded-lg hover:bg-gray-100 transition"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500 text-white">
+        <h1 className="text-3xl font-bold mb-4">Authentication Error</h1>
+        <p className="mb-4">{authError}</p>
+        <div className="space-x-4">
+          <button
+            onClick={() => {
+              setAuthError(null);
+              setLoading(true);
+              setAuthChecked(false);
+              window.location.reload();
+            }}
+            className="px-6 py-2 bg-white text-purple-600 rounded-lg hover:bg-gray-100 transition"
+          >
+            Retry
+          </button>
+          <button
+            onClick={() => {
+              localStorage.removeItem('sb-session');
+              supabase.auth.signOut();
+              window.location.href = "/";
+            }}
+            className="px-6 py-2 bg-transparent border border-white text-white rounded-lg hover:bg-white hover:text-purple-600 transition"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     console.log(
@@ -230,40 +368,11 @@ function App() {
       !!session,
       "Role:",
       userRole,
-      "Loading:",
-      loading,
+      "AuthChecked:",
+      authChecked,
       "Path:",
       window.location.pathname,
     );
-
-    if (configError) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500 text-white">
-          <h1 className="text-3xl font-bold mb-4">Configuration Error</h1>
-          <p className="mb-4">
-            Supabase is not configured properly. Please check your environment
-            variables.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-white text-purple-600 rounded-lg hover:bg-gray-100 transition"
-          >
-            Retry
-          </button>
-        </div>
-      );
-    }
-
-    if (loading) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500">
-          <div className="text-center">
-            <div className="loading-spinner mx-auto"></div>
-            <p className="mt-4 text-white text-lg">Loading...</p>
-          </div>
-        </div>
-      );
-    }
 
     if (!session) {
       console.log("🔒 No session, redirecting to login");
@@ -272,10 +381,10 @@ function App() {
 
     if (userRole === null) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500">
+        <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="loading-spinner mx-auto"></div>
-            <p className="mt-4 text-white text-lg">Loading your profile...</p>
+            <p className="mt-4">Loading your profile...</p>
           </div>
         </div>
       );
