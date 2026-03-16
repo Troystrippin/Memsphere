@@ -1,6 +1,6 @@
 /* ===== TOP NAVIGATION BAR ===== */
 .top-navbar {
-  background: var(--light-surface);
+  background: #2563eb;
   border-bottom: 1px solid var(--border-color);
   padding: 0 60px;
   display: flex;

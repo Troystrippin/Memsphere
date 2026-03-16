@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import './AdminSidebarNav.css';
-// Import the logo from src/assets
 import logo from '../../assets/logo.png';
 
 const AdminSidebarNav = ({ children }) => {

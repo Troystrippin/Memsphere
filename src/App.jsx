@@ -329,39 +329,7 @@ function App() {
       </div>
     );
   }
-
-  if (authError) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500 text-white">
-        <h1 className="text-3xl font-bold mb-4">Authentication Error</h1>
-        <p className="mb-4">{authError}</p>
-        <div className="space-x-4">
-          <button
-            onClick={() => {
-              setAuthError(null);
-              setLoading(true);
-              setAuthChecked(false);
-              window.location.reload();
-            }}
-            className="px-6 py-2 bg-white text-purple-600 rounded-lg hover:bg-gray-100 transition"
-          >
-            Retry
-          </button>
-          <button
-            onClick={() => {
-              localStorage.removeItem('sb-session');
-              supabase.auth.signOut();
-              window.location.href = "/";
-            }}
-            className="px-6 py-2 bg-transparent border border-white text-white rounded-lg hover:bg-white hover:text-purple-600 transition"
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  
   const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     console.log(
       "🛡️ ProtectedRoute - Session:",
