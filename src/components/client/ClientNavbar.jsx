@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import logo from '../../assets/logo.jpg';
+import logo from '../../assets/logo.png';
 import './ClientNavbar.css';
 
 const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
