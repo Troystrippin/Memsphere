@@ -194,6 +194,21 @@ const RegisterPage = () => {
     }
   };
 
+  const handleTabChange = (tab) => {
+    console.log("Changing tab to:", tab);
+    setActiveTab(tab);
+    // Reset owner fields when switching to client
+    if (tab === 'client') {
+      setFormData(prev => ({
+        ...prev,
+        businessName: '',
+        businessCategory: '',
+        businessAddress: '',
+        businessDescription: ''
+      }));
+    }
+  };
+
   const validateForm = () => {
     // First Name validation
     if (!formData.firstName.trim()) {
@@ -292,6 +307,9 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    console.log("1. Form submission started");
+    console.log("2. Current activeTab:", activeTab); // This will show 'owner' or 'client'
 
     const allFields = [
       "firstName",
@@ -316,11 +334,23 @@ const RegisterPage = () => {
     });
     setTouchedFields(touched);
 
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      console.log("3. Form validation failed");
+      return;
+    }
 
     setIsLoading(true);
+    console.log("4. Loading started");
 
     try {
+      console.log("5. Starting registration with data:", {
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        mobile: formData.mobile,
+        userType: activeTab
+      });
+
       // Sign up with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -330,86 +360,141 @@ const RegisterPage = () => {
             first_name: formData.firstName,
             last_name: formData.lastName,
             mobile: formData.mobile,
-            user_type: activeTab,
+            user_type: activeTab, // This should be 'owner' when activeTab is 'owner'
           },
           emailRedirectTo: `${window.location.origin}/login`,
         },
       });
 
-      if (authError) throw authError;
+      console.log("6. Signup response:", { authData, authError });
 
-      if (authData.user) {
-        // Create profile
-        const { error: profileError } = await supabase
+      if (authError) {
+        console.error("7. Auth error details:", authError);
+        throw authError;
+      }
+
+      if (!authData.user) {
+        console.error("8. No user data returned");
+        throw new Error("No user data returned from signup");
+      }
+
+      console.log("9. User created successfully:", authData.user.id);
+      console.log("10. User metadata:", authData.user.user_metadata);
+
+      // Wait a moment for the trigger to create the profile
+      console.log("11. Waiting for trigger...");
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Check if profile was created
+      console.log("12. Checking for profile...");
+      const { data: profile, error: profileCheckError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+
+      console.log("13. Profile check result:", { profile, profileCheckError });
+
+      if (!profile) {
+        console.log("14. No profile found, creating manually...");
+        
+        const { error: insertError } = await supabase
           .from("profiles")
-          .upsert({
+          .insert({
             id: authData.user.id,
             email: formData.email,
             first_name: formData.firstName,
             last_name: formData.lastName,
             mobile: formData.mobile,
             role: activeTab === "owner" ? "owner" : "client",
+            verification_status: "approved",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           });
 
-        if (profileError) throw profileError;
-
-        // For OWNER registration - create business with pending verification
-        if (activeTab === "owner") {
-          // Extract location from address
-          const location = formData.businessAddress.split(",").pop().trim() || "Downtown";
-
-          // Create business entry with pending verification status
-          const { error: businessError } = await supabase
-            .from("businesses")
-            .insert([
-              {
-                name: formData.businessName,
-                owner_name: `${formData.firstName} ${formData.lastName}`,
-                owner_id: authData.user.id,
-                business_type: formData.businessCategory,
-                description: formData.businessDescription,
-                price: 0,
-                location: location,
-                address: formData.businessAddress,
-                emoji:
-                  formData.businessCategory === "gym"
-                    ? "🏋️"
-                    : formData.businessCategory === "cafe"
-                      ? "☕"
-                      : "🥐",
-                rating: 0,
-                members_count: 0,
-                status: "active", // Business is active but needs permit verification
-                verification_status: "pending", // Pending permit verification
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              },
-            ]);
-
-          if (businessError) throw businessError;
+        if (insertError) {
+          console.error("15. Manual profile creation failed:", insertError);
+          throw insertError;
         }
 
-        setShowSuccess(true);
-
-        // Redirect to login after 2 seconds
-        setTimeout(() => {
-          setShowSuccess(false);
-          navigate("/login");
-        }, 2000);
-      }
-    } catch (error) {
-      console.error("Registration failed:", error);
-
-      if (error.message.includes("User already registered")) {
-        alert("This email is already registered. Please try logging in instead.");
+        console.log("16. Profile created manually");
       } else {
-        alert(error.message || "Registration failed. Please try again.");
+        console.log("17. Profile found from trigger");
+        
+        // Double-check and fix role if needed
+        if (profile.role !== activeTab) {
+          console.log(`18. Fixing role from ${profile.role} to ${activeTab}`);
+          await supabase
+            .from("profiles")
+            .update({ role: activeTab })
+            .eq("id", authData.user.id);
+        }
       }
-    } finally {
+
+      // For OWNER registration - create business
+      if (activeTab === "owner") {
+        console.log("19. Creating business for owner...");
+        
+        // Extract location from address
+        const location = formData.businessAddress.split(",").pop().trim() || "Downtown";
+
+        // Create business entry with pending verification status
+        const { error: businessError, data: businessData } = await supabase
+          .from("businesses")
+          .insert([
+            {
+              name: formData.businessName,
+              owner_name: `${formData.firstName} ${formData.lastName}`,
+              owner_id: authData.user.id,
+              business_type: formData.businessCategory,
+              description: formData.businessDescription,
+              price: 0,
+              location: location,
+              address: formData.businessAddress,
+              emoji:
+                formData.businessCategory === "gym"
+                  ? "🏋️"
+                  : formData.businessCategory === "cafe"
+                    ? "☕"
+                    : "🥐",
+              rating: 0,
+              members_count: 0,
+              status: "active",
+              verification_status: "pending", // Business needs permit verification
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ])
+          .select();
+
+        if (businessError) {
+          console.error("20. Business creation error:", businessError);
+          throw businessError;
+        }
+
+        console.log("21. Business created successfully:", businessData);
+      }
+
+      console.log("22. Registration successful!");
+      setShowSuccess(true);
+
+      // Redirect to login after 3 seconds
+      setTimeout(() => {
+        console.log("23. Redirecting to login");
+        setShowSuccess(false);
+        navigate("/login");
+      }, 3000);
+
+    } catch (error) {
+      console.error("24. Registration failed with error:", error);
+      alert(error.message || "Registration failed. Please try again.");
       setIsLoading(false);
     }
+  };
+
+  const handleSignInClick = (e) => {
+    e.preventDefault();
+    navigate("/login");
   };
 
   const getInputClassName = (fieldName) => {
@@ -618,13 +703,13 @@ const RegisterPage = () => {
         <div className="tab-selector">
           <button
             className={`tab-btn ${activeTab === "client" ? "active" : ""}`}
-            onClick={() => setActiveTab("client")}
+            onClick={() => handleTabChange("client")}
           >
             Client
           </button>
           <button
             className={`tab-btn ${activeTab === "owner" ? "active" : ""}`}
-            onClick={() => setActiveTab("owner")}
+            onClick={() => handleTabChange("owner")}
           >
             Business Owner
           </button>
@@ -888,7 +973,7 @@ const RegisterPage = () => {
         {/* Login Redirect */}
         <div className="login-redirect">
           Already have an account?{" "}
-          <a href="/login" onClick={(e) => { e.preventDefault(); navigate("/login"); }}>
+          <a href="/login" onClick={handleSignInClick}>
             Sign in
           </a>
         </div>
