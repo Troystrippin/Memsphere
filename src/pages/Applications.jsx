@@ -181,7 +181,7 @@ const Applications = () => {
       // First get all businesses owned by this user
       const { data: businessesData, error: businessesError } = await supabase
         .from('businesses')
-        .select('id')
+        .select('id, verification_status') // Added verification_status
         .eq('owner_id', user.id);
 
       if (businessesError) throw businessesError;
@@ -193,6 +193,12 @@ const Applications = () => {
       }
 
       const businessIds = businessesData.map(b => b.id);
+      
+      // Create a map of business verification status
+      const businessVerificationMap = {};
+      businessesData.forEach(b => {
+        businessVerificationMap[b.id] = b.verification_status;
+      });
 
       // Fetch all memberships for these businesses with related data in ONE query
       let query = supabase
@@ -220,7 +226,8 @@ const Applications = () => {
             business_type,
             address,
             location,
-            owner_id
+            owner_id,
+            verification_status
           ),
           payments:payments (
             id,
@@ -265,10 +272,14 @@ const Applications = () => {
           clientAvatarUrl = await getClientAvatarUrl(app.applicant.avatar_url, app.applicant.id);
         }
         
+        // Add business verification status from map if not in the business object
+        const businessVerification = app.business?.verification_status || businessVerificationMap[app.business_id] || 'pending';
+        
         return {
           ...app,
           receipt_url_display: receiptUrl,
-          client_avatar_display: clientAvatarUrl
+          client_avatar_display: clientAvatarUrl,
+          business_verification: businessVerification // Add this field
         };
       }));
 
@@ -548,6 +559,31 @@ const Applications = () => {
                               </span>
                             )}
                           </div>
+                          
+                          {/* ===== BUSINESS VERIFICATION DISPLAY ===== */}
+                          {/* Add this after the applicant details div */}
+                          <div className="business-verification-badge-container">
+                            {app.business_verification === 'pending' && (
+                              <div className="verification-badge pending">
+                                <span className="badge-icon">⏳</span>
+                                <span className="badge-text">Business Pending Verification</span>
+                              </div>
+                            )}
+                            {app.business_verification === 'approved' && (
+                              <div className="verification-badge approved">
+                                <span className="badge-icon">✅</span>
+                                <span className="badge-text">Business Verified</span>
+                              </div>
+                            )}
+                            {app.business_verification === 'rejected' && (
+                              <div className="verification-badge rejected">
+                                <span className="badge-icon">❌</span>
+                                <span className="badge-text">Business Rejected</span>
+                              </div>
+                            )}
+                          </div>
+                          {/* ===== END BUSINESS VERIFICATION DISPLAY ===== */}
+                          
                         </div>
                       </div>
                       
@@ -833,7 +869,7 @@ const Applications = () => {
                         <button
                           className="btn-approve-enhanced"
                           onClick={() => handleApprove(app.id)}
-                          disabled={processing[app.id] || (isGcash && !isVerified)}
+                          disabled={processing[app.id] || (isGcash && !isVerified) || app.business_verification === 'pending'}
                         >
                           {processing[app.id] ? (
                             <>
@@ -843,7 +879,11 @@ const Applications = () => {
                           ) : (
                             <>
                               <span className="btn-icon">✓</span>
-                              {isGcash && !isVerified ? 'Verify Payment First' : 'Approve Application'}
+                              {app.business_verification === 'pending' 
+                                ? 'Business Not Verified' 
+                                : (isGcash && !isVerified) 
+                                  ? 'Verify Payment First' 
+                                  : 'Approve Application'}
                             </>
                           )}
                         </button>

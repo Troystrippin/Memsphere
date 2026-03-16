@@ -28,6 +28,14 @@ const MyBusinessPage = () => {
   const [uploadingQr, setUploadingQr] = useState(false);
   const [gcashNumber, setGcashNumber] = useState("");
 
+  // Business Permit state
+  const [permitFile, setPermitFile] = useState(null);
+  const [permitPreview, setPermitPreview] = useState(null);
+  const [uploadingPermit, setUploadingPermit] = useState(false);
+  const [permitNumber, setPermitNumber] = useState("");
+  const [permitExpiry, setPermitExpiry] = useState("");
+  const [showVerificationBanner, setShowVerificationBanner] = useState(true);
+
   // Membership plans state
   const [membershipPlans, setMembershipPlans] = useState([]);
   const [editingPlan, setEditingPlan] = useState(null);
@@ -99,8 +107,24 @@ const MyBusinessPage = () => {
       if (business.gcash_number) {
         setGcashNumber(business.gcash_number);
       }
+      // Set permit data if exists
+      if (business.permit_number) {
+        setPermitNumber(business.permit_number);
+      }
+      if (business.permit_expiry) {
+        setPermitExpiry(business.permit_expiry);
+      }
     }
   }, [business]);
+
+  // Clean up preview URL
+  useEffect(() => {
+    return () => {
+      if (permitPreview) {
+        URL.revokeObjectURL(permitPreview);
+      }
+    };
+  }, [permitPreview]);
 
   // Validate fields when formData changes
   useEffect(() => {
@@ -494,6 +518,156 @@ const MyBusinessPage = () => {
     }
   };
 
+  // Permit Upload Functions
+  const uploadPermit = async () => {
+    if (!permitFile) {
+      setError("Please select a permit file to upload");
+      return;
+    }
+
+    if (!permitNumber.trim()) {
+      setError("Please enter permit number");
+      return;
+    }
+
+    if (!permitExpiry) {
+      setError("Please select permit expiry date");
+      return;
+    }
+
+    // Validate expiry date
+    const expiryDate = new Date(permitExpiry);
+    const today = new Date();
+    if (expiryDate < today) {
+      setError("Permit expiry date must be in the future");
+      return;
+    }
+
+    try {
+      setUploadingPermit(true);
+      setError(null);
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
+      // Create a unique file name
+      const fileExt = permitFile.name.split(".").pop();
+      const fileName = `${user.id}/permit_${Date.now()}.${fileExt}`;
+
+      // Upload file to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from("business-permits")
+        .upload(fileName, permitFile);
+
+      if (uploadError) throw uploadError;
+
+      // Update business with permit information
+      const { error: updateError } = await supabase
+        .from("businesses")
+        .update({
+          permit_document: fileName,
+          permit_number: permitNumber,
+          permit_expiry: permitExpiry,
+          permit_verified: false,
+          permit_uploaded_at: new Date().toISOString(),
+          verification_status: "pending",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", business.id);
+
+      if (updateError) throw updateError;
+
+      // Refresh business data
+      await fetchBusiness();
+
+      setSuccessMessage("Permit uploaded successfully! Waiting for admin verification.");
+      setTimeout(() => setSuccessMessage(""), 3000);
+
+      // Reset form
+      setPermitFile(null);
+      setPermitPreview(null);
+      setPermitNumber("");
+      setPermitExpiry("");
+
+    } catch (err) {
+      console.error("Error uploading permit:", err);
+      setError("Failed to upload permit. Please try again.");
+    } finally {
+      setUploadingPermit(false);
+    }
+  };
+
+  const handlePermitFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      setError("Please upload a JPG, PNG, or PDF file");
+      return;
+    }
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File size must be less than 5MB");
+      return;
+    }
+
+    setPermitFile(file);
+    
+    // Create preview URL for images
+    if (permitPreview) {
+      URL.revokeObjectURL(permitPreview);
+    }
+    
+    if (file.type.startsWith('image/')) {
+      setPermitPreview(URL.createObjectURL(file));
+    } else {
+      setPermitPreview(null);
+    }
+    
+    setError(null);
+  };
+
+  const removePermit = async () => {
+    if (!business?.permit_document) return;
+
+    if (!window.confirm("Are you sure you want to remove the permit document?")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.storage
+        .from("business-permits")
+        .remove([business.permit_document]);
+
+      if (error) throw error;
+
+      await supabase
+        .from("businesses")
+        .update({
+          permit_document: null,
+          permit_number: null,
+          permit_expiry: null,
+          permit_verified: false,
+          verification_status: "pending"
+        })
+        .eq("id", business.id);
+
+      await fetchBusiness();
+
+      setSuccessMessage("Permit removed successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      console.error("Error removing permit:", err);
+      setError("Failed to remove permit. Please try again.");
+    }
+  };
+
   const validateForm = () => {
     const fieldsToValidate = ['name', 'business_type', 'location', 'address', 'price'];
     let isValid = true;
@@ -810,6 +984,38 @@ const MyBusinessPage = () => {
               <div className="business-success-message">{successMessage}</div>
             )}
 
+            {/* Verification Status Banner */}
+            {business && business.verification_status === 'pending' && showVerificationBanner && (
+              <div className="verification-banner pending">
+                <div className="banner-icon">⏳</div>
+                <div className="banner-content">
+                  <h3>Business Verification Pending</h3>
+                  <p>Please upload your business permit for verification. Once verified, your business will be fully visible to customers.</p>
+                </div>
+                <button className="banner-close" onClick={() => setShowVerificationBanner(false)}>✕</button>
+              </div>
+            )}
+
+            {business && business.verification_status === 'approved' && business.permit_verified && (
+              <div className="verification-banner approved">
+                <div className="banner-icon">✅</div>
+                <div className="banner-content">
+                  <h3>Business Verified!</h3>
+                  <p>Your business is fully verified and visible to customers.</p>
+                </div>
+              </div>
+            )}
+
+            {business && business.verification_status === 'rejected' && (
+              <div className="verification-banner rejected">
+                <div className="banner-icon">❌</div>
+                <div className="banner-content">
+                  <h3>Verification Rejected</h3>
+                  <p>Reason: {business.rejection_reason || 'Your permit was not approved. Please upload a valid permit.'}</p>
+                </div>
+              </div>
+            )}
+
             {!business && !editMode ? (
               <div className="no-business-state">
                 <div className="no-business-icon">🏢</div>
@@ -888,6 +1094,12 @@ const MyBusinessPage = () => {
                     onClick={() => setActiveTab("payment")}
                   >
                     Payment
+                  </button>
+                  <button
+                    className={`business-tab ${activeTab === "permit" ? "active" : ""}`}
+                    onClick={() => setActiveTab("permit")}
+                  >
+                    📄 Business Permit
                   </button>
                   <button
                     className={`business-tab ${activeTab === "plans" ? "active" : ""}`}
@@ -1604,6 +1816,152 @@ const MyBusinessPage = () => {
                           </p>
                           <p>Make sure the QR code is clear and readable.</p>
                         </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Business Permit Tab */}
+                  {activeTab === "permit" && (
+                    <div className="business-form-section">
+                      <h2 className="section-subtitle">Business Permit Verification</h2>
+                      
+                      <div className="permit-section">
+                        <div className="permit-info">
+                          <div className="permit-icon">📄</div>
+                          <div className="permit-description">
+                            <h3>Upload Your Business Permit</h3>
+                            <p>
+                              To verify your business, please upload a clear image or PDF of your current business permit.
+                              Maximum file size: 5MB (JPG, PNG, PDF)
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Current Permit Status */}
+                        {business?.permit_document && (
+                          <div className="current-permit">
+                            <h4>Current Permit Document</h4>
+                            <div className="permit-document-info">
+                              <span className="permit-number">Permit #: {business.permit_number || 'N/A'}</span>
+                              <span className="permit-expiry">Expires: {business.permit_expiry ? new Date(business.permit_expiry).toLocaleDateString() : 'N/A'}</span>
+                              <span className={`permit-status ${business.permit_verified ? 'verified' : 'pending'}`}>
+                                {business.permit_verified ? '✅ Verified' : '⏳ Pending Verification'}
+                              </span>
+                            </div>
+                            <div className="permit-document-preview">
+                              {business.permit_document && (
+                                <div className="permit-file-link">
+                                  <a 
+                                    href={supabase.storage.from('business-permits').getPublicUrl(business.permit_document).data.publicUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="btn-view-permit"
+                                  >
+                                    📄 View Uploaded Permit
+                                  </a>
+                                  <button
+                                    className="btn-remove-permit"
+                                    onClick={removePermit}
+                                    disabled={uploadingPermit}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Upload New Permit Form */}
+                        {(!business?.permit_document || business?.verification_status === 'rejected') && (
+                          <div className="permit-upload-form">
+                            <h4>{business?.permit_document ? 'Re-upload New Permit' : 'Upload Your Permit'}</h4>
+                            
+                            <div className="form-row">
+                              <div className="form-group">
+                                <label>Permit Number *</label>
+                                <input
+                                  type="text"
+                                  value={permitNumber}
+                                  onChange={(e) => setPermitNumber(e.target.value)}
+                                  placeholder="Enter permit number"
+                                  disabled={uploadingPermit}
+                                />
+                              </div>
+
+                              <div className="form-group">
+                                <label>Permit Expiry Date *</label>
+                                <input
+                                  type="date"
+                                  value={permitExpiry}
+                                  onChange={(e) => setPermitExpiry(e.target.value)}
+                                  min={new Date().toISOString().split('T')[0]}
+                                  disabled={uploadingPermit}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="permit-file-upload">
+                              <div className="file-upload-area">
+                                {permitPreview ? (
+                                  <div className="permit-preview">
+                                    <img src={permitPreview} alt="Permit Preview" className="permit-preview-image" />
+                                    <button
+                                      type="button"
+                                      className="btn-remove-file"
+                                      onClick={() => {
+                                        setPermitFile(null);
+                                        setPermitPreview(null);
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <input
+                                      type="file"
+                                      id="permit-upload"
+                                      accept=".jpg,.jpeg,.png,.pdf"
+                                      onChange={handlePermitFileChange}
+                                      disabled={uploadingPermit}
+                                      className="file-input"
+                                    />
+                                    <label htmlFor="permit-upload" className="file-upload-label">
+                                      <span className="upload-icon">📎</span>
+                                      <span className="upload-text">
+                                        {permitFile ? permitFile.name : 'Choose file or drag here'}
+                                      </span>
+                                    </label>
+                                  </>
+                                )}
+                              </div>
+                              
+                              <button
+                                className="btn-upload-permit"
+                                onClick={uploadPermit}
+                                disabled={!permitFile || !permitNumber || !permitExpiry || uploadingPermit}
+                              >
+                                {uploadingPermit ? 'Uploading...' : 'Upload Permit'}
+                              </button>
+                            </div>
+
+                            <p className="permit-note">
+                              ℹ️ After uploading, your permit will be reviewed by an admin. This usually takes 1-2 business days.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Verified Message */}
+                        {business?.permit_verified && (
+                          <div className="permit-verified-message">
+                            <div className="verified-icon">✅</div>
+                            <div className="verified-content">
+                              <h4>Permit Verified!</h4>
+                              <p>Your business permit has been verified. You now have full access to all business features.</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

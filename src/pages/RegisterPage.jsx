@@ -217,7 +217,7 @@ const RegisterPage = () => {
       return false;
     }
 
-    // Email validation - STRICT GMAIL ONLY
+    // Email validation
     if (!formData.email.trim()) {
       alert("Email is required");
       return false;
@@ -321,9 +321,7 @@ const RegisterPage = () => {
     setIsLoading(true);
 
     try {
-      console.log("Starting registration with mobile:", formData.mobile);
-
-      // Sign up with Supabase Auth - include ALL metadata for the trigger
+      // Sign up with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -331,32 +329,38 @@ const RegisterPage = () => {
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
-            mobile: formData.mobile, // This is now properly included
+            mobile: formData.mobile,
             user_type: activeTab,
-            business_name: activeTab === "owner" ? formData.businessName : null,
           },
           emailRedirectTo: `${window.location.origin}/login`,
         },
       });
 
-      if (authError) {
-        console.error("Auth error:", authError);
-        throw authError;
-      }
+      if (authError) throw authError;
 
       if (authData.user) {
-        console.log("User created successfully:", authData.user.id);
+        // Create profile
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .upsert({
+            id: authData.user.id,
+            email: formData.email,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            mobile: formData.mobile,
+            role: activeTab === "owner" ? "owner" : "client",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
 
-        // Small delay to let the trigger complete
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (profileError) throw profileError;
 
-        // If registering as owner, create business entry
+        // For OWNER registration - create business with pending verification
         if (activeTab === "owner") {
           // Extract location from address
-          const location =
-            formData.businessAddress.split(",").pop().trim() || "Downtown";
+          const location = formData.businessAddress.split(",").pop().trim() || "Downtown";
 
-          // Create business entry
+          // Create business entry with pending verification status
           const { error: businessError } = await supabase
             .from("businesses")
             .insert([
@@ -377,70 +381,35 @@ const RegisterPage = () => {
                       : "🥐",
                 rating: 0,
                 members_count: 0,
-                status: "active",
+                status: "active", // Business is active but needs permit verification
+                verification_status: "pending", // Pending permit verification
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               },
             ]);
 
-          if (businessError) {
-            console.error("Business creation error:", businessError);
-            throw businessError;
-          }
-
-          console.log("Business created successfully");
+          if (businessError) throw businessError;
         }
+
+        setShowSuccess(true);
+
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+          setShowSuccess(false);
+          navigate("/login");
+        }, 2000);
       }
-
-      console.log("Registration successful!");
-      setShowSuccess(true);
-
-      // Redirect to login after 3 seconds
-      setTimeout(() => {
-        setShowSuccess(false);
-        setFormData({
-          firstName: "",
-          lastName: "",
-          email: "",
-          mobile: "",
-          businessName: "",
-          businessCategory: "",
-          businessAddress: "",
-          businessDescription: "",
-          password: "",
-          confirmPassword: "",
-        });
-        setTouchedFields({});
-        setFieldErrors({
-          firstName: "",
-          lastName: "",
-          email: "",
-          mobile: "",
-          businessName: "",
-          businessCategory: "",
-          businessAddress: "",
-          businessDescription: "",
-        });
-        navigate("/login");
-      }, 3000);
     } catch (error) {
       console.error("Registration failed:", error);
 
       if (error.message.includes("User already registered")) {
-        alert(
-          "This email is already registered. Please try logging in instead.",
-        );
+        alert("This email is already registered. Please try logging in instead.");
       } else {
         alert(error.message || "Registration failed. Please try again.");
       }
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleSignInClick = (e) => {
-    e.preventDefault();
-    navigate("/login");
   };
 
   const getInputClassName = (fieldName) => {
@@ -467,10 +436,8 @@ const RegisterPage = () => {
 
     const missingCriteria = [];
     if (formData.password.length < 8) missingCriteria.push("8+ characters");
-    if (!/(?=.*[a-z])/.test(formData.password))
-      missingCriteria.push("lowercase");
-    if (!/(?=.*[A-Z])/.test(formData.password))
-      missingCriteria.push("uppercase");
+    if (!/(?=.*[a-z])/.test(formData.password)) missingCriteria.push("lowercase");
+    if (!/(?=.*[A-Z])/.test(formData.password)) missingCriteria.push("uppercase");
     if (!/(?=.*\d)/.test(formData.password)) missingCriteria.push("number");
     if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(formData.password))
       missingCriteria.push("special character");
@@ -921,7 +888,7 @@ const RegisterPage = () => {
         {/* Login Redirect */}
         <div className="login-redirect">
           Already have an account?{" "}
-          <a href="/login" onClick={handleSignInClick}>
+          <a href="/login" onClick={(e) => { e.preventDefault(); navigate("/login"); }}>
             Sign in
           </a>
         </div>

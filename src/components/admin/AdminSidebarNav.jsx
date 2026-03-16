@@ -10,7 +10,9 @@ const AdminSidebarNav = ({ children }) => {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [stats, setStats] = useState({
-    pendingApplications: 0
+    pendingApplications: 0,
+    totalUsers: 0,
+    totalBusinesses: 0
   });
 
   useEffect(() => {
@@ -45,12 +47,27 @@ const AdminSidebarNav = ({ children }) => {
 
   const fetchStats = async () => {
     try {
-      const { count } = await supabase
+      // Get pending owner applications
+      const { count: pendingCount } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .eq('role', 'pending_owner');
 
-      setStats({ pendingApplications: count || 0 });
+      // Get total users
+      const { count: usersCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      // Get total businesses
+      const { count: businessesCount } = await supabase
+        .from('businesses')
+        .select('*', { count: 'exact', head: true });
+
+      setStats({ 
+        pendingApplications: pendingCount || 0,
+        totalUsers: usersCount || 0,
+        totalBusinesses: businessesCount || 0
+      });
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -101,18 +118,24 @@ const AdminSidebarNav = ({ children }) => {
       path: '/admin/users',
       icon: '👥',
       label: 'User Management',
-      badge: null
+      badge: stats.pendingApplications > 0 ? stats.pendingApplications : null
     },
     {
       path: '/admin/businesses',
       icon: '🏢',
       label: 'Business Management',
-      badge: null
+      badge: stats.totalBusinesses > 0 ? stats.totalBusinesses : null
     },
     {
       path: '/admin/settings',
       icon: '⚙️',
       label: 'Settings',
+      badge: null
+    },
+    {
+      path: '/admin/profile',
+      icon: '👤',
+      label: 'Profile',
       badge: null
     }
   ];
@@ -123,11 +146,12 @@ const AdminSidebarNav = ({ children }) => {
       <aside className="admin-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M2 17L12 22L22 17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M2 12L12 17L22 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="12" r="2" fill="white"/>
+            {/* Updated Logo - Blue */}
+            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="10" fill="#2563eb" stroke="#2563eb" strokeWidth="1.5"/>
+              <path d="M7 8L12 16L17 8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M12 16V8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M7 8L12 8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             {!sidebarCollapsed && <span className="sidebar-logo-text">MEMSPHERE</span>}
           </div>
@@ -160,7 +184,11 @@ const AdminSidebarNav = ({ children }) => {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user" onClick={() => navigate('/profile')}>
+          <div 
+            className="sidebar-user" 
+            onClick={() => navigate('/admin/profile')}
+            style={{ cursor: 'pointer' }}
+          >
             <div className="user-avatar">
               {avatarUrl ? (
                 <img src={avatarUrl} alt={profile?.first_name} />
@@ -172,14 +200,15 @@ const AdminSidebarNav = ({ children }) => {
             </div>
             {!sidebarCollapsed && (
               <div className="user-info">
-                <span className="user-name">{profile?.first_name || 'Admin'}</span>
+                <span className="user-name">
+                  {profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : 'Admin User'}
+                </span>
                 <span className="user-role">Administrator</span>
               </div>
             )}
           </div>
           <button className="sidebar-logout" onClick={handleSignOut}>
-            <span className="nav-icon">🚪</span>
-            {!sidebarCollapsed && <span className="nav-label">Logout</span>}
+            {!sidebarCollapsed && <span>Logout</span>}
           </button>
         </div>
       </aside>
@@ -192,7 +221,7 @@ const AdminSidebarNav = ({ children }) => {
             {menuItems.find(item => item.path === location.pathname)?.label || 'Admin Dashboard'}
           </h1>
           <div className="header-actions">
-            <button className="notification-btn">
+            <button className="notification-btn" onClick={() => navigate('/notifications')}>
               <span className="notification-icon">🔔</span>
               {stats.pendingApplications > 0 && (
                 <span className="notification-badge">{stats.pendingApplications}</span>

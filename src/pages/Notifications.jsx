@@ -1,8 +1,10 @@
+// pages/Notifications.jsx - UPDATED
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import ClientNavbar from '../components/client/ClientNavbar';
 import OwnerNavbar from '../components/owner/OwnerNavbar';
+import AdminSidebarNav from '../components/admin/AdminSidebarNav'; // You might need to create this
 import '../styles/Notifications.css';
 
 const Notifications = () => {
@@ -216,7 +218,20 @@ const Notifications = () => {
       : notification.data || {};
 
     // Different navigation based on user role and notification type
-    if (userRole === 'owner') {
+    if (userRole === 'admin') {
+      // ADMIN NAVIGATION
+      if (notification.type === 'new_owner_application') {
+        navigate('/admin/users?tab=pending');
+      } else if (notification.type === 'new_business') {
+        navigate('/admin/businesses');
+      } else if (notification.type === 'system_alert') {
+        navigate('/admin/settings');
+      } else if (notification.type === 'new_user_registered') {
+        navigate('/admin/users');
+      } else {
+        navigate('/admin-dashboard');
+      }
+    } else if (userRole === 'owner') {
       // OWNER NAVIGATION
       if (notification.type === 'announcement') {
         if (notificationData.membership_id) {
@@ -270,7 +285,20 @@ const Notifications = () => {
   };
 
   const getNotificationIcon = (type, role) => {
-    if (role === 'owner') {
+    if (role === 'admin') {
+      switch(type) {
+        case 'new_owner_application':
+          return '📝';
+        case 'new_business':
+          return '🏢';
+        case 'system_alert':
+          return '⚠️';
+        case 'new_user_registered':
+          return '👤';
+        default:
+          return '📋';
+      }
+    } else if (role === 'owner') {
       switch(type) {
         case 'announcement':
           return '📢';
@@ -306,7 +334,22 @@ const Notifications = () => {
       ? JSON.parse(notification.data) 
       : notification.data || {};
 
-    if (userRole === 'owner') {
+    if (userRole === 'admin') {
+      switch(notification.type) {
+        case 'new_owner_application':
+          return 'New Owner Application';
+        case 'new_business':
+          return data.business_name 
+            ? `New Business: ${data.business_name}`
+            : 'New Business Registered';
+        case 'system_alert':
+          return '⚠️ System Alert';
+        case 'new_user_registered':
+          return 'New User Registered';
+        default:
+          return 'Admin Notification';
+      }
+    } else if (userRole === 'owner') {
       switch(notification.type) {
         case 'announcement':
           if (data.applicant_name) {
@@ -351,7 +394,26 @@ const Notifications = () => {
       ? JSON.parse(notification.data) 
       : notification.data || {};
 
-    if (userRole === 'owner') {
+    if (userRole === 'admin') {
+      switch(notification.type) {
+        case 'new_owner_application':
+          return data.applicant_name 
+            ? `${data.applicant_name} has applied to become a business owner`
+            : 'New owner application received';
+        case 'new_business':
+          return data.owner_name 
+            ? `${data.owner_name} registered a new business: ${data.business_name}`
+            : 'New business registered';
+        case 'system_alert':
+          return data.message || 'System requires attention';
+        case 'new_user_registered':
+          return data.user_name 
+            ? `${data.user_name} just joined Memsphere`
+            : 'New user registered';
+        default:
+          return 'You have a new notification';
+      }
+    } else if (userRole === 'owner') {
       switch(notification.type) {
         case 'announcement':
           if (data.applicant_name && data.plan_name) {
@@ -432,23 +494,55 @@ const Notifications = () => {
   const firstName = getFirstName();
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  return (
-    <div className="notifications-container-page">
-      {userRole === 'owner' ? (
+  // Render appropriate navbar based on role
+  const renderNavbar = () => {
+    if (userRole === 'owner') {
+      return (
         <OwnerNavbar 
           profile={profile}
           avatarUrl={avatarUrl}
           unreadCount={unreadCount}
         />
-      ) : (
+      );
+    } else if (userRole === 'admin') {
+      // If you have an AdminNavbar component, use it here
+      // Otherwise, you might want to create one or redirect
+      return (
+        <div className="admin-navbar-placeholder">
+          {/* You can add a simple admin header here or use AdminSidebarNav */}
+          <div className="admin-navbar">
+            <div className="admin-navbar-content">
+              <span className="admin-navbar-title">Admin Dashboard</span>
+              <div className="admin-navbar-user">
+                <span>{firstName}</span>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={firstName} className="admin-navbar-avatar" />
+                ) : (
+                  <div className="admin-navbar-avatar-placeholder">
+                    {firstName.charAt(0)}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    } else {
+      return (
         <ClientNavbar 
           profile={profile}
           avatarUrl={avatarUrl}
           unreadCount={unreadCount}
         />
-      )}
+      );
+    }
+  };
 
-      <div className="notifications-main" style={{ paddingTop: 'calc(70px + 2rem)' }}>
+  return (
+    <div className="notifications-container-page">
+      {renderNavbar()}
+
+      <div className="notifications-main" style={{ paddingTop: userRole === 'admin' ? '80px' : 'calc(70px + 2rem)' }}>
         <div className="notifications-header">
           <div className="header-left">
             <h1 className="page-title">
@@ -505,9 +599,19 @@ const Notifications = () => {
             <p>You don't have any notifications at the moment.</p>
             <button 
               className="browse-btn"
-              onClick={() => userRole === 'owner' ? navigate('/owner-dashboard') : navigate('/browse')}
+              onClick={() => {
+                if (userRole === 'admin') {
+                  navigate('/admin-dashboard');
+                } else if (userRole === 'owner') {
+                  navigate('/owner-dashboard');
+                } else {
+                  navigate('/browse');
+                }
+              }}
             >
-              {userRole === 'owner' ? 'Go to Dashboard' : 'Browse Businesses'}
+              {userRole === 'admin' ? 'Go to Dashboard' : 
+               userRole === 'owner' ? 'Go to Dashboard' : 
+               'Browse Businesses'}
             </button>
           </div>
         ) : (
@@ -519,7 +623,13 @@ const Notifications = () => {
               
               // Determine where this notification will take the user
               let navigateTo = '';
-              if (userRole === 'owner') {
+              if (userRole === 'admin') {
+                if (notification.type === 'new_owner_application') navigateTo = 'Review Application';
+                else if (notification.type === 'new_business') navigateTo = 'View Business';
+                else if (notification.type === 'system_alert') navigateTo = 'Check System';
+                else if (notification.type === 'new_user_registered') navigateTo = 'View User';
+                else navigateTo = 'View Details';
+              } else if (userRole === 'owner') {
                 if (notification.type === 'announcement') {
                   if (notificationData.membership_id) navigateTo = 'Go to Applications';
                   else if (notificationData.payment_id) navigateTo = 'Go to Payments';
@@ -573,6 +683,16 @@ const Notifications = () => {
                         <span className="meta-label">{notification.business.emoji || '🏢'}</span>
                         <span className="meta-value">
                           {notification.business.name}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* Admin-specific metadata */}
+                    {userRole === 'admin' && notificationData.applicant_name && (
+                      <div className="notification-meta">
+                        <span className="meta-label">👤</span>
+                        <span className="meta-value">
+                          Applicant: {notificationData.applicant_name}
                         </span>
                       </div>
                     )}

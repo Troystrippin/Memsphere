@@ -150,6 +150,9 @@ const OwnerNavbar = ({ profile, avatarUrl }) => {
       navigate('/members');
     } else if (notification.type === 'promo') {
       navigate('/my-business');
+    } else if (notification.type === 'application_approved') {
+      // Owner application approved
+      navigate('/owner-dashboard?approved=true');
     } else {
       // Default to dashboard
       navigate('/owner-dashboard');
@@ -157,7 +160,7 @@ const OwnerNavbar = ({ profile, avatarUrl }) => {
   };
 
   const handleViewAllNotifications = () => {
-    navigate('/notifications');
+    navigate('/owner-notifications'); // ← CHANGED to owner-specific notifications page
     setShowNotifications(false);
   };
 
@@ -239,6 +242,10 @@ const OwnerNavbar = ({ profile, avatarUrl }) => {
         return 'Member approved';
       case 'promo':
         return 'New promotion';
+      case 'application_approved':
+        return 'Your application has been approved!';
+      case 'application_rejected':
+        return data.reason || 'Your application was not approved';
       default:
         return 'New notification';
     }
@@ -438,7 +445,7 @@ const OwnerNavbar = ({ profile, avatarUrl }) => {
                   className="dropdown-item"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleNavigation('/notifications');
+                    handleNavigation('/owner-notifications'); // ← CHANGED to owner-specific notifications page
                   }}
                 >
                   <span className="dropdown-icon">🔔</span>

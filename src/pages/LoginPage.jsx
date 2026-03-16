@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import '../styles/LoginPage.css';
 
 const LoginPage = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -81,14 +82,17 @@ const LoginPage = () => {
     setError('');
     
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
       
       if (error) throw error;
       
-      // Don't do anything here - App will handle redirect
+      // Let the App component handle routing based on role
+      setTimeout(() => {
+        setLoading(false);
+      }, 500);
       
     } catch (error) {
       console.error('Login error:', error);

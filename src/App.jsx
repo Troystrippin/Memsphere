@@ -19,6 +19,8 @@ import OwnerMemberManagement from "./pages/OwnerMemberManagement";
 import AdminUserManagement from "./pages/AdminUserManagement";
 import AdminBusinessManagement from "./pages/AdminBusinessManagement";
 import AdminSettings from "./pages/AdminSettings";
+import AdminProfile from "./components/admin/AdminProfile";
+import OwnerNotifications from "./pages/OwnerNotifications";
 import "./App.css";
 
 function App() {
@@ -28,18 +30,15 @@ function App() {
   const [configError, setConfigError] = useState(false);
   const [initialRedirectDone, setInitialRedirectDone] = useState(false);
 
-  // Use refs to prevent duplicate processing
   const hasProcessedSignIn = useRef(false);
   const authInitialized = useRef(false);
   const navigationInProgress = useRef(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Prevent double initialization in StrictMode
     if (authInitialized.current) return;
     authInitialized.current = true;
 
-    // Check if Supabase is configured
     if (!isSupabaseConfigured()) {
       console.error("Supabase is not configured properly");
       setConfigError(true);
@@ -47,30 +46,35 @@ function App() {
       return;
     }
 
-    // Check active session
     const initializeAuth = async () => {
       try {
         console.log("🔍 Initializing auth...");
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
+        
+        // Get session from localStorage first
+        const storedSession = localStorage.getItem('sb-session');
+        if (storedSession) {
+          try {
+            const parsed = JSON.parse(storedSession);
+            if (parsed?.user) {
+              console.log("📦 Found stored session for:", parsed.user.email);
+              setSession(parsed);
+            }
+          } catch (e) {
+            console.error("Error parsing stored session:", e);
+          }
+        }
 
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
         if (error) {
           console.error("Error getting session:", error);
         }
 
-        console.log(
-          "📦 Initial session:",
-          session?.user?.email || "No session",
-        );
+        console.log("📦 Initial session:", session?.user?.email || "No session");
         setSession(session);
 
         if (session?.user) {
-          console.log(
-            "👤 User found in session, fetching role for:",
-            session.user.email,
-          );
+          console.log("👤 User found in session, fetching role for:", session.user.email);
           await fetchUserRole(session.user.id);
         } else {
           console.log("👤 No user in session");
@@ -84,55 +88,43 @@ function App() {
 
     initializeAuth();
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log(
-        "🔄 Auth state changed - event:",
-        _event,
-        "email:",
-        session?.user?.email,
-      );
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log("🔄 Auth state changed - event:", event, "email:", session?.user?.email);
 
-      // Update session state
-      setSession(session);
+        // Update session state
+        setSession(session);
 
-      // Handle sign in
-      if (_event === "SIGNED_IN" && session?.user) {
-        // Check if we've already processed this sign-in
-        if (hasProcessedSignIn.current) {
-          console.log("⏭️ Sign-in already processed, skipping...");
-          return;
+        // Handle sign in
+        if (event === "SIGNED_IN" && session?.user) {
+          console.log("✅ User signed in:", session.user.email);
+          hasProcessedSignIn.current = true;
+          setInitialRedirectDone(false);
+          setLoading(true);
+          await fetchUserRole(session.user.id);
         }
-
-        console.log("✅ Processing new sign-in for:", session.user.email);
-        hasProcessedSignIn.current = true;
-        setInitialRedirectDone(false); // Reset redirect flag on new sign in
-        setLoading(true);
-        await fetchUserRole(session.user.id);
+        // Handle token refresh
+        else if (event === "TOKEN_REFRESHED") {
+          console.log("🔄 Token refreshed");
+          if (session?.user) {
+            await fetchUserRole(session.user.id);
+          }
+        }
+        // Handle sign out - add a small delay to prevent race conditions
+        else if (event === "SIGNED_OUT") {
+          console.log("👤 User signed out");
+          // Clear state after a small delay
+          setTimeout(() => {
+            setUserRole(null);
+            setSession(null);
+            setLoading(false);
+            setInitialRedirectDone(false);
+            hasProcessedSignIn.current = false;
+            navigationInProgress.current = false;
+          }, 100);
+        }
       }
-      // Handle sign out
-      else if (_event === "SIGNED_OUT") {
-        console.log("👤 User signed out");
-        setUserRole(null);
-        setSession(null);
-        setLoading(false);
-        setInitialRedirectDone(false);
-        hasProcessedSignIn.current = false;
-        navigationInProgress.current = false;
-      }
-      // Handle initial session
-      else if (
-        _event === "INITIAL_SESSION" &&
-        session?.user &&
-        !hasProcessedSignIn.current
-      ) {
-        console.log("🔄 Initial session loaded for:", session.user.email);
-        hasProcessedSignIn.current = true;
-        await fetchUserRole(session.user.id);
-      }
-    });
+    );
 
     return () => {
       subscription.unsubscribe();
@@ -152,8 +144,8 @@ function App() {
 
       if (error) {
         console.error("❌ Error fetching user role:", error);
-        console.log("⚠️ Defaulting to client role");
         setUserRole("client");
+        setLoading(false);
         return;
       }
 
@@ -174,9 +166,8 @@ function App() {
     }
   };
 
-  // Handle initial redirect only once
+  // Handle initial redirect
   useEffect(() => {
-    // Don't navigate if still loading or missing data
     if (loading || !session || !userRole) {
       console.log("⏳ Waiting for navigation conditions:", {
         loading,
@@ -186,7 +177,6 @@ function App() {
       return;
     }
 
-    // Prevent multiple navigation attempts
     if (navigationInProgress.current || initialRedirectDone) {
       console.log("🚫 Navigation already in progress or done, skipping");
       return;
@@ -195,11 +185,12 @@ function App() {
     const currentPath = window.location.pathname;
     console.log("📍 Navigation check - Path:", currentPath, "Role:", userRole);
 
-    // Only redirect from login/root to dashboard
-    if (currentPath === "/login" || currentPath === "/") {
+    const publicPaths = ["/login", "/", "/register", "/forgot-password", "/about"];
+    
+    if (publicPaths.includes(currentPath)) {
       navigationInProgress.current = true;
       let destination;
-      
+
       if (userRole === "owner") {
         destination = "/owner-dashboard";
       } else if (userRole === "admin") {
@@ -207,24 +198,22 @@ function App() {
       } else {
         destination = "/ClientDashboard";
       }
-      
+
       console.log(`🏠 Redirecting from ${currentPath} to ${destination}`);
-      
-      navigate(destination, { replace: true });
-      setInitialRedirectDone(true);
-      
-      // Reset navigation flag after a delay
+
       setTimeout(() => {
-        navigationInProgress.current = false;
-      }, 500);
+        navigate(destination, { replace: true });
+        setInitialRedirectDone(true);
+        
+        setTimeout(() => {
+          navigationInProgress.current = false;
+        }, 500);
+      }, 100);
     } else {
-      // If we're already on a valid page, mark redirect as done
       setInitialRedirectDone(true);
     }
-
   }, [loading, session, userRole, navigate, initialRedirectDone]);
 
-  // Add a debug effect to log state changes
   useEffect(() => {
     console.log("📊 App State Update:", {
       loading,
@@ -235,7 +224,6 @@ function App() {
     });
   }, [loading, session, userRole, initialRedirectDone]);
 
-  // Protected Route wrapper component
   const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     console.log(
       "🛡️ ProtectedRoute - Session:",
@@ -252,9 +240,12 @@ function App() {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500 text-white">
           <h1 className="text-3xl font-bold mb-4">Configuration Error</h1>
-          <p className="mb-4">Supabase is not configured properly. Please check your environment variables.</p>
-          <button 
-            onClick={() => window.location.reload()} 
+          <p className="mb-4">
+            Supabase is not configured properly. Please check your environment
+            variables.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
             className="px-6 py-2 bg-white text-purple-600 rounded-lg hover:bg-gray-100 transition"
           >
             Retry
@@ -375,6 +366,14 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/owner-notifications"
+        element={
+          <ProtectedRoute allowedRoles={["owner"]}>
+            <OwnerNotifications />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Admin Routes */}
       <Route
@@ -409,12 +408,20 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin/profile"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminProfile />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Shared Protected Routes */}
       <Route
         path="/profile"
         element={
-          <ProtectedRoute allowedRoles={["owner", "client", "admin"]}>
+          <ProtectedRoute allowedRoles={["owner", "client"]}>
             <Profile />
           </ProtectedRoute>
         }

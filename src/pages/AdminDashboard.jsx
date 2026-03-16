@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AdminSidebarNav from '../components/admin/AdminSidebarNav';
+import RejectionModal from '../components/admin/RejectionModal';
 import { supabase } from '../lib/supabase';
 import '../styles/AdminDashboard.css';
 
@@ -10,6 +11,10 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
+  
+  // Modal state
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState(null);
   
   // Data states
   const [applications, setApplications] = useState([]);
@@ -21,7 +26,14 @@ const AdminDashboard = () => {
     totalBusinesses: 0
   });
 
+  // Add session check ref to prevent multiple calls
+  const sessionChecked = React.useRef(false);
+
   useEffect(() => {
+    // Prevent double execution in StrictMode
+    if (sessionChecked.current) return;
+    sessionChecked.current = true;
+    
     checkAdmin();
   }, []);
 
@@ -35,9 +47,38 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
       
+      // Get session first to ensure we have a valid session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) throw sessionError;
+      
+      if (!session) {
+        console.log('No session found, redirecting to login');
+        navigate('/login');
+        return;
+      }
+
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (userError) throw userError;
+      if (userError) {
+        // If we get an auth error, try to refresh the session
+        if (userError.message?.includes('Auth session missing')) {
+          console.log('Session missing, attempting to refresh...');
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError || !refreshData.session) {
+            navigate('/login');
+            return;
+          }
+          
+          // Retry with refreshed session
+          const { data: retryUser, error: retryError } = await supabase.auth.getUser();
+          if (retryError) throw retryError;
+          user = retryUser;
+        } else {
+          throw userError;
+        }
+      }
       
       if (!user) {
         navigate('/login');
@@ -50,15 +91,32 @@ const AdminDashboard = () => {
         .eq('id', user.id)
         .single();
 
-      if (profileError) throw profileError;
-      
-      // Check if user is admin
-      if (profileData?.role !== 'admin') {
-        navigate('/ClientDashboard');
-        return;
+      if (profileError) {
+        console.error('Profile error:', profileError);
+        // If profile doesn't exist, create a default one
+        if (profileError.code === 'PGRST116') {
+          // Create default profile
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([{
+              id: user.id,
+              email: user.email,
+              role: 'admin',
+              first_name: 'Admin',
+              last_name: 'User',
+              verification_status: 'approved'
+            }])
+            .select()
+            .single();
+            
+          if (createError) throw createError;
+          setProfile(newProfile);
+        } else {
+          throw profileError;
+        }
+      } else {
+        setProfile(profileData);
       }
-      
-      setProfile(profileData);
 
       if (profileData?.avatar_url) {
         downloadAvatar(profileData.avatar_url);
@@ -66,7 +124,16 @@ const AdminDashboard = () => {
 
     } catch (err) {
       console.error('Error checking admin:', err);
-      setError(err.message);
+      
+      // Handle specific error cases
+      if (err.message?.includes('Auth session missing') || 
+          err.message?.includes('JWT') ||
+          err.message?.includes('refresh_token')) {
+        console.log('Auth error, redirecting to login');
+        navigate('/login');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -79,11 +146,19 @@ const AdminDashboard = () => {
       await fetchRecentOwners();
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      // Don't set error state here to avoid blocking the UI
     }
   };
 
   const fetchStats = async () => {
     try {
+      // Check if we have a valid session before making requests
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.log('No session for stats fetch');
+        return;
+      }
+
       const { count: pendingApplications } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
@@ -112,11 +187,16 @@ const AdminDashboard = () => {
 
     } catch (error) {
       console.error('Error fetching stats:', error);
+      // Don't throw, just log
     }
   };
 
   const fetchApplications = async () => {
     try {
+      // Check session before making request
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
       const { data, error } = await supabase
         .from('profiles')
         .select(`
@@ -127,7 +207,16 @@ const AdminDashboard = () => {
           mobile,
           avatar_url,
           created_at,
-          businesses (*)
+          businesses (
+            id,
+            name,
+            business_type,
+            location,
+            description,
+            emoji,
+            verification_status,
+            submitted_at
+          )
         `)
         .eq('role', 'pending_owner')
         .order('created_at', { ascending: false });
@@ -145,11 +234,16 @@ const AdminDashboard = () => {
       setApplications(processedData);
     } catch (error) {
       console.error('Error fetching applications:', error);
+      // Don't throw, just log
     }
   };
 
   const fetchRecentOwners = async () => {
     try {
+      // Check session before making request
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
       const { data, error } = await supabase
         .from('profiles')
         .select(`
@@ -160,7 +254,7 @@ const AdminDashboard = () => {
           mobile,
           avatar_url,
           created_at,
-          businesses (name, business_type, emoji)
+          businesses (id, name, business_type, emoji)
         `)
         .eq('role', 'owner')
         .order('created_at', { ascending: false })
@@ -179,6 +273,7 @@ const AdminDashboard = () => {
       setRecentOwners(processedData);
     } catch (error) {
       console.error('Error fetching recent owners:', error);
+      // Don't throw, just log
     }
   };
 
@@ -230,39 +325,190 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleApproveOwner = async (userId) => {
+  const handleApproveClick = (application) => {
+    setSelectedApplication(application);
+    handleApproveOwner(application.id, application.businesses?.[0]?.id);
+  };
+
+  const handleRejectClick = (application) => {
+    setSelectedApplication(application);
+    setShowRejectionModal(true);
+  };
+
+  const handleApproveOwner = async (userId, businessId) => {
     try {
-      const { error } = await supabase
+      // Check session before proceeding
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Your session has expired. Please login again.');
+        navigate('/login');
+        return;
+      }
+
+      // Get current admin profile
+      const { data: adminProfile, error: adminError } = await supabase
         .from('profiles')
-        .update({ role: 'owner' })
+        .select('id')
+        .eq('id', profile?.id)
+        .single();
+
+      if (adminError) throw adminError;
+
+      // Update profile to owner
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ 
+          role: 'owner', 
+          verification_status: 'approved',
+          approved_at: new Date(),
+          approved_by: adminProfile?.id,
+          application_reviewed_at: new Date()
+        })
         .eq('id', userId);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      // Update business to approved
+      const { error: businessError } = await supabase
+        .from('businesses')
+        .update({ 
+          verification_status: 'approved',
+          status: 'active',
+          verified_at: new Date(),
+          verified_by: adminProfile?.id
+        })
+        .eq('id', businessId);
+
+      if (businessError) throw businessError;
+
+      // Log verification
+      await supabase
+        .from('verification_logs')
+        .insert({
+          business_id: businessId,
+          owner_id: userId,
+          action_by: adminProfile?.id,
+          action_type: 'approve',
+          created_at: new Date()
+        });
+
+      // Notify owner
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          type: 'application_approved',
+          title: 'Application Approved! 🎉',
+          message: 'Your business owner application has been approved! You can now log in and start managing your business.',
+          data: { businessId },
+          created_at: new Date()
+        });
 
       fetchDashboardData();
       alert('Owner application approved successfully!');
     } catch (error) {
       console.error('Error approving owner:', error);
-      alert('Failed to approve owner. Please try again.');
+      
+      // Handle session errors
+      if (error.message?.includes('Auth session missing') || 
+          error.message?.includes('JWT')) {
+        alert('Your session has expired. Please login again.');
+        navigate('/login');
+      } else {
+        alert('Failed to approve owner. Please try again.');
+      }
     }
   };
 
-  const handleRejectOwner = async (userId) => {
-    if (!window.confirm('Are you sure you want to reject this application?')) return;
+  const handleRejectOwner = async (reason) => {
+    if (!selectedApplication) return;
+
+    const userId = selectedApplication.id;
+    const businessId = selectedApplication.businesses?.[0]?.id;
 
     try {
-      const { error } = await supabase
+      // Check session before proceeding
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Your session has expired. Please login again.');
+        navigate('/login');
+        return;
+      }
+
+      // Get current admin profile
+      const { data: adminProfile, error: adminError } = await supabase
         .from('profiles')
-        .update({ role: 'rejected_owner' })
+        .select('id')
+        .eq('id', profile?.id)
+        .single();
+
+      if (adminError) throw adminError;
+
+      // Update profile to rejected_owner
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ 
+          role: 'rejected_owner', 
+          verification_status: 'rejected',
+          rejected_at: new Date(),
+          application_reviewed_at: new Date()
+        })
         .eq('id', userId);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      // Update business to rejected
+      const { error: businessError } = await supabase
+        .from('businesses')
+        .update({ 
+          verification_status: 'rejected',
+          status: 'rejected',
+          rejection_reason: reason
+        })
+        .eq('id', businessId);
+
+      if (businessError) throw businessError;
+
+      // Log rejection
+      await supabase
+        .from('verification_logs')
+        .insert({
+          business_id: businessId,
+          owner_id: userId,
+          action_by: adminProfile?.id,
+          action_type: 'reject',
+          reason: reason,
+          created_at: new Date()
+        });
+
+      // Notify owner
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          type: 'application_rejected',
+          title: 'Application Update',
+          message: reason || 'Your application was not approved. Please contact support for more information.',
+          data: { reason },
+          created_at: new Date()
+        });
 
       fetchDashboardData();
       alert('Owner application rejected.');
     } catch (error) {
       console.error('Error rejecting owner:', error);
-      alert('Failed to reject application. Please try again.');
+      
+      // Handle session errors
+      if (error.message?.includes('Auth session missing') || 
+          error.message?.includes('JWT')) {
+        alert('Your session has expired. Please login again.');
+        navigate('/login');
+      } else {
+        alert('Failed to reject application. Please try again.');
+      }
+    } finally {
+      setShowRejectionModal(false);
+      setSelectedApplication(null);
     }
   };
 
@@ -294,6 +540,14 @@ const AdminDashboard = () => {
     }
   };
 
+  // Add retry function
+  const handleRetry = () => {
+    sessionChecked.current = false;
+    setError(null);
+    setLoading(true);
+    checkAdmin();
+  };
+
   if (loading) {
     return (
       <div className="admin-loading">
@@ -308,9 +562,14 @@ const AdminDashboard = () => {
       <div className="admin-error">
         <h2>Error</h2>
         <p>{error}</p>
-        <button onClick={handleSignOut} className="btn-error">
-          Sign Out
-        </button>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+          <button onClick={handleRetry} className="btn-error" style={{ background: '#2563eb' }}>
+            Retry
+          </button>
+          <button onClick={handleSignOut} className="btn-error">
+            Sign Out
+          </button>
+        </div>
       </div>
     );
   }
@@ -368,8 +627,8 @@ const AdminDashboard = () => {
           <div className="section-header">
             <h2 className="section-title">Pending Applications</h2>
             {applications.length > 0 && (
-              <Link to="/admin-dashboard?tab=applications" className="view-all-link">
-                View All
+              <Link to="/admin/users?tab=pending" className="view-all-link">
+                View All ({applications.length})
               </Link>
             )}
           </div>
@@ -409,6 +668,7 @@ const AdminDashboard = () => {
                           <div className="business-info">
                             <p className="business-name">{business.name}</p>
                             <p className="business-type">{business.business_type}</p>
+                            <p className="business-location">{business.location}</p>
                           </div>
                         </div>
                       ))}
@@ -418,13 +678,13 @@ const AdminDashboard = () => {
                   <div className="application-actions">
                     <button
                       className="btn-approve"
-                      onClick={() => handleApproveOwner(app.id)}
+                      onClick={() => handleApproveClick(app)}
                     >
                       ✓ Approve
                     </button>
                     <button
                       className="btn-reject"
-                      onClick={() => handleRejectOwner(app.id)}
+                      onClick={() => handleRejectClick(app)}
                     >
                       ✗ Reject
                     </button>
@@ -446,7 +706,7 @@ const AdminDashboard = () => {
           <div className="section-header">
             <h2 className="section-title">Recent Business Owners</h2>
             {stats.totalOwners > 0 && (
-              <Link to="/admin/businesses" className="view-all-link">
+              <Link to="/admin/users?tab=owners" className="view-all-link">
                 View All ({stats.totalOwners})
               </Link>
             )}
@@ -497,6 +757,18 @@ const AdminDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Rejection Modal */}
+      <RejectionModal
+        isOpen={showRejectionModal}
+        onClose={() => {
+          setShowRejectionModal(false);
+          setSelectedApplication(null);
+        }}
+        onConfirm={handleRejectOwner}
+        ownerName={selectedApplication ? `${selectedApplication.first_name} ${selectedApplication.last_name}` : ''}
+        businessName={selectedApplication?.businesses?.[0]?.name || ''}
+      />
     </AdminSidebarNav>
   );
 };

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import AdminSidebarNav from '../components/admin/AdminSidebarNav';
+import RejectionModal from '../components/admin/RejectionModal';
+import PermitViewerModal from '../components/admin/PermitViewerModal';
 import '../styles/AdminBusinessManagement.css';
 
 const AdminBusinessManagement = () => {
@@ -12,14 +14,20 @@ const AdminBusinessManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [verificationFilter, setVerificationFilter] = useState('all');
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [showPermitModal, setShowPermitModal] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
     pending: 0,
-    suspended: 0
+    suspended: 0,
+    verified: 0,
+    unverified: 0,
+    permitPending: 0
   });
 
   // Business types for filter
@@ -36,7 +44,7 @@ const AdminBusinessManagement = () => {
 
   useEffect(() => {
     filterBusinesses();
-  }, [searchTerm, statusFilter, typeFilter, businesses]);
+  }, [searchTerm, statusFilter, typeFilter, verificationFilter, businesses]);
 
   const fetchBusinesses = async () => {
     try {
@@ -50,7 +58,9 @@ const AdminBusinessManagement = () => {
             id,
             email,
             first_name,
-            last_name
+            last_name,
+            role,
+            verification_status
           )
         `)
         .order('created_at', { ascending: false });
@@ -60,12 +70,15 @@ const AdminBusinessManagement = () => {
       setBusinesses(data || []);
       setFilteredBusinesses(data || []);
       
-      // Calculate stats
+      // Calculate stats with permit info
       const stats = {
         total: data?.length || 0,
         active: data?.filter(b => b.status === 'active').length || 0,
-        pending: data?.filter(b => b.status === 'pending').length || 0,
-        suspended: data?.filter(b => b.status === 'suspended').length || 0
+        pending: data?.filter(b => b.verification_status === 'pending').length || 0,
+        suspended: data?.filter(b => b.status === 'suspended').length || 0,
+        verified: data?.filter(b => b.verification_status === 'approved' && b.permit_verified).length || 0,
+        unverified: data?.filter(b => b.verification_status === 'pending' || !b.verification_status).length || 0,
+        permitPending: data?.filter(b => b.permit_document && !b.permit_verified).length || 0
       };
       setStats(stats);
 
@@ -89,7 +102,8 @@ const AdminBusinessManagement = () => {
         business.owner?.email?.toLowerCase().includes(term) ||
         business.owner?.first_name?.toLowerCase().includes(term) ||
         business.owner?.last_name?.toLowerCase().includes(term) ||
-        business.location?.toLowerCase().includes(term)
+        business.location?.toLowerCase().includes(term) ||
+        business.permit_number?.toLowerCase().includes(term)
       );
     }
 
@@ -103,33 +117,204 @@ const AdminBusinessManagement = () => {
       filtered = filtered.filter(business => business.business_type === typeFilter);
     }
 
+    // Filter by verification status
+    if (verificationFilter !== 'all') {
+      filtered = filtered.filter(business => business.verification_status === verificationFilter);
+    }
+
     setFilteredBusinesses(filtered);
   };
 
-  const handleVerifyBusiness = async (businessId) => {
-    if (!window.confirm('Are you sure you want to verify this business?')) return;
-
+  const handleApproveBusiness = async (business) => {
     try {
-      setActionLoading(prev => ({ ...prev, [businessId]: 'verify' }));
+      setActionLoading(prev => ({ ...prev, [business.id]: 'approve' }));
+
+      // Check if permit is uploaded
+      if (!business.permit_document) {
+        alert('This business has not uploaded a business permit. Please ask them to upload a permit first.');
+        return;
+      }
+
+      // Get current admin profile
+      const { data: adminProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      // Update business with full approval
+      const { error: businessError } = await supabase
+        .from('businesses')
+        .update({ 
+          verification_status: 'approved',
+          status: 'active',
+          permit_verified: true,
+          permit_verified_at: new Date().toISOString(),
+          permit_verified_by: adminProfile?.id || null,
+          verified_at: new Date().toISOString(),
+          verified_by: adminProfile?.id || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', business.id);
+
+      if (businessError) throw businessError;
+
+      // Check if owner exists and needs to be approved
+      if (business.owner_id) {
+        const { data: ownerData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', business.owner_id)
+          .maybeSingle();
+
+        if (ownerData?.role === 'pending_owner') {
+          await supabase
+            .from('profiles')
+            .update({ 
+              role: 'owner',
+              verification_status: 'approved',
+              approved_at: new Date().toISOString(),
+              approved_by: adminProfile?.id || null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', business.owner_id);
+        }
+      }
+
+      // Log verification
+      await supabase
+        .from('verification_logs')
+        .insert({
+          business_id: business.id,
+          owner_id: business.owner_id,
+          action_by: adminProfile?.id || null,
+          action_type: 'approve',
+          created_at: new Date().toISOString()
+        });
+
+      // Notify business owner
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: business.owner_id,
+          type: 'business_approved',
+          title: '✅ Business Approved!',
+          message: `Your business "${business.name}" has been verified and approved with your business permit.`,
+          data: { 
+            businessId: business.id,
+            businessName: business.name
+          },
+          created_at: new Date().toISOString()
+        });
+
+      await fetchBusinesses();
+      alert('Business approved successfully!');
+    } catch (error) {
+      console.error('Error approving business:', error);
+      alert('Failed to approve business. Please try again.');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [business.id]: null }));
+    }
+  };
+
+  const handleRejectBusiness = async (business, reason) => {
+    try {
+      setActionLoading(prev => ({ ...prev, [business.id]: 'reject' }));
+
+      const { data: adminProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      // Update business to rejected
+      const { error: businessError } = await supabase
+        .from('businesses')
+        .update({ 
+          verification_status: 'rejected',
+          status: 'rejected',
+          rejection_reason: reason,
+          permit_verified: false,
+          verified_at: new Date().toISOString(),
+          verified_by: adminProfile?.id || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', business.id);
+
+      if (businessError) throw businessError;
+
+      // Log rejection
+      await supabase
+        .from('verification_logs')
+        .insert({
+          business_id: business.id,
+          owner_id: business.owner_id,
+          action_by: adminProfile?.id || null,
+          action_type: 'reject',
+          reason: reason,
+          created_at: new Date().toISOString()
+        });
+
+      // Notify business owner
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: business.owner_id,
+          type: 'business_rejected',
+          title: '❌ Business Application Update',
+          message: reason || `Your business "${business.name}" was not approved. Please check your permit and try again.`,
+          data: { 
+            businessId: business.id,
+            businessName: business.name,
+            reason: reason
+          },
+          created_at: new Date().toISOString()
+        });
+
+      await fetchBusinesses();
+      alert('Business rejected successfully.');
+    } catch (error) {
+      console.error('Error rejecting business:', error);
+      alert('Failed to reject business. Please try again.');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [business.id]: null }));
+      setShowRejectionModal(false);
+      setSelectedBusiness(null);
+    }
+  };
+
+  const handleRejectClick = (business) => {
+    setSelectedBusiness(business);
+    setShowRejectionModal(true);
+  };
+
+  const handleVerifyPermit = async (businessId) => {
+    try {
+      setActionLoading(prev => ({ ...prev, [businessId]: 'verifyPermit' }));
+
+      const { data: adminProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'admin')
+        .maybeSingle();
 
       const { error } = await supabase
         .from('businesses')
         .update({ 
-          verified: true, 
-          status: 'active',
+          permit_verified: true,
+          permit_verified_at: new Date().toISOString(),
+          permit_verified_by: adminProfile?.id || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', businessId);
 
       if (error) throw error;
 
-      // Refresh data
       await fetchBusinesses();
-      
-      alert('Business verified successfully!');
+      alert('Permit verified successfully!');
     } catch (error) {
-      console.error('Error verifying business:', error);
-      alert('Failed to verify business. Please try again.');
+      console.error('Error verifying permit:', error);
+      alert('Failed to verify permit. Please try again.');
     } finally {
       setActionLoading(prev => ({ ...prev, [businessId]: null }));
     }
@@ -151,9 +336,22 @@ const AdminBusinessManagement = () => {
 
       if (error) throw error;
 
-      // Refresh data
+      // Notify owner
+      const business = businesses.find(b => b.id === businessId);
+      if (business) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: business.owner_id,
+            type: 'business_suspended',
+            title: '⚠️ Business Suspended',
+            message: `Your business "${business.name}" has been suspended. Please contact admin for more information.`,
+            data: { businessId },
+            created_at: new Date().toISOString()
+          });
+      }
+
       await fetchBusinesses();
-      
       alert('Business suspended successfully!');
     } catch (error) {
       console.error('Error suspending business:', error);
@@ -179,9 +377,22 @@ const AdminBusinessManagement = () => {
 
       if (error) throw error;
 
-      // Refresh data
+      // Notify owner
+      const business = businesses.find(b => b.id === businessId);
+      if (business) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: business.owner_id,
+            type: 'business_activated',
+            title: '✅ Business Activated',
+            message: `Your business "${business.name}" has been activated and is now visible to customers.`,
+            data: { businessId },
+            created_at: new Date().toISOString()
+          });
+      }
+
       await fetchBusinesses();
-      
       alert('Business activated successfully!');
     } catch (error) {
       console.error('Error activating business:', error);
@@ -204,9 +415,7 @@ const AdminBusinessManagement = () => {
 
       if (error) throw error;
 
-      // Refresh data
       await fetchBusinesses();
-      
       alert('Business deleted successfully.');
     } catch (error) {
       console.error('Error deleting business:', error);
@@ -214,6 +423,11 @@ const AdminBusinessManagement = () => {
     } finally {
       setActionLoading(prev => ({ ...prev, [businessId]: null }));
     }
+  };
+
+  const handleViewPermit = (business) => {
+    setSelectedBusiness(business);
+    setShowPermitModal(true);
   };
 
   const handleViewDetails = (business) => {
@@ -255,9 +469,34 @@ const AdminBusinessManagement = () => {
         return <span className="status-badge pending">Pending</span>;
       case 'suspended':
         return <span className="status-badge suspended">Suspended</span>;
+      case 'rejected':
+        return <span className="status-badge rejected">Rejected</span>;
       default:
         return <span className="status-badge">{status}</span>;
     }
+  };
+
+  const getVerificationBadge = (business) => {
+    if (business.verification_status === 'approved' && business.permit_verified) {
+      return <span className="verification-badge approved">✅ Fully Verified</span>;
+    } else if (business.verification_status === 'approved' && !business.permit_verified) {
+      return <span className="verification-badge pending">📄 Permit Pending</span>;
+    } else if (business.verification_status === 'pending') {
+      return <span className="verification-badge pending">⏳ Pending Review</span>;
+    } else if (business.verification_status === 'rejected') {
+      return <span className="verification-badge rejected">❌ Rejected</span>;
+    }
+    return <span className="verification-badge">Not Set</span>;
+  };
+
+  const getPermitBadge = (business) => {
+    if (!business.permit_document) {
+      return <span className="permit-badge missing">📄 No Permit</span>;
+    }
+    if (business.permit_verified) {
+      return <span className="permit-badge verified">✅ Permit Verified</span>;
+    }
+    return <span className="permit-badge pending">⏳ Permit Pending</span>;
   };
 
   if (loading) {
@@ -304,12 +543,12 @@ const AdminBusinessManagement = () => {
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon-wrapper active">
+            <div className="stat-icon-wrapper verified">
               <span className="stat-icon">✅</span>
             </div>
             <div className="stat-content">
-              <span className="stat-value">{stats.active}</span>
-              <span className="stat-label">Active</span>
+              <span className="stat-value">{stats.verified}</span>
+              <span className="stat-label">Fully Verified</span>
             </div>
           </div>
 
@@ -318,8 +557,8 @@ const AdminBusinessManagement = () => {
               <span className="stat-icon">⏳</span>
             </div>
             <div className="stat-content">
-              <span className="stat-value">{stats.pending}</span>
-              <span className="stat-label">Pending</span>
+              <span className="stat-value">{stats.permitPending}</span>
+              <span className="stat-label">Permit Pending</span>
             </div>
           </div>
 
@@ -340,7 +579,7 @@ const AdminBusinessManagement = () => {
             <span className="search-icon">🔍</span>
             <input
               type="text"
-              placeholder="Search businesses by name, type, or owner..."
+              placeholder="Search businesses by name, type, permit #, or owner..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
@@ -357,6 +596,17 @@ const AdminBusinessManagement = () => {
 
           <div className="filter-group">
             <select
+              value={verificationFilter}
+              onChange={(e) => setVerificationFilter(e.target.value)}
+              className="filter-select"
+            >
+              <option value="all">All Verification</option>
+              <option value="approved">Fully Verified</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+            </select>
+
+            <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="filter-select"
@@ -365,6 +615,7 @@ const AdminBusinessManagement = () => {
               <option value="active">Active</option>
               <option value="pending">Pending</option>
               <option value="suspended">Suspended</option>
+              <option value="rejected">Rejected</option>
             </select>
 
             <select
@@ -403,7 +654,10 @@ const AdminBusinessManagement = () => {
                       {getBusinessIcon(business)} {business.business_type}
                     </span>
                   </div>
-                  {getStatusBadge(business.status)}
+                  <div className="badge-group">
+                    {getStatusBadge(business.status)}
+                    {getPermitBadge(business)}
+                  </div>
                 </div>
 
                 <div className="business-card-body">
@@ -425,6 +679,31 @@ const AdminBusinessManagement = () => {
                   </div>
 
                   <div className="business-info-row">
+                    <span className="info-label">📄 Permit #:</span>
+                    <span className="info-value">
+                      {business.permit_number || 'Not submitted'}
+                      {business.permit_document && (
+                        <button
+                          className="view-permit-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewPermit(business);
+                          }}
+                        >
+                          View Document
+                        </button>
+                      )}
+                    </span>
+                  </div>
+
+                  {business.permit_expiry && (
+                    <div className="business-info-row">
+                      <span className="info-label">📅 Permit Expiry:</span>
+                      <span className="info-value">{formatDate(business.permit_expiry)}</span>
+                    </div>
+                  )}
+
+                  <div className="business-info-row">
                     <span className="info-label">📅 Created:</span>
                     <span className="info-value">{formatDate(business.created_at)}</span>
                   </div>
@@ -440,31 +719,66 @@ const AdminBusinessManagement = () => {
                     </p>
                   </div>
 
-                  {business.verified && (
-                    <div className="verified-badge">
-                      <span className="verified-icon">✓</span>
-                      Verified Business
+                  {business.rejection_reason && (
+                    <div className="rejection-reason">
+                      <span className="rejection-icon">❌</span>
+                      <span className="rejection-text">Rejection reason: {business.rejection_reason}</span>
                     </div>
                   )}
                 </div>
 
                 <div className="business-card-footer">
                   <div className="action-buttons">
-                    {!business.verified && business.status === 'active' && (
+                    {/* Permit Verification Button */}
+                    {business.permit_document && !business.permit_verified && (
                       <button
-                        className="action-btn verify"
-                        onClick={() => handleVerifyBusiness(business.id)}
+                        className="action-btn verify-permit"
+                        onClick={() => handleVerifyPermit(business.id)}
                         disabled={actionLoading[business.id]}
                       >
-                        {actionLoading[business.id] === 'verify' ? (
+                        {actionLoading[business.id] === 'verifyPermit' ? (
                           <span className="loading-spinner-small"></span>
                         ) : (
                           <>
                             <span className="btn-icon">✓</span>
-                            Verify
+                            Verify Permit
                           </>
                         )}
                       </button>
+                    )}
+
+                    {/* Approval/Rejection buttons for pending businesses */}
+                    {business.verification_status === 'pending' && business.permit_document && (
+                      <>
+                        <button
+                          className="action-btn approve"
+                          onClick={() => handleApproveBusiness(business)}
+                          disabled={actionLoading[business.id]}
+                        >
+                          {actionLoading[business.id] === 'approve' ? (
+                            <span className="loading-spinner-small"></span>
+                          ) : (
+                            <>
+                              <span className="btn-icon">✓</span>
+                              Approve
+                            </>
+                          )}
+                        </button>
+                        <button
+                          className="action-btn reject"
+                          onClick={() => handleRejectClick(business)}
+                          disabled={actionLoading[business.id]}
+                        >
+                          {actionLoading[business.id] === 'reject' ? (
+                            <span className="loading-spinner-small"></span>
+                          ) : (
+                            <>
+                              <span className="btn-icon">✗</span>
+                              Reject
+                            </>
+                          )}
+                        </button>
+                      </>
                     )}
 
                     {business.status === 'active' ? (
@@ -497,7 +811,22 @@ const AdminBusinessManagement = () => {
                           </>
                         )}
                       </button>
-                    ) : null}
+                    ) : business.status === 'rejected' && business.permit_document && (
+                      <button
+                        className="action-btn reactivate"
+                        onClick={() => handleApproveBusiness(business)}
+                        disabled={actionLoading[business.id]}
+                      >
+                        {actionLoading[business.id] === 'approve' ? (
+                          <span className="loading-spinner-small"></span>
+                        ) : (
+                          <>
+                            <span className="btn-icon">🔄</span>
+                            Reactivate
+                          </>
+                        )}
+                      </button>
+                    )}
 
                     <button
                       className="action-btn view"
@@ -531,13 +860,14 @@ const AdminBusinessManagement = () => {
             <div className="empty-icon">🏢</div>
             <h3>No Businesses Found</h3>
             <p>Try adjusting your search or filter to find what you're looking for.</p>
-            {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
+            {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all' || verificationFilter !== 'all') && (
               <button
                 className="clear-filters-btn"
                 onClick={() => {
                   setSearchTerm('');
                   setStatusFilter('all');
                   setTypeFilter('all');
+                  setVerificationFilter('all');
                 }}
               >
                 Clear All Filters
@@ -571,10 +901,8 @@ const AdminBusinessManagement = () => {
                       <span className="detail-value">{getStatusBadge(selectedBusiness.status)}</span>
                     </div>
                     <div className="detail-item">
-                      <span className="detail-label">Verified:</span>
-                      <span className="detail-value">
-                        {selectedBusiness.verified ? '✅ Yes' : '❌ No'}
-                      </span>
+                      <span className="detail-label">Verification:</span>
+                      <span className="detail-value">{getVerificationBadge(selectedBusiness)}</span>
                     </div>
                     <div className="detail-item">
                       <span className="detail-label">Location:</span>
@@ -601,16 +929,63 @@ const AdminBusinessManagement = () => {
                       <span className="detail-value">{selectedBusiness.owner?.email || 'N/A'}</span>
                     </div>
                     <div className="detail-item">
-                      <span className="detail-label">Owner ID:</span>
-                      <span className="detail-value">{selectedBusiness.owner_id || 'N/A'}</span>
+                      <span className="detail-label">Owner Status:</span>
+                      <span className="detail-value">
+                        {selectedBusiness.owner?.role === 'owner' ? (
+                          <span className="status-badge active">Approved Owner</span>
+                        ) : (
+                          'Unknown'
+                        )}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="detail-section full-width">
-                    <h3>Description</h3>
-                    <p className="full-description">
-                      {selectedBusiness.description || 'No description provided.'}
-                    </p>
+                  <div className="detail-section">
+                    <h3>Permit Information</h3>
+                    <div className="detail-item">
+                      <span className="detail-label">Permit Number:</span>
+                      <span className="detail-value">{selectedBusiness.permit_number || 'Not provided'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Expiry Date:</span>
+                      <span className="detail-value">
+                        {selectedBusiness.permit_expiry 
+                          ? new Date(selectedBusiness.permit_expiry).toLocaleDateString() 
+                          : 'Not provided'}
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Permit Status:</span>
+                      <span className="detail-value">
+                        {selectedBusiness.permit_verified ? (
+                          <span className="status-badge active">Verified</span>
+                        ) : selectedBusiness.permit_document ? (
+                          <span className="status-badge pending">Pending Verification</span>
+                        ) : (
+                          <span className="status-badge">Not Uploaded</span>
+                        )}
+                      </span>
+                    </div>
+                    {selectedBusiness.permit_document && (
+                      <div className="detail-item">
+                        <span className="detail-label">Document:</span>
+                        <button
+                          className="view-permit-button"
+                          onClick={() => {
+                            setShowDetailsModal(false);
+                            handleViewPermit(selectedBusiness);
+                          }}
+                        >
+                          📄 View Permit Document
+                        </button>
+                      </div>
+                    )}
+                    {selectedBusiness.rejection_reason && (
+                      <div className="detail-item">
+                        <span className="detail-label">Rejection:</span>
+                        <span className="detail-value rejection-text">{selectedBusiness.rejection_reason}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="detail-section">
@@ -649,6 +1024,22 @@ const AdminBusinessManagement = () => {
                     </div>
                   </div>
 
+                  {selectedBusiness.rejection_reason && (
+                    <div className="detail-section full-width">
+                      <h3>Rejection Reason</h3>
+                      <div className="rejection-detail">
+                        <p>{selectedBusiness.rejection_reason}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="detail-section full-width">
+                    <h3>Description</h3>
+                    <p className="full-description">
+                      {selectedBusiness.description || 'No description provided.'}
+                    </p>
+                  </div>
+
                   {selectedBusiness.business_hours && (
                     <div className="detail-section full-width">
                       <h3>Business Hours</h3>
@@ -682,6 +1073,28 @@ const AdminBusinessManagement = () => {
                 <button className="btn-secondary" onClick={() => setShowDetailsModal(false)}>
                   Close
                 </button>
+                {selectedBusiness.verification_status === 'pending' && selectedBusiness.permit_document && (
+                  <>
+                    <button 
+                      className="btn-approve"
+                      onClick={() => {
+                        setShowDetailsModal(false);
+                        handleApproveBusiness(selectedBusiness);
+                      }}
+                    >
+                      ✓ Approve Business
+                    </button>
+                    <button 
+                      className="btn-reject"
+                      onClick={() => {
+                        setShowDetailsModal(false);
+                        handleRejectClick(selectedBusiness);
+                      }}
+                    >
+                      ✗ Reject Business
+                    </button>
+                  </>
+                )}
                 <button 
                   className="btn-primary"
                   onClick={() => {
@@ -695,6 +1108,28 @@ const AdminBusinessManagement = () => {
             </div>
           </div>
         )}
+
+        {/* Permit Viewer Modal */}
+        <PermitViewerModal
+          isOpen={showPermitModal}
+          onClose={() => {
+            setShowPermitModal(false);
+            setSelectedBusiness(null);
+          }}
+          business={selectedBusiness}
+        />
+
+        {/* Rejection Modal */}
+        <RejectionModal
+          isOpen={showRejectionModal}
+          onClose={() => {
+            setShowRejectionModal(false);
+            setSelectedBusiness(null);
+          }}
+          onConfirm={(reason) => handleRejectBusiness(selectedBusiness, reason)}
+          ownerName={selectedBusiness ? `${selectedBusiness.owner?.first_name} ${selectedBusiness.owner?.last_name}` : ''}
+          businessName={selectedBusiness?.name || ''}
+        />
       </div>
     </AdminSidebarNav>
   );

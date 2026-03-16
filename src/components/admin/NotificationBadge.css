@@ -1,0 +1,84 @@
+/* Notification Badge Styles */
+.notification-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ef4444;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 20px;
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4);
+  border: 2px solid white;
+  animation: pulse 2s infinite ease-in-out;
+  line-height: 1;
+  letter-spacing: 0.3px;
+}
+
+/* Pulse animation for attention */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.6);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4);
+  }
+}
+
+/* For collapsed sidebar */
+.sidebar-collapsed .notification-badge {
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+  padding: 2px 4px;
+  animation: none; /* Remove animation in collapsed state to save performance */
+}
+
+/* Different color for different badge types (optional) */
+.notification-badge.warning {
+  background: #f59e0b;
+  box-shadow: 0 2px 5px rgba(245, 158, 11, 0.4);
+}
+
+.notification-badge.success {
+  background: #10b981;
+  box-shadow: 0 2px 5px rgba(16, 185, 129, 0.4);
+}
+
+.notification-badge.info {
+  background: #3b82f6;
+  box-shadow: 0 2px 5px rgba(59, 130, 246, 0.4);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .notification-badge {
+    top: -6px;
+    right: -6px;
+    min-width: 18px;
+    height: 18px;
+    font-size: 10px;
+    padding: 2px 5px;
+  }
+}
+
+/* Dark mode support (if needed) */
+@media (prefers-color-scheme: dark) {
+  .notification-badge {
+    border-color: #1f2937;
+  }
+}

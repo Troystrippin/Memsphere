@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import OwnerNavbar from '../components/owner/OwnerNavbar';
 import '../styles/OwnerDashboard.css';
 
 const OwnerDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [profile, setProfile] = useState(null);
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
+  const [businessVerificationStatus, setBusinessVerificationStatus] = useState({});
   
   const [stats, setStats] = useState({
     totalMembers: 0,
@@ -21,6 +24,15 @@ const OwnerDashboard = () => {
   
   const [recentApplications, setRecentApplications] = useState([]);
   const [clientAvatars, setClientAvatars] = useState({});
+
+  useEffect(() => {
+    // Check if owner was just approved (from URL or state)
+    const params = new URLSearchParams(location.search);
+    if (params.get('approved') === 'true') {
+      setShowWelcomeBanner(true);
+      setTimeout(() => setShowWelcomeBanner(false), 5000);
+    }
+  }, [location]);
 
   useEffect(() => {
     fetchOwnerData();
@@ -47,6 +59,7 @@ const OwnerDashboard = () => {
 
       if (profileError) throw profileError;
       
+      // Check if user is approved owner
       if (profileData?.role !== 'owner') {
         navigate('/ClientDashboard');
         return;
@@ -66,6 +79,13 @@ const OwnerDashboard = () => {
       if (businessesError) throw businessesError;
       
       setBusinesses(businessesData || []);
+      
+      // Track verification status for each business
+      const verificationStatus = {};
+      businessesData?.forEach(b => {
+        verificationStatus[b.id] = b.verification_status;
+      });
+      setBusinessVerificationStatus(verificationStatus);
       
       if (businessesData && businessesData.length > 0) {
         const businessIds = businessesData.map(b => b.id);
@@ -212,7 +232,8 @@ const OwnerDashboard = () => {
           ),
           business:business_id (
             id,
-            name
+            name,
+            verification_status
           )
         `)
         .in('business_id', businessIds)
@@ -249,7 +270,8 @@ const OwnerDashboard = () => {
           timeAgo: timeAgo,
           formattedDate: formattedDate,
           avatarUrl: avatarUrl,
-          businessName: app.business?.name || 'Unknown Business'
+          businessName: app.business?.name || 'Unknown Business',
+          businessVerification: app.business?.verification_status || 'pending'
         };
       }));
 
@@ -279,55 +301,6 @@ const OwnerDashboard = () => {
     if (interval > 1) return Math.floor(interval) + ' minutes ago';
     
     return Math.floor(seconds) + ' seconds ago';
-  };
-
-  const getStatusBadge = (status) => {
-    switch(status) {
-      case 'approved':
-        return (
-          <span className="status-badge-card approved">
-            <span className="status-icon">✅</span>
-            <span className="status-text">Approved</span>
-          </span>
-        );
-      case 'pending':
-        return (
-          <span className="status-badge-card pending">
-            <span className="status-icon">⏳</span>
-            <span className="status-text">Pending</span>
-          </span>
-        );
-      case 'rejected':
-        return (
-          <span className="status-badge-card rejected">
-            <span className="status-icon">❌</span>
-            <span className="status-text">Rejected</span>
-          </span>
-        );
-      default:
-        return <span className="status-badge-card">{status}</span>;
-    }
-  };
-
-  const getPaymentStatusBadge = (status) => {
-    switch(status?.toLowerCase()) {
-      case 'paid':
-        return (
-          <span className="payment-badge-card paid">
-            <span className="payment-icon">✓</span>
-            <span className="payment-text">Paid</span>
-          </span>
-        );
-      case 'pending':
-        return (
-          <span className="payment-badge-card pending">
-            <span className="payment-icon">⏳</span>
-            <span className="payment-text">Pending</span>
-          </span>
-        );
-      default:
-        return <span className="payment-badge-card">{status}</span>;
-    }
   };
 
   const downloadAvatar = async (path) => {
@@ -392,25 +365,43 @@ const OwnerDashboard = () => {
 
       <div className="content-wrapper">
         <main className="dashboard-main">
-          {/* Header - Matching Applications page style */}
-          <div className="dashboard-header">
-            <div className="header-left">
-              <h2 className="page-title">
-                Owner Dashboard
-                <span className="title-glow"></span>
-              </h2>
-              <div className="header-decoration"></div>
-            </div>
-            <div className="header-right">
-              <div className="user-greeting">
-                <span className="greeting-wave">👋</span>
-                <span className="greeting-text">Welcome back,</span>
-                <span className="greeting-name">{firstName}</span>
+          {/* Welcome Banner for Newly Approved Owners */}
+          {showWelcomeBanner && (
+            <div className="welcome-banner">
+              <span className="welcome-icon">🎉</span>
+              <div className="welcome-content">
+                <h3>Welcome to Owner Dashboard!</h3>
+                <p>Your business application has been approved. Start managing your business now.</p>
               </div>
+              <button className="welcome-close" onClick={() => setShowWelcomeBanner(false)}>×</button>
+            </div>
+          )}
+
+          {/* Business Verification Status Banner */}
+          {Object.values(businessVerificationStatus).some(status => status === 'pending') && (
+            <div className="verification-banner">
+              <span className="verification-icon">⏳</span>
+              <div className="verification-content">
+                <h4>Business Verification Pending</h4>
+                <p>Some of your businesses are still pending admin verification. Features may be limited until verified.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Header */}
+          <div className="dashboard-header">
+            <h1 className="page-title">
+              Owner Dashboard
+              <span className="title-glow"></span>
+            </h1>
+            <div className="user-greeting">
+              <span className="greeting-wave">👋</span>
+              <span className="greeting-text">Welcome back,</span>
+              <span className="greeting-name">{firstName}</span>
             </div>
           </div>
 
-          {/* Enhanced Stats Cards - Without trend indicators */}
+          {/* Stats Cards */}
           <div className="stats-grid-enhanced">
             <div className="stat-card-enhanced">
               <div className="stat-icon-wrapper members">
@@ -456,7 +447,7 @@ const OwnerDashboard = () => {
             </div>
           </div>
 
-          {/* Recent Applications Section */}
+          {/* Recent Applications Section - Table Style */}
           <div className="recent-applications-section-enhanced">
             <div className="section-header-enhanced">
               <div className="header-left">
@@ -476,73 +467,127 @@ const OwnerDashboard = () => {
             </div>
             
             {recentApplications.length > 0 ? (
-              <div className="applications-grid-enhanced">
-                {recentApplications.map((app) => (
-                  <div key={app.id} className={`application-card-enhanced ${app.status}`}>
-                    <div className="application-card-header">
-                      <div className="applicant-avatar-large">
-                        {app.avatarUrl ? (
-                          <img 
-                            src={app.avatarUrl} 
-                            alt={app.name}
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                              e.target.parentNode.innerHTML = `<div class="avatar-placeholder">${getInitials(app.name.split(' ')[0], app.name.split(' ')[1])}</div>`;
-                            }}
-                          />
-                        ) : (
-                          <div className="avatar-placeholder">
-                            {getInitials(app.name.split(' ')[0], app.name.split(' ')[1])}
+              <div className="applications-table-container">
+                <table className="applications-table">
+                  <thead>
+                    <tr>
+                      <th>Applicant</th>
+                      <th>Plan</th>
+                      <th>Amount</th>
+                      <th>Business</th>
+                      <th>Payment</th>
+                      <th>Status</th>
+                      <th>Time</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentApplications.map((app) => (
+                      <tr 
+                        key={app.id} 
+                        onClick={() => handleViewApplication(app.id)}
+                      >
+                        <td>
+                          <div className="applicant-cell">
+                            <div className="applicant-avatar-small">
+                              {app.avatarUrl ? (
+                                <img 
+                                  src={app.avatarUrl} 
+                                  alt={app.name}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.parentNode.innerHTML = `<div class="avatar-placeholder-small">${getInitials(app.name.split(' ')[0], app.name.split(' ')[1])}</div>`;
+                                  }}
+                                />
+                              ) : (
+                                <div className="avatar-placeholder-small">
+                                  {getInitials(app.name.split(' ')[0], app.name.split(' ')[1])}
+                                </div>
+                              )}
+                            </div>
+                            <div className="applicant-info-small">
+                              <span className="applicant-name-small">{app.name}</span>
+                              <span className="applicant-email-small">{app.email}</span>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      <div className="applicant-info">
-                        <h4 className="applicant-name">{app.name}</h4>
-                        <span className="applicant-email">{app.email}</span>
-                      </div>
-                    </div>
-
-                    <div className="application-card-body">
-                      <div className="application-details-grid">
-                        <div className="detail-item">
-                          <span className="detail-label">Plan</span>
-                          <span className="detail-value">{app.plan}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Amount</span>
-                          <span className="detail-value amount">{app.amount}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Business</span>
-                          <span className="detail-value">{app.businessName}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Payment</span>
-                          <span className="detail-value capitalize">{app.paymentMethod || 'Not specified'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="application-card-footer">
-                      <div className="application-badges">
-                        {getStatusBadge(app.status)}
-                        {getPaymentStatusBadge(app.paymentStatus)}
-                      </div>
-                      <div className="application-meta-info">
-                        <span className="application-time" title={app.formattedDate}>
-                          <span className="time-icon">🕒</span>
-                          {app.timeAgo}
-                        </span>
-                        <button 
-                          className="view-details-btn"
-                          onClick={() => handleViewApplication(app.id)}
-                        >
-                          View Details
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                        </td>
+                        <td>
+                          <span className="plan-cell">{app.plan}</span>
+                        </td>
+                        <td>
+                          <span className="amount-cell">{app.amount}</span>
+                        </td>
+                        <td>
+                          <div className="business-cell">
+                            <span className="business-icon">🏢</span>
+                            <span>{app.businessName}</span>
+                            {app.businessVerification === 'pending' && (
+                              <span className="verification-dot" title="Pending verification">⏳</span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="payment-cell">
+                            <span className="payment-icon">💳</span>
+                            <span className="capitalize">{app.paymentMethod || 'Not specified'}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="badges-container">
+                            {app.status === 'pending' && (
+                              <span className="status-badge-table pending">
+                                <span className="status-icon">⏳</span>
+                                Pending
+                              </span>
+                            )}
+                            {app.status === 'approved' && (
+                              <span className="status-badge-table approved">
+                                <span className="status-icon">✅</span>
+                                Approved
+                              </span>
+                            )}
+                            {app.status === 'rejected' && (
+                              <span className="status-badge-table rejected">
+                                <span className="status-icon">❌</span>
+                                Rejected
+                              </span>
+                            )}
+                            
+                            {app.paymentStatus === 'paid' && (
+                              <span className="payment-badge-table paid">
+                                <span className="payment-icon">✓</span>
+                                Paid
+                              </span>
+                            )}
+                            {app.paymentStatus === 'pending' && (
+                              <span className="payment-badge-table pending">
+                                <span className="payment-icon">⏳</span>
+                                Pending
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="time-cell" title={app.formattedDate}>
+                            <span className="time-icon-small">🕒</span>
+                            {app.timeAgo}
+                          </span>
+                        </td>
+                        <td>
+                          <button 
+                            className="action-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewApplication(app.id);
+                            }}
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <div className="empty-state-enhanced">
@@ -576,6 +621,15 @@ const OwnerDashboard = () => {
                       <h4 className="business-card-name">{business.name}</h4>
                       <p className="business-card-location">{business.location || 'No location set'}</p>
                       <span className="business-type-badge-large">{business.business_type}</span>
+                      {business.verification_status === 'pending' && (
+                        <span className="verification-badge-small pending">Pending Verification</span>
+                      )}
+                      {business.verification_status === 'approved' && (
+                        <span className="verification-badge-small approved">✓ Verified</span>
+                      )}
+                      {business.verification_status === 'rejected' && (
+                        <span className="verification-badge-small rejected">✗ Rejected</span>
+                      )}
                     </div>
                   </div>
                 ))}
