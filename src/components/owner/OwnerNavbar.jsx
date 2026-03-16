@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import logo from '../../assets/logo.jpg'; // Import the logo
+import logo from '../../assets/logo.png'; // Import the logo
 import './OwnerNavbar.css';
 
 const OwnerNavbar = ({ profile, avatarUrl }) => {

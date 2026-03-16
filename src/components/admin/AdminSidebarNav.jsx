@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import './AdminSidebarNav.css';
+// Import the logo from src/assets
+import logo from '../../assets/logo.png';
 
 const AdminSidebarNav = ({ children }) => {
   const navigate = useNavigate();
@@ -146,13 +148,11 @@ const AdminSidebarNav = ({ children }) => {
       <aside className="admin-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
-            {/* Updated Logo - Blue */}
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" fill="#2563eb" stroke="#2563eb" strokeWidth="1.5"/>
-              <path d="M7 8L12 16L17 8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M12 16V8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M7 8L12 8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <img 
+              src={logo} 
+              alt="MEMSPHERE Logo" 
+              className="sidebar-logo-image"
+            />
             {!sidebarCollapsed && <span className="sidebar-logo-text">MEMSPHERE</span>}
           </div>
           <button className="sidebar-toggle" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
@@ -208,6 +208,7 @@ const AdminSidebarNav = ({ children }) => {
             )}
           </div>
           <button className="sidebar-logout" onClick={handleSignOut}>
+            <span className="nav-icon">🚪</span>
             {!sidebarCollapsed && <span>Logout</span>}
           </button>
         </div>
