@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import ClientNavbar from '../components/client/ClientNavbar';
 import OwnerNavbar from '../components/owner/OwnerNavbar';
-import AdminSidebarNav from '../components/admin/AdminSidebarNav'; // You might need to create this
+import AdminSidebarNav from '../components/admin/AdminSidebarNav';
 import '../styles/Notifications.css';
 
 const Notifications = () => {
@@ -150,9 +150,9 @@ const Notifications = () => {
         .order('created_at', { ascending: false });
 
       if (filter === 'unread') {
-        query = query.eq('is_read', false);
+        query = query.eq('read', false);
       } else if (filter === 'read') {
-        query = query.eq('is_read', true);
+        query = query.eq('read', true);
       }
 
       const { data, error } = await query;
@@ -172,7 +172,7 @@ const Notifications = () => {
       const { error } = await supabase
         .from('notifications')
         .update({ 
-          is_read: true,
+          read: true,
           read_at: new Date().toISOString() 
         })
         .eq('id', notificationId);
@@ -180,7 +180,7 @@ const Notifications = () => {
       if (error) throw error;
 
       setNotifications(notifications.map(n => 
-        n.id === notificationId ? { ...n, is_read: true } : n
+        n.id === notificationId ? { ...n, read: true } : n
       ));
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -192,15 +192,15 @@ const Notifications = () => {
       const { error } = await supabase
         .from('notifications')
         .update({ 
-          is_read: true,
+          read: true,
           read_at: new Date().toISOString() 
         })
         .eq('user_id', user.id)
-        .eq('is_read', false);
+        .eq('read', false);
 
       if (error) throw error;
 
-      setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+      setNotifications(notifications.map(n => ({ ...n, read: true })));
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
@@ -208,7 +208,7 @@ const Notifications = () => {
 
   const handleNotificationClick = async (notification) => {
     // Mark as read if unread
-    if (!notification.is_read) {
+    if (!notification.read) {
       await markAsRead(notification.id);
     }
 
@@ -492,7 +492,7 @@ const Notifications = () => {
   }
 
   const firstName = getFirstName();
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   // Render appropriate navbar based on role
   const renderNavbar = () => {
@@ -501,38 +501,15 @@ const Notifications = () => {
         <OwnerNavbar 
           profile={profile}
           avatarUrl={avatarUrl}
-          unreadCount={unreadCount}
         />
       );
     } else if (userRole === 'admin') {
-      // If you have an AdminNavbar component, use it here
-      // Otherwise, you might want to create one or redirect
-      return (
-        <div className="admin-navbar-placeholder">
-          {/* You can add a simple admin header here or use AdminSidebarNav */}
-          <div className="admin-navbar">
-            <div className="admin-navbar-content">
-              <span className="admin-navbar-title">Admin Dashboard</span>
-              <div className="admin-navbar-user">
-                <span>{firstName}</span>
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={firstName} className="admin-navbar-avatar" />
-                ) : (
-                  <div className="admin-navbar-avatar-placeholder">
-                    {firstName.charAt(0)}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      );
+      return <AdminSidebarNav />;
     } else {
       return (
         <ClientNavbar 
           profile={profile}
           avatarUrl={avatarUrl}
-          unreadCount={unreadCount}
         />
       );
     }
@@ -654,7 +631,7 @@ const Notifications = () => {
               return (
                 <div
                   key={notification.id}
-                  className={`notification-card ${!notification.is_read ? 'unread' : ''} ${highlightedId === notification.id ? 'highlighted' : ''}`}
+                  className={`notification-card ${!notification.read ? 'unread' : ''} ${highlightedId === notification.id ? 'highlighted' : ''}`}
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="notification-icon-wrapper">
@@ -741,7 +718,7 @@ const Notifications = () => {
                     </div>
                   </div>
                   
-                  {!notification.is_read && (
+                  {!notification.read && (
                     <span className="unread-dot"></span>
                   )}
                 </div>

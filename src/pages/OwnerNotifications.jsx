@@ -2,28 +2,44 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import OwnerNavbar from '../components/owner/OwnerNavbar';
-import '../styles/OwnerNotifications.css';
+import '../styles/OwnerMemberManagement.css';
 
-const OwnerNotifications = () => {
-  const [profile, setProfile] = useState(null);
-  const [avatarUrl, setAvatarUrl] = useState(null);
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+const OwnerMemberManagement = () => {
   const navigate = useNavigate();
+  const [profile, setProfile] = useState(null);
+  const [businesses, setBusinesses] = useState([]);
+  const [selectedBusiness, setSelectedBusiness] = useState('all');
+  const [members, setMembers] = useState([]);
+  const [filteredMembers, setFilteredMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [memberAvatars, setMemberAvatars] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [messageSubject, setMessageSubject] = useState('');
+  const [messageContent, setMessageContent] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState(null);
+  const [messageType, setMessageType] = useState('announcement');
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
-    fetchUserProfile();
+    fetchOwnerData();
   }, []);
 
   useEffect(() => {
-    if (profile) {
-      fetchNotifications();
-    }
-  }, [profile, filter]);
+    filterMembers();
+  }, [searchTerm, statusFilter, members, selectedBusiness]);
 
-  const fetchUserProfile = async () => {
+  const fetchOwnerData = async () => {
     try {
+      setLoading(true);
+      
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) throw userError;
@@ -41,13 +57,195 @@ const OwnerNotifications = () => {
 
       if (profileError) throw profileError;
       
+      if (profileData?.role !== 'owner') {
+        navigate('/ClientDashboard');
+        return;
+      }
+      
       setProfile(profileData);
 
       if (profileData?.avatar_url) {
         downloadAvatar(profileData.avatar_url);
       }
+
+      const { data: businessesData, error: businessesError } = await supabase
+        .from('businesses')
+        .select('*')
+        .eq('owner_id', user.id);
+
+      if (businessesError) throw businessesError;
+      
+      setBusinesses(businessesData || []);
+      
+      if (businessesData && businessesData.length > 0) {
+        const businessIds = businessesData.map(b => b.id);
+        await fetchMembers(businessIds);
+      } else {
+        setMembers([]);
+        setFilteredMembers([]);
+      }
+
+    } catch (err) {
+      console.error('Error fetching owner data:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMembers = async (businessIds) => {
+    try {
+      // First, get all memberships
+      const { data: memberships, error: membershipsError } = await supabase
+        .from('memberships')
+        .select('*')
+        .in('business_id', businessIds)
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false });
+
+      if (membershipsError) throw membershipsError;
+
+      if (!memberships || memberships.length === 0) {
+        setMembers([]);
+        setFilteredMembers([]);
+        return;
+      }
+
+      // Get all unique user IDs, plan IDs, and business IDs
+      const userIds = [...new Set(memberships.map(m => m.user_id))];
+      const planIds = [...new Set(memberships.map(m => m.plan_id))];
+      const uniqueBusinessIds = [...new Set(memberships.map(m => m.business_id))];
+
+      // Fetch all related data in parallel
+      const [profilesResponse, plansResponse, businessesResponse] = await Promise.all([
+        supabase.from('profiles').select('*').in('id', userIds),
+        supabase.from('membership_plans').select('*').in('id', planIds),
+        supabase.from('businesses').select('*').in('id', uniqueBusinessIds)
+      ]);
+
+      if (profilesResponse.error) throw profilesResponse.error;
+      if (plansResponse.error) throw plansResponse.error;
+      if (businessesResponse.error) throw businessesResponse.error;
+
+      // Create lookup maps for faster access
+      const profilesMap = Object.fromEntries(
+        (profilesResponse.data || []).map(p => [p.id, p])
+      );
+      const plansMap = Object.fromEntries(
+        (plansResponse.data || []).map(p => [p.id, p])
+      );
+      const businessesMap = Object.fromEntries(
+        (businessesResponse.data || []).map(b => [b.id, b])
+      );
+
+      // Process memberships with related data
+      const processedMembers = await Promise.all((memberships || []).map(async (membership) => {
+        const profile = profilesMap[membership.user_id];
+        const plan = plansMap[membership.plan_id];
+        const business = businessesMap[membership.business_id];
+
+        let avatarUrl = null;
+        if (profile?.avatar_url) {
+          avatarUrl = await getMemberAvatarUrl(profile.avatar_url, profile.id);
+        }
+
+        // Calculate membership status
+        const now = new Date();
+        const endDate = new Date(membership.end_date);
+        const daysUntilExpiry = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+        
+        let membershipStatus = 'active';
+        if (daysUntilExpiry < 0) {
+          membershipStatus = 'expired';
+        } else if (daysUntilExpiry <= 7) {
+          membershipStatus = 'expiring_soon';
+        }
+
+        // Format dates
+        const startDate = membership.start_date ? new Date(membership.start_date).toISOString() : null;
+        const endDateFormatted = membership.end_date ? new Date(membership.end_date).toISOString() : null;
+        const joinedDate = membership.created_at ? new Date(membership.created_at).toISOString() : null;
+
+        return {
+          id: membership.id,
+          membershipId: membership.id,
+          userId: profile?.id,
+          name: profile ? 
+            `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 
+            profile.email?.split('@')[0] || 
+            'Unknown User' : 
+            'Unknown User',
+          email: profile?.email || 'No email',
+          phone: profile?.mobile || 'Not provided',
+          plan: plan?.name || 'Standard Plan',
+          planId: plan?.id,
+          planDuration: plan?.duration,
+          amount: `₱${membership.price_paid?.toLocaleString() || '0'}`,
+          pricePaid: membership.price_paid,
+          paymentStatus: membership.payment_status || 'pending',
+          paymentMethod: membership.payment_method || 'Not specified',
+          startDate: startDate,
+          endDate: endDateFormatted,
+          joinedDate: joinedDate,
+          daysUntilExpiry,
+          membershipStatus,
+          avatarUrl,
+          businessName: business?.name || 'Unknown Business',
+          businessId: business?.id,
+          businessEmoji: business?.emoji || '🏢'
+        };
+      }));
+
+      setMembers(processedMembers);
+      setFilteredMembers(processedMembers);
+
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Error fetching members:', error);
+      setError('Failed to load members: ' + error.message);
+    }
+  };
+
+  const getMemberAvatarUrl = async (avatarPath, userId) => {
+    if (!avatarPath) return null;
+    
+    // Check cache first
+    if (memberAvatars[userId]) {
+      return memberAvatars[userId];
+    }
+
+    try {
+      // Try to get public URL first
+      const { data: publicUrlData } = supabase
+        .storage
+        .from('avatars')
+        .getPublicUrl(avatarPath);
+      
+      if (publicUrlData?.publicUrl) {
+        // Test if the public URL is accessible
+        try {
+          const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
+          if (response.ok) {
+            setMemberAvatars(prev => ({ ...prev, [userId]: publicUrlData.publicUrl }));
+            return publicUrlData.publicUrl;
+          }
+        } catch (e) {
+          console.log('Public URL not accessible, trying download...');
+        }
+      }
+
+      // Fallback to downloading the image
+      const { data, error } = await supabase.storage
+        .from('avatars')
+        .download(avatarPath);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      setMemberAvatars(prev => ({ ...prev, [userId]: url }));
+      return url;
+    } catch (error) {
+      console.error('Error getting member avatar:', error);
+      return null;
     }
   };
 
@@ -66,304 +264,610 @@ const OwnerNotifications = () => {
     }
   };
 
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      
-      let query = supabase
-        .from('notifications')
-        .select(`
-          *,
-          business:business_id (
-            id,
-            name,
-            emoji
-          )
-        `)
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false });
+  const filterMembers = () => {
+    let filtered = [...members];
 
-      if (filter === 'unread') {
-        query = query.eq('is_read', false);
-      } else if (filter === 'read') {
-        query = query.eq('is_read', true);
+    // Filter by business
+    if (selectedBusiness !== 'all') {
+      filtered = filtered.filter(member => member.businessId === selectedBusiness);
+    }
+
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(member => 
+        member.name.toLowerCase().includes(term) ||
+        member.email.toLowerCase().includes(term) ||
+        member.plan.toLowerCase().includes(term) ||
+        member.businessName.toLowerCase().includes(term)
+      );
+    }
+
+    // Filter by membership status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(member => member.membershipStatus === statusFilter);
+    }
+
+    setFilteredMembers(filtered);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedMembers.length === filteredMembers.length) {
+      setSelectedMembers([]);
+    } else {
+      setSelectedMembers(filteredMembers.map(m => m.membershipId));
+    }
+  };
+
+  const handleSelectMember = (membershipId) => {
+    if (selectedMembers.includes(membershipId)) {
+      setSelectedMembers(selectedMembers.filter(id => id !== membershipId));
+    } else {
+      setSelectedMembers([...selectedMembers, membershipId]);
+    }
+  };
+
+  // FIXED: Updated to use allowed notification types only
+  const handleSendMessage = async () => {
+    if (!messageSubject.trim() || !messageContent.trim()) {
+      alert('Please enter both subject and message');
+      return;
+    }
+
+    if (selectedMembers.length === 0) {
+      alert('Please select at least one member');
+      return;
+    }
+
+    setSendingMessage(true);
+
+    try {
+      // Get selected members' details
+      const recipients = members.filter(m => selectedMembers.includes(m.membershipId));
+      
+      // Determine notification type - only use allowed types from the constraint
+      // Allowed types: 'welcome', 'announcement', 'membership_approved', 'membership_rejected', 'promo'
+      let notificationType = 'announcement'; // Default
+      
+      if (messageType === 'promo') {
+        notificationType = 'promo';
+      } else if (messageType === 'direct') {
+        // For direct messages, use 'announcement' as it's the closest allowed type
+        notificationType = 'announcement';
+      }
+      
+      // Create notifications in database with correct column names
+      const notifications = recipients.map(recipient => ({
+        user_id: recipient.userId,
+        type: notificationType, // Only using allowed types
+        title: messageSubject,
+        message: messageContent,
+        business_id: recipient.businessId,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        // Store the original message type and sender info in data field
+        data: {
+          sender: 'owner',
+          sender_name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Owner',
+          sender_id: profile?.id,
+          business_name: recipient.businessName,
+          business_id: recipient.businessId,
+          original_message_type: messageType, // Store original type for reference
+          recipient_count: recipients.length
+        }
+      }));
+
+      console.log('Sending notifications:', notifications);
+
+      const { error } = await supabase
+        .from('notifications')
+        .insert(notifications);
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
       }
 
-      const { data, error } = await query;
+      setToastMessage(`Message sent to ${recipients.length} member(s) successfully!`);
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
 
-      if (error) throw error;
+      // Reset form
+      setMessageSubject('');
+      setMessageContent('');
+      setSelectedMembers([]);
+      setShowMessageModal(false);
+      setMessageType('announcement');
 
-      setNotifications(data || []);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('Error sending message:', error);
+      alert('Failed to send message: ' + error.message);
     } finally {
-      setLoading(false);
+      setSendingMessage(false);
     }
   };
 
-  const markAsRead = async (notificationId) => {
+  // FIXED: Updated to use 'cancelled' status (allowed value)
+  const handleRemoveMember = async () => {
+    if (!memberToRemove) return;
+
     try {
+      // Update membership status to 'cancelled' (allowed value from constraint)
       const { error } = await supabase
-        .from('notifications')
+        .from('memberships')
         .update({ 
-          is_read: true,
-          read_at: new Date().toISOString() 
+          status: 'cancelled', // Changed from 'inactive' to 'cancelled'
+          updated_at: new Date().toISOString()
         })
-        .eq('id', notificationId);
+        .eq('id', memberToRemove.membershipId);
 
       if (error) throw error;
 
-      setNotifications(notifications.map(n => 
-        n.id === notificationId ? { ...n, is_read: true } : n
-      ));
+      // Create a notification for the removed member
+      await supabase.from('notifications').insert({
+        user_id: memberToRemove.userId,
+        type: 'announcement', // Using allowed type
+        title: 'Membership Cancelled',
+        message: `Your membership at ${memberToRemove.businessName || 'the business'} has been cancelled. Please contact the business owner for more information.`,
+        business_id: memberToRemove.businessId,
+        data: {
+          membership_id: memberToRemove.membershipId,
+          status: 'cancelled',
+          removed_at: new Date().toISOString(),
+          business_name: memberToRemove.businessName
+        },
+        is_read: false,
+        created_at: new Date().toISOString()
+      });
+
+      // Also create a notification for the owner (for record keeping)
+      await supabase.from('notifications').insert({
+        user_id: profile?.id,
+        type: 'announcement',
+        title: 'Member Removed',
+        message: `${memberToRemove.name} has been removed from your members.`,
+        business_id: memberToRemove.businessId,
+        data: {
+          membership_id: memberToRemove.membershipId,
+          member_name: memberToRemove.name,
+          member_email: memberToRemove.email,
+          removed_at: new Date().toISOString()
+        },
+        is_read: false,
+        created_at: new Date().toISOString()
+      });
+
+      // Remove from local state
+      setMembers(members.filter(m => m.membershipId !== memberToRemove.membershipId));
+      setFilteredMembers(filteredMembers.filter(m => m.membershipId !== memberToRemove.membershipId));
+      
+      setToastMessage(`${memberToRemove.name} has been removed from members`);
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
+
+      setShowRemoveConfirm(false);
+      setMemberToRemove(null);
+
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error('Error removing member:', error);
+      alert('Failed to remove member. Please try again.');
     }
   };
 
-  const markAllAsRead = async () => {
+  const getInitials = (firstName, lastName) => {
+    if (!firstName && !lastName) return '??';
+    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+  };
+
+  const getMembershipStatusBadge = (status) => {
+    switch(status) {
+      case 'active':
+        return <span className="member-status-badge active">Active</span>;
+      case 'expiring_soon':
+        return <span className="member-status-badge expiring">Expiring Soon</span>;
+      case 'expired':
+        return <span className="member-status-badge expired">Expired</span>;
+      default:
+        return <span className="member-status-badge">{status}</span>;
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ 
-          is_read: true,
-          read_at: new Date().toISOString() 
-        })
-        .eq('user_id', profile.id)
-        .eq('is_read', false);
-
-      if (error) throw error;
-
-      setNotifications(notifications.map(n => ({ ...n, is_read: true })));
-    } catch (error) {
-      console.error('Error marking all as read:', error);
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (e) {
+      return 'Invalid Date';
     }
   };
-
-  const handleNotificationClick = async (notification) => {
-    if (!notification.is_read) {
-      await markAsRead(notification.id);
-    }
-
-    const notificationData = typeof notification.data === 'string' 
-      ? JSON.parse(notification.data) 
-      : notification.data || {};
-
-    if (notificationData.membership_id) {
-      navigate('/applications');
-    } else if (notificationData.payment_id) {
-      navigate('/applications?tab=payments');
-    } else if (notification.type === 'membership_approved') {
-      navigate('/members');
-    } else if (notification.type === 'promo') {
-      navigate('/my-business');
-    } else if (notification.type === 'application_approved') {
-      // Owner application approved - go to dashboard
-      navigate('/owner-dashboard?approved=true');
-    } else if (notification.type === 'application_rejected') {
-      // Owner application rejected - stay on notifications
-      // No navigation
-    } else {
-      navigate('/owner-dashboard');
-    }
-  };
-
-  const getNotificationIcon = (type) => {
-    switch(type) {
-      case 'application_approved':
-        return '✅';
-      case 'application_rejected':
-        return '❌';
-      case 'membership_approved':
-        return '🎉';
-      case 'promo':
-        return '🏷️';
-      case 'announcement':
-        return '📢';
-      default:
-        return '📋';
-    }
-  };
-
-  const getNotificationTitle = (notification) => {
-    if (notification.title) return notification.title;
-
-    const data = typeof notification.data === 'string' 
-      ? JSON.parse(notification.data) 
-      : notification.data || {};
-
-    switch(notification.type) {
-      case 'application_approved':
-        return 'Application Approved! 🎉';
-      case 'application_rejected':
-        return 'Application Update';
-      case 'membership_approved':
-        return data.member_name 
-          ? `${data.member_name} Joined`
-          : 'New Member';
-      case 'promo':
-        return 'Promotion Opportunity';
-      case 'announcement':
-        return data.applicant_name 
-          ? `New Application: ${data.applicant_name}`
-          : 'New Notification';
-      default:
-        return 'Notification';
-    }
-  };
-
-  const getNotificationMessage = (notification) => {
-    if (notification.message) return notification.message;
-
-    const data = typeof notification.data === 'string' 
-      ? JSON.parse(notification.data) 
-      : notification.data || {};
-
-    switch(notification.type) {
-      case 'application_approved':
-        return 'Your business owner application has been approved! You can now log in and start managing your business.';
-      case 'application_rejected':
-        return data.reason || 'Your application was not approved. Please contact support for more information.';
-      case 'membership_approved':
-        return data.member_name 
-          ? `${data.member_name} has joined as a member`
-          : 'A new member has joined';
-      case 'promo':
-        return 'Create a promotion to attract more members';
-      case 'announcement':
-        if (data.applicant_name && data.plan_name) {
-          return `${data.applicant_name} applied for ${data.plan_name} plan`;
-        }
-        return 'You have a new notification';
-      default:
-        return 'You have a new notification';
-    }
-  };
-
-  const formatTime = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   if (loading) {
     return (
-      <div className="notifications-loading">
+      <div className="member-management-loading">
         <div className="loading-spinner"></div>
-        <p>Loading notifications...</p>
+        <p>Loading member management...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="member-management-error">
+        <h2>Error</h2>
+        <p>{error}</p>
+        <button onClick={() => window.location.reload()} className="btn-error">
+          Retry
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="notifications-container-page">
-      <OwnerNavbar profile={profile} avatarUrl={avatarUrl} />
+    <div className="member-management-container">
+      <OwnerNavbar 
+        profile={profile} 
+        avatarUrl={avatarUrl}
+      />
 
-      <div className="notifications-main">
-        <div className="notifications-header">
-          <div className="header-left">
-            <h1 className="page-title">
-              Notifications
-              {unreadCount > 0 && (
-                <span className="unread-badge">{unreadCount} new</span>
-              )}
-            </h1>
+      <div className="content-wrapper">
+        <main className="member-management-main">
+          {/* Header */}
+          <div className="member-management-header">
+            <div className="header-left">
+              <h2 className="page-title">
+                Member Management
+                <span className="title-glow"></span>
+              </h2>
+              <div className="header-decoration"></div>
+            </div>
+            <div className="header-right">
+              <div className="member-count-badge">
+                <span className="count-number">{filteredMembers.length}</span>
+                <span className="count-label">Total Members</span>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="notifications-filter">
-          <button
-            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
-          >
-            All
-          </button>
-          <button
-            className={`filter-btn ${filter === 'unread' ? 'active' : ''}`}
-            onClick={() => setFilter('unread')}
-          >
-            Unread
-          </button>
-          <button
-            className={`filter-btn ${filter === 'read' ? 'active' : ''}`}
-            onClick={() => setFilter('read')}
-          >
-            Read
-          </button>
-          
-          {unreadCount > 0 && (
-            <button className="mark-all-read-btn" onClick={markAllAsRead}>
-              Mark all as read
-            </button>
+          {/* Success Toast */}
+          {showSuccessToast && (
+            <div className="success-toast">
+              <span className="toast-icon">✅</span>
+              <span className="toast-message">{toastMessage}</span>
+            </div>
           )}
-        </div>
 
-        {notifications.length === 0 ? (
-          <div className="no-notifications-state">
-            <div className="no-notifications-icon">🔔</div>
-            <h3>No notifications</h3>
-            <p>You don't have any notifications at the moment.</p>
-          </div>
-        ) : (
-          <div className="notifications-list">
-            {notifications.map((notification) => (
-              <div
-                key={notification.id}
-                className={`notification-card ${!notification.is_read ? 'unread' : ''}`}
-                onClick={() => handleNotificationClick(notification)}
+          {/* Action Bar */}
+          <div className="action-bar">
+            <div className="action-buttons">
+              <button 
+                className="action-btn send-message"
+                onClick={() => setShowMessageModal(true)}
+                disabled={selectedMembers.length === 0}
               >
-                <div className="notification-icon-wrapper">
-                  <span className="notification-icon-large">
-                    {getNotificationIcon(notification.type)}
-                  </span>
+                <span className="btn-icon">✉️</span>
+                Send Message ({selectedMembers.length})
+              </button>
+            </div>
+            <div className="filter-bar">
+              <div className="search-box">
+                <span className="search-icon">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search members..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="search-input"
+                />
+              </div>
+              <select 
+                className="filter-select"
+                value={selectedBusiness}
+                onChange={(e) => setSelectedBusiness(e.target.value)}
+              >
+                <option value="all">All Businesses</option>
+                {businesses.map(business => (
+                  <option key={business.id} value={business.id}>
+                    {business.emoji} {business.name}
+                  </option>
+                ))}
+              </select>
+              <select 
+                className="filter-select"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="expiring_soon">Expiring Soon</option>
+                <option value="expired">Expired</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Members Table */}
+          {filteredMembers.length > 0 ? (
+            <div className="members-table-container">
+              <table className="members-table">
+                <thead>
+                  <tr>
+                    <th className="checkbox-col">
+                      <input
+                        type="checkbox"
+                        checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0}
+                        onChange={handleSelectAll}
+                        className="select-checkbox"
+                      />
+                    </th>
+                    <th>Member</th>
+                    <th>Business</th>
+                    <th>Plan</th>
+                    <th>Membership Period</th>
+                    <th>Status</th>
+                    <th>Payment</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredMembers.map((member) => (
+                    <tr key={member.membershipId} className={selectedMembers.includes(member.membershipId) ? 'selected' : ''}>
+                      <td className="checkbox-col">
+                        <input
+                          type="checkbox"
+                          checked={selectedMembers.includes(member.membershipId)}
+                          onChange={() => handleSelectMember(member.membershipId)}
+                          className="select-checkbox"
+                        />
+                      </td>
+                      <td className="member-info-cell">
+                        <div className="member-avatar-small">
+                          {member.avatarUrl ? (
+                            <img 
+                              src={member.avatarUrl} 
+                              alt={member.name}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.parentNode.innerHTML = `<div class="avatar-placeholder-small">${getInitials(member.name.split(' ')[0], member.name.split(' ')[1])}</div>`;
+                              }}
+                            />
+                          ) : (
+                            <div className="avatar-placeholder-small">
+                              {getInitials(member.name.split(' ')[0], member.name.split(' ')[1])}
+                            </div>
+                          )}
+                        </div>
+                        <div className="member-details">
+                          <span className="member-name">{member.name}</span>
+                          <span className="member-email">{member.email}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="business-badge">
+                          {member.businessEmoji} {member.businessName}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="plan-info">
+                          <span className="plan-name">{member.plan}</span>
+                          <span className="plan-price">{member.amount}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="membership-dates">
+                          <span className="date-range">
+                            {formatDate(member.startDate)} - {formatDate(member.endDate)}
+                          </span>
+                          {member.daysUntilExpiry > 0 && member.daysUntilExpiry <= 30 && (
+                            <span className="expiry-warning">
+                              {member.daysUntilExpiry} days left
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        {getMembershipStatusBadge(member.membershipStatus)}
+                      </td>
+                      <td>
+                        <span className={`payment-status-badge ${member.paymentStatus}`}>
+                          {member.paymentStatus === 'paid' ? '✓' : '⏳'} {member.paymentStatus}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons-cell">
+                          <button 
+                            className="table-action-btn view"
+                            onClick={() => navigate(`/member/${member.userId}`)}
+                            title="View Profile"
+                          >
+                            👤
+                          </button>
+                          <button 
+                            className="table-action-btn message"
+                            onClick={() => {
+                              setSelectedMembers([member.membershipId]);
+                              setShowMessageModal(true);
+                            }}
+                            title="Send Message"
+                          >
+                            ✉️
+                          </button>
+                          <button 
+                            className="table-action-btn remove"
+                            onClick={() => {
+                              setMemberToRemove(member);
+                              setShowRemoveConfirm(true);
+                            }}
+                            title="Remove Member"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-icon">👥</div>
+              <h3>No Members Found</h3>
+              <p>There are no active members matching your criteria</p>
+              {businesses.length === 0 && (
+                <p className="empty-subtext">You don't have any businesses yet. Create a business to start adding members.</p>
+              )}
+            </div>
+          )}
+
+          {/* Send Message Modal */}
+          {showMessageModal && (
+            <div className="modal-overlay">
+              <div className="modal-content message-modal">
+                <div className="modal-header">
+                  <h3>Send Message to Members</h3>
+                  <button 
+                    className="close-modal"
+                    onClick={() => setShowMessageModal(false)}
+                  >
+                    ×
+                  </button>
                 </div>
-                
-                <div className="notification-content">
-                  <div className="notification-header">
-                    <h3 className="notification-title">
-                      {getNotificationTitle(notification)}
-                    </h3>
-                    <span className="notification-time">
-                      {formatTime(notification.created_at)}
+                <div className="modal-body">
+                  <div className="recipient-info">
+                    <span className="recipient-count">
+                      Sending to: <strong>{selectedMembers.length} member(s)</strong>
                     </span>
                   </div>
                   
-                  <p className="notification-message">
-                    {getNotificationMessage(notification)}
-                  </p>
-                  
-                  {notification.business && (
-                    <div className="notification-meta">
-                      <span className="meta-label">{notification.business.emoji || '🏢'}</span>
-                      <span className="meta-value">{notification.business.name}</span>
+                  <div className="form-group">
+                    <label>Message Type</label>
+                    <div className="message-type-selector">
+                      <label className="radio-label">
+                        <input
+                          type="radio"
+                          name="messageType"
+                          value="announcement"
+                          checked={messageType === 'announcement'}
+                          onChange={(e) => setMessageType(e.target.value)}
+                        />
+                        <span className="radio-custom"></span>
+                        Announcement (General announcement for all members)
+                      </label>
+                      <label className="radio-label">
+                        <input
+                          type="radio"
+                          name="messageType"
+                          value="promo"
+                          checked={messageType === 'promo'}
+                          onChange={(e) => setMessageType(e.target.value)}
+                        />
+                        <span className="radio-custom"></span>
+                        Promo (Special offers and promotions)
+                      </label>
+                      <label className="radio-label">
+                        <input
+                          type="radio"
+                          name="messageType"
+                          value="direct"
+                          checked={messageType === 'direct'}
+                          onChange={(e) => setMessageType(e.target.value)}
+                        />
+                        <span className="radio-custom"></span>
+                        Direct Message (Personal communication)
+                      </label>
                     </div>
-                  )}
+                    <small className="form-hint">
+                      Note: Direct messages will be sent as announcements to comply with notification settings
+                    </small>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Subject</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Enter message subject..."
+                      value={messageSubject}
+                      onChange={(e) => setMessageSubject(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Message</label>
+                    <textarea
+                      className="form-textarea"
+                      placeholder="Type your message here..."
+                      rows="6"
+                      value={messageContent}
+                      onChange={(e) => setMessageContent(e.target.value)}
+                    ></textarea>
+                  </div>
                 </div>
-                
-                {!notification.is_read && <span className="unread-dot"></span>}
+                <div className="modal-footer">
+                  <button 
+                    className="btn-cancel"
+                    onClick={() => setShowMessageModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="btn-send"
+                    onClick={handleSendMessage}
+                    disabled={sendingMessage}
+                  >
+                    {sendingMessage ? 'Sending...' : 'Send Message'}
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
+
+          {/* Remove Confirmation Modal */}
+          {showRemoveConfirm && memberToRemove && (
+            <div className="modal-overlay">
+              <div className="modal-content confirm-modal">
+                <div className="modal-header">
+                  <h3>Remove Member</h3>
+                  <button 
+                    className="close-modal"
+                    onClick={() => setShowRemoveConfirm(false)}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="warning-icon">⚠️</div>
+                  <p className="confirm-message">
+                    Are you sure you want to remove <strong>{memberToRemove.name}</strong> from your members?
+                  </p>
+                  <p className="confirm-submessage">
+                    This will mark their membership as cancelled. The member will be notified of this change.
+                  </p>
+                </div>
+                <div className="modal-footer">
+                  <button 
+                    className="btn-cancel"
+                    onClick={() => setShowRemoveConfirm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="btn-remove"
+                    onClick={handleRemoveMember}
+                  >
+                    Remove Member
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );
 };
 
-export default OwnerNotifications;
+export default OwnerMemberManagement;

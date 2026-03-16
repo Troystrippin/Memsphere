@@ -27,6 +27,17 @@
   --payment-completed-color: #22543d;
   --payment-pending-bg: #feebc8;
   --payment-pending-color: #744210;
+  
+  /* Business Verification Colors */
+  --verification-pending-bg: #fef3c7;
+  --verification-pending-color: #92400e;
+  --verification-pending-border: #fbbf24;
+  --verification-approved-bg: #dcfce7;
+  --verification-approved-color: #166534;
+  --verification-approved-border: #4ade80;
+  --verification-rejected-bg: #fee2e2;
+  --verification-rejected-color: #991b1b;
+  --verification-rejected-border: #f87171;
 }
 
 /* ===== DASHBOARD CONTAINER ===== */
@@ -38,6 +49,13 @@
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+}
+
+/* ===== APPLICATIONS WRAPPER ===== */
+.applications-wrapper {
+  padding-top: 80px;
+  min-height: 100vh;
+  background: var(--light-bg);
 }
 
 /* ===== APPLICATIONS MAIN CONTENT ===== */
@@ -70,9 +88,6 @@
   position: relative;
   display: inline-block;
 }
-
-/* REMOVED: title-glow animation */
-/* .title-glow removed */
 
 .header-decoration {
   position: absolute;
@@ -279,6 +294,55 @@
   font-size: 14px;
   opacity: 0.7;
   min-width: 20px;
+}
+
+/* Business Verification Badges */
+.business-verification-badge-container {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.verification-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.verification-badge.pending {
+  background: var(--verification-pending-bg);
+  color: var(--verification-pending-color);
+  border-color: var(--verification-pending-border);
+}
+
+.verification-badge.approved {
+  background: var(--verification-approved-bg);
+  color: var(--verification-approved-color);
+  border-color: var(--verification-approved-border);
+}
+
+.verification-badge.rejected {
+  background: var(--verification-rejected-bg);
+  color: var(--verification-rejected-color);
+  border-color: var(--verification-rejected-border);
+}
+
+.badge-icon {
+  font-size: 12px;
+}
+
+.badge-text {
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .application-meta {
@@ -883,64 +947,6 @@
   margin-top: 8px;
 }
 
-/* ===== APPROVAL SECTION ===== */
-.approval-section {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 2px solid #e2e8f0;
-}
-
-.ready-for-approval,
-.pending-verification {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border-radius: 12px;
-  margin-top: 12px;
-}
-
-.ready-for-approval {
-  background: #f0fff4;
-  border: 1px solid #9ae6b4;
-}
-
-.pending-verification {
-  background: #fffaf0;
-  border: 1px solid #fbd38d;
-}
-
-.ready-icon,
-.pending-icon {
-  font-size: 2rem;
-}
-
-.ready-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #22543d;
-  margin: 0 0 4px 0;
-}
-
-.ready-description {
-  font-size: 0.9rem;
-  color: #276749;
-  margin: 0;
-}
-
-.pending-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #744210;
-  margin: 0 0 4px 0;
-}
-
-.pending-description {
-  font-size: 0.9rem;
-  color: #975a16;
-  margin: 0;
-}
-
 /* ===== ACTION BUTTONS ===== */
 .application-card-actions-enhanced {
   display: flex;
@@ -996,13 +1002,26 @@
 .btn-reject-enhanced:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  background: #a0aec0;
+  background: #9ca3af;
   box-shadow: none;
   transform: none;
 }
 
 .btn-icon {
   font-size: 18px;
+}
+
+/* Disabled button state for unverified businesses */
+.btn-approve-enhanced:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  box-shadow: none;
+}
+
+.btn-approve-enhanced:disabled:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 /* ===== NO APPLICATIONS STATE ===== */
@@ -1355,6 +1374,10 @@
 }
 
 @media (max-width: 768px) {
+  .applications-wrapper {
+    padding-top: 70px;
+  }
+
   .applications-main-full {
     padding: 24px;
   }
@@ -1382,6 +1405,10 @@
   
   .contact-item {
     flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .business-verification-badge-container {
     justify-content: center;
   }
   
@@ -1484,6 +1511,15 @@
   .greeting-text {
     display: none;
   }
+  
+  .applications-filter-tabs {
+    gap: 8px;
+  }
+  
+  .filter-tab {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1534,83 +1570,13 @@
   .receipt-modal {
     width: 95%;
   }
-}
-
-/* Add this to your Applications.css */
-.applications-wrapper {
-  padding-top: 80px; /* Adjust based on your navbar height */
-  min-height: 100vh;
-  background: var(--light-bg);
-}
-
-/* Update the filter tabs order */
-.applications-filter-tabs {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 32px;
-  flex-wrap: wrap;
-}
-
-/* Ensure the "All" tab appears first */
-.filter-tab[data-filter="all"] {
-  order: -1;
-}
-
-/* Business Verification Badges */
-.business-verification-badge-container {
-  margin-top: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.verification-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 500;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.verification-badge.pending {
-  background: #fef3c7;
-  color: #92400e;
-  border-color: #fbbf24;
-}
-
-.verification-badge.approved {
-  background: #dcfce7;
-  color: #166534;
-  border-color: #4ade80;
-}
-
-.verification-badge.rejected {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #f87171;
-}
-
-.badge-icon {
-  font-size: 12px;
-}
-
-.badge-text {
-  font-size: 11px;
-  font-weight: 600;
-}
-
-/* Disabled button state for unverified businesses */
-.btn-approve-enhanced:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: #9ca3af;
-}
-
-.btn-approve-enhanced:disabled:hover {
-  transform: none;
-  box-shadow: none;
+  
+  .verification-badge {
+    padding: 2px 8px;
+    font-size: 10px;
+  }
+  
+  .badge-text {
+    font-size: 9px;
+  }
 }

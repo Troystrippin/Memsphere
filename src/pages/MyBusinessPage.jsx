@@ -48,6 +48,15 @@ const MyBusinessPage = () => {
     is_active: true,
   });
 
+  // Membership applications state
+  const [applications, setApplications] = useState([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
+  const [processingApplication, setProcessingApplication] = useState(null);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [pendingCount, setPendingCount] = useState(0);
+
   // Business hours state
   const [businessHours, setBusinessHours] = useState({
     monday: { open: "09:00", close: "18:00", closed: false },
@@ -95,6 +104,7 @@ const MyBusinessPage = () => {
   useEffect(() => {
     if (business?.id) {
       fetchMembershipPlans();
+      fetchApplications();
       // Parse business hours if they exist
       if (business.business_hours) {
         setBusinessHours(business.business_hours);
@@ -358,6 +368,171 @@ const MyBusinessPage = () => {
       setMembershipPlans(data || []);
     } catch (err) {
       console.error("Error fetching membership plans:", err);
+    }
+  };
+
+  const fetchApplications = async () => {
+    if (!business?.id) return;
+    
+    try {
+      setApplicationsLoading(true);
+      const { data, error } = await supabase
+        .from("memberships")
+        .select(`
+          *,
+          user:profiles!memberships_user_id_fkey (
+            id,
+            email,
+            first_name,
+            last_name,
+            mobile
+          ),
+          plan:membership_plans (
+            id,
+            name,
+            price,
+            duration,
+            features
+          )
+        `)
+        .eq("business_id", business.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setApplications(data || []);
+      setPendingCount(data?.length || 0);
+    } catch (error) {
+      console.error("Error fetching applications:", error);
+    } finally {
+      setApplicationsLoading(false);
+    }
+  };
+
+  const handleApproveApplication = async (application) => {
+    try {
+      setProcessingApplication(application.id);
+
+      // Get current owner
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // 1. Update membership status
+      const { error: membershipError } = await supabase
+        .from("memberships")
+        .update({
+          status: "active",
+          payment_status: "paid",
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+          reviewed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", application.id);
+
+      if (membershipError) throw membershipError;
+
+      // 2. Increment business member count
+      const { error: updateError } = await supabase
+        .from("businesses")
+        .update({ 
+          members_count: (business.members_count || 0) + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", business.id);
+
+      if (updateError) throw updateError;
+
+      // 3. Update local business state
+      setBusiness(prev => ({
+        ...prev,
+        members_count: (prev.members_count || 0) + 1
+      }));
+
+      // 4. Send notification to client
+      await supabase
+        .from("notifications")
+        .insert({
+          user_id: application.user_id,
+          type: "membership_approved",
+          title: "✅ Membership Approved!",
+          message: `Your membership application for ${application.plan?.name} has been approved! You can now enjoy your membership benefits.`,
+          data: {
+            membershipId: application.id,
+            businessId: business.id,
+            planName: application.plan?.name
+          },
+          created_at: new Date().toISOString()
+        });
+
+      // Refresh applications
+      await fetchApplications();
+      
+      setSuccessMessage("Membership approved successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (error) {
+      console.error("Error approving application:", error);
+      setError("Failed to approve application. Please try again.");
+    } finally {
+      setProcessingApplication(null);
+    }
+  };
+
+  const handleRejectApplication = async () => {
+    if (!rejectReason.trim()) {
+      alert("Please provide a reason for rejection");
+      return;
+    }
+
+    try {
+      setProcessingApplication(selectedApplication.id);
+
+      // Get current owner
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Update membership status
+      const { error: membershipError } = await supabase
+        .from("memberships")
+        .update({
+          status: "rejected",
+          payment_status: "failed",
+          application_notes: rejectReason,
+          reviewed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", selectedApplication.id);
+
+      if (membershipError) throw membershipError;
+
+      // Send notification to client
+      await supabase
+        .from("notifications")
+        .insert({
+          user_id: selectedApplication.user_id,
+          type: "membership_rejected",
+          title: "❌ Membership Application Update",
+          message: `Your membership application was not approved. Reason: ${rejectReason}`,
+          data: {
+            membershipId: selectedApplication.id,
+            businessId: business.id,
+            reason: rejectReason
+          },
+          created_at: new Date().toISOString()
+        });
+
+      // Refresh applications
+      await fetchApplications();
+      
+      setShowRejectModal(false);
+      setSelectedApplication(null);
+      setRejectReason("");
+      
+      setSuccessMessage("Application rejected successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (error) {
+      console.error("Error rejecting application:", error);
+      setError("Failed to reject application. Please try again.");
+    } finally {
+      setProcessingApplication(null);
     }
   };
 
@@ -1106,6 +1281,15 @@ const MyBusinessPage = () => {
                     onClick={() => setActiveTab("plans")}
                   >
                     Membership Plans
+                  </button>
+                  <button
+                    className={`business-tab ${activeTab === "applications" ? "active" : ""}`}
+                    onClick={() => {
+                      setActiveTab("applications");
+                      fetchApplications();
+                    }}
+                  >
+                    📋 Applications {pendingCount > 0 && `(${pendingCount})`}
                   </button>
                   <button
                     className={`business-tab ${activeTab === "preview" ? "active" : ""}`}
@@ -2215,6 +2399,104 @@ const MyBusinessPage = () => {
                     </div>
                   )}
 
+                  {/* Membership Applications Tab */}
+                  {activeTab === "applications" && (
+                    <div className="applications-tab">
+                      <h2 className="section-subtitle">Membership Applications</h2>
+                      
+                      {applicationsLoading ? (
+                        <div className="applications-loading">
+                          <div className="loading-spinner"></div>
+                          <p>Loading applications...</p>
+                        </div>
+                      ) : applications.length > 0 ? (
+                        <div className="applications-grid">
+                          {applications.map((app) => (
+                            <div key={app.id} className="application-card">
+                              <div className="application-header">
+                                <div className="applicant-info">
+                                  <span className="applicant-icon">👤</span>
+                                  <div>
+                                    <h4>{app.user?.first_name} {app.user?.last_name}</h4>
+                                    <p className="applicant-email">{app.user?.email}</p>
+                                    <p className="applicant-phone">{app.user?.mobile}</p>
+                                  </div>
+                                </div>
+                                <span className="application-badge pending">Pending</span>
+                              </div>
+
+                              <div className="application-details">
+                                <div className="detail-row">
+                                  <span className="detail-label">Plan:</span>
+                                  <span className="detail-value">{app.plan?.name}</span>
+                                </div>
+                                <div className="detail-row">
+                                  <span className="detail-label">Price:</span>
+                                  <span className="detail-value">₱{app.price_paid?.toLocaleString()}/{app.plan?.duration}</span>
+                                </div>
+                                <div className="detail-row">
+                                  <span className="detail-label">Payment:</span>
+                                  <span className="detail-value">{app.payment_method}</span>
+                                </div>
+                                <div className="detail-row">
+                                  <span className="detail-label">Applied:</span>
+                                  <span className="detail-value">{new Date(app.created_at).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+
+                              {app.receipt_path && (
+                                <div className="receipt-preview">
+                                  <a 
+                                    href={supabase.storage.from('payment-receipts').getPublicUrl(app.receipt_path).data.publicUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="view-receipt-btn"
+                                  >
+                                    📄 View Receipt
+                                  </a>
+                                </div>
+                              )}
+
+                              <div className="application-actions">
+                                <button
+                                  className="action-btn approve"
+                                  onClick={() => handleApproveApplication(app)}
+                                  disabled={processingApplication === app.id}
+                                >
+                                  {processingApplication === app.id ? (
+                                    <span className="loading-spinner-small"></span>
+                                  ) : (
+                                    <>
+                                      <span className="btn-icon">✓</span>
+                                      Approve
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  className="action-btn reject"
+                                  onClick={() => {
+                                    setSelectedApplication(app);
+                                    setShowRejectModal(true);
+                                  }}
+                                  disabled={processingApplication === app.id}
+                                >
+                                  <span className="btn-icon">✗</span>
+                                  Reject
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="no-applications-state">
+                          <div className="empty-icon">📋</div>
+                          <h3>No Pending Applications</h3>
+                          <p>When clients apply for memberships, they will appear here.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Preview Tab */}
                   {activeTab === "preview" && (
                     <div className="business-preview">
@@ -2273,7 +2555,7 @@ const MyBusinessPage = () => {
                               <div className="business-detail-item">
                                 <span className="detail-icon">👥</span>
                                 <span className="detail-text">
-                                  {formData.members_count || 0} members
+                                  {business?.members_count || 0} members
                                 </span>
                               </div>
                             </div>
@@ -2443,6 +2725,40 @@ const MyBusinessPage = () => {
           </div>
         </main>
       </div>
+
+      {/* Reject Application Modal */}
+      {showRejectModal && (
+        <div className="modal-overlay" onClick={() => setShowRejectModal(false)}>
+          <div className="modal-content reject-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Reject Application</h2>
+              <button className="modal-close" onClick={() => setShowRejectModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Please provide a reason for rejecting this application:</p>
+              <textarea
+                className="reject-reason-input"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Enter rejection reason..."
+                rows="4"
+              />
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowRejectModal(false)}>
+                Cancel
+              </button>
+              <button 
+                className="btn-reject"
+                onClick={handleRejectApplication}
+                disabled={!rejectReason.trim() || processingApplication === selectedApplication?.id}
+              >
+                {processingApplication === selectedApplication?.id ? 'Rejecting...' : 'Reject Application'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

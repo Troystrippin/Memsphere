@@ -20,7 +20,7 @@ const Browse = () => {
   const [successData, setSuccessData] = useState({
     business: null,
     plan: null,
-    paymentMethod: ''
+    paymentMethod: "",
   });
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -150,7 +150,9 @@ const Browse = () => {
       let query = supabase
         .from("businesses")
         .select("*")
-        .eq("status", "active");
+        .eq("status", "active")
+        .eq("verification_status", "approved") // Only show fully verified businesses
+        .eq("permit_verified", true); // Must have verified permit
 
       if (selectedBusinessType !== "all") {
         query = query.eq("business_type", selectedBusinessType);
@@ -376,9 +378,9 @@ const Browse = () => {
       setSuccessData({
         business: business,
         plan: selectedPlanForPayment,
-        paymentMethod: selectedPaymentMethod
+        paymentMethod: selectedPaymentMethod,
       });
-      
+
       setShowSuccessModal(true);
     } catch (error) {
       console.error("Error submitting payment:", error);
@@ -1314,9 +1316,13 @@ const Browse = () => {
                 <span className="address-icon">📍</span>
                 <div className="address-details">
                   <strong>{successData.business?.name}</strong>
-                  <p>{successData.business?.address || successData.business?.location}</p>
                   <p>
-                    {successData.business?.city}, {successData.business?.province}
+                    {successData.business?.address ||
+                      successData.business?.location}
+                  </p>
+                  <p>
+                    {successData.business?.city},{" "}
+                    {successData.business?.province}
                   </p>
                 </div>
               </div>

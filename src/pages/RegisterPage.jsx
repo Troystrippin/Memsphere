@@ -309,7 +309,7 @@ const RegisterPage = () => {
     e.preventDefault();
     
     console.log("1. Form submission started");
-    console.log("2. Current activeTab:", activeTab); // This will show 'owner' or 'client'
+    console.log("2. Current activeTab:", activeTab);
 
     const allFields = [
       "firstName",
@@ -360,7 +360,7 @@ const RegisterPage = () => {
             first_name: formData.firstName,
             last_name: formData.lastName,
             mobile: formData.mobile,
-            user_type: activeTab, // This should be 'owner' when activeTab is 'owner'
+            user_type: activeTab,
           },
           emailRedirectTo: `${window.location.origin}/login`,
         },
@@ -469,24 +469,40 @@ const RegisterPage = () => {
 
         if (businessError) {
           console.error("20. Business creation error:", businessError);
+          console.error("21. Error details:", {
+            code: businessError.code,
+            message: businessError.message,
+            details: businessError.details
+          });
           throw businessError;
         }
 
-        console.log("21. Business created successfully:", businessData);
+        console.log("22. Business created successfully:", businessData);
       }
 
-      console.log("22. Registration successful!");
+      console.log("23. Registration successful!");
       setShowSuccess(true);
 
-      // Redirect to login after 3 seconds
+      // Navigate to appropriate dashboard after a short delay
       setTimeout(() => {
-        console.log("23. Redirecting to login");
+        console.log("24. Redirecting to dashboard");
         setShowSuccess(false);
-        navigate("/login");
-      }, 3000);
+        
+        // Redirect based on user role
+        if (activeTab === "owner") {
+          navigate("/owner-dashboard");
+        } else {
+          navigate("/ClientDashboard");
+        }
+      }, 2000); // 2 second delay to show success message
 
     } catch (error) {
-      console.error("24. Registration failed with error:", error);
+      console.error("25. Registration failed with error:", error);
+      console.error("26. Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details
+      });
       alert(error.message || "Registration failed. Please try again.");
       setIsLoading(false);
     }
@@ -696,7 +712,7 @@ const RegisterPage = () => {
 
         {showSuccess && (
           <div className="success-message">
-            ✨ Registration successful! Redirecting to login...
+            ✨ Registration successful! Redirecting to dashboard...
           </div>
         )}
 

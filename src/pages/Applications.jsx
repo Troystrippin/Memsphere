@@ -13,7 +13,7 @@ const Applications = () => {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(null);
-  const [clientAvatars, setClientAvatars] = useState({}); // Store client avatar URLs
+  const [clientAvatars, setClientAvatars] = useState({});
   const [filter, setFilter] = useState('pending');
   const [expandedCard, setExpandedCard] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
@@ -72,28 +72,23 @@ const Applications = () => {
     }
   };
 
-  // New function to get client avatar URL
   const getClientAvatarUrl = async (avatarPath, userId) => {
     if (!avatarPath) return null;
     
-    // Check if we already have this avatar cached
     if (clientAvatars[userId]) {
       return clientAvatars[userId];
     }
 
     try {
-      // Try to get public URL first
       const { data: publicUrlData } = supabase
         .storage
         .from('avatars')
         .getPublicUrl(avatarPath);
       
       if (publicUrlData?.publicUrl) {
-        // Test if the URL is accessible
         try {
           const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
           if (response.ok) {
-            // Cache the URL
             setClientAvatars(prev => ({ ...prev, [userId]: publicUrlData.publicUrl }));
             return publicUrlData.publicUrl;
           }
@@ -102,7 +97,6 @@ const Applications = () => {
         }
       }
 
-      // If public URL fails, download the file
       const { data, error } = await supabase.storage
         .from('avatars')
         .download(avatarPath);
@@ -110,7 +104,6 @@ const Applications = () => {
       if (error) throw error;
 
       const url = URL.createObjectURL(data);
-      // Cache the URL
       setClientAvatars(prev => ({ ...prev, [userId]: url }));
       return url;
     } catch (error) {
@@ -120,11 +113,9 @@ const Applications = () => {
   };
 
   const getReceiptUrl = async (membership) => {
-    // Check multiple places for receipt
     let receiptPath = membership.receipt_path;
     
     if (!receiptPath && membership.payments && membership.payments.length > 0) {
-      // Try to get from payments table if available
       const payment = membership.payments[0];
       receiptPath = payment.receipt_path;
     }
@@ -132,14 +123,12 @@ const Applications = () => {
     if (!receiptPath) return null;
 
     try {
-      // Try to get public URL first (if bucket is public)
       const { data: publicUrlData } = supabase
         .storage
         .from('payment-receipts')
         .getPublicUrl(receiptPath);
       
       if (publicUrlData?.publicUrl) {
-        // Test if the URL is accessible
         try {
           const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
           if (response.ok) {
@@ -150,9 +139,7 @@ const Applications = () => {
         }
       }
 
-      // If public URL fails or bucket is private, download the file
-      const { data, error } = await supabase
-        .storage
+      const { data, error } = await supabase.storage
         .from('payment-receipts')
         .download(receiptPath);
 
@@ -178,10 +165,9 @@ const Applications = () => {
         return;
       }
 
-      // First get all businesses owned by this user
       const { data: businessesData, error: businessesError } = await supabase
         .from('businesses')
-        .select('id, verification_status') // Added verification_status
+        .select('id, verification_status')
         .eq('owner_id', user.id);
 
       if (businessesError) throw businessesError;
@@ -194,13 +180,11 @@ const Applications = () => {
 
       const businessIds = businessesData.map(b => b.id);
       
-      // Create a map of business verification status
       const businessVerificationMap = {};
       businessesData.forEach(b => {
         businessVerificationMap[b.id] = b.verification_status;
       });
 
-      // Fetch all memberships for these businesses with related data in ONE query
       let query = supabase
         .from('memberships')
         .select(`
@@ -245,7 +229,6 @@ const Applications = () => {
         .in('business_id', businessIds)
         .order('created_at', { ascending: false });
 
-      // Apply filter if not 'all'
       if (filter !== 'all') {
         query = query.eq('status', filter);
       }
@@ -257,29 +240,25 @@ const Applications = () => {
         throw error;
       }
 
-      // Process the data to get receipt URLs and client avatars
       const processedData = await Promise.all((data || []).map(async (app) => {
         let receiptUrl = null;
         let clientAvatarUrl = null;
         
-        // Check if membership has receipt
         if (app.payment_method?.toLowerCase() === 'gcash') {
           receiptUrl = await getReceiptUrl(app);
         }
         
-        // Get client avatar URL if available
         if (app.applicant?.avatar_url) {
           clientAvatarUrl = await getClientAvatarUrl(app.applicant.avatar_url, app.applicant.id);
         }
         
-        // Add business verification status from map if not in the business object
         const businessVerification = app.business?.verification_status || businessVerificationMap[app.business_id] || 'pending';
         
         return {
           ...app,
           receipt_url_display: receiptUrl,
           client_avatar_display: clientAvatarUrl,
-          business_verification: businessVerification // Add this field
+          business_verification: businessVerification
         };
       }));
 
@@ -560,8 +539,6 @@ const Applications = () => {
                             )}
                           </div>
                           
-                          {/* ===== BUSINESS VERIFICATION DISPLAY ===== */}
-                          {/* Add this after the applicant details div */}
                           <div className="business-verification-badge-container">
                             {app.business_verification === 'pending' && (
                               <div className="verification-badge pending">
@@ -582,7 +559,6 @@ const Applications = () => {
                               </div>
                             )}
                           </div>
-                          {/* ===== END BUSINESS VERIFICATION DISPLAY ===== */}
                           
                         </div>
                       </div>
@@ -708,7 +684,6 @@ const Applications = () => {
                           </div>
                         </div>
 
-                        {/* Payment Receipt Section */}
                         {isGcash && (
                           <div className="expanded-section receipt-section">
                             <h4 className="section-title-small">
@@ -738,7 +713,6 @@ const Applications = () => {
                                   </button>
                                 </div>
                                 
-                                {/* Payment Details from payments table if available */}
                                 {app.payments && app.payments.length > 0 && (
                                   <div className="receipt-details">
                                     <h5>Payment Information</h5>
@@ -763,7 +737,6 @@ const Applications = () => {
                                   </div>
                                 )}
 
-                                {/* Verification Actions */}
                                 {app.status === 'pending' && app.payment_status === 'pending' && (
                                   <div className="receipt-actions">
                                     <button
@@ -808,7 +781,6 @@ const Applications = () => {
                           </div>
                         )}
 
-                        {/* Onsite Payment Section */}
                         {app.payment_method?.toLowerCase() === 'onsite' && (
                           <div className="expanded-section onsite-section">
                             <h4 className="section-title-small">
@@ -928,7 +900,6 @@ const Applications = () => {
           </main>
         </div>
 
-        {/* Receipt Full View Modal */}
         {showReceiptModal && selectedReceipt && (
           <div className="receipt-modal-overlay" onClick={() => setShowReceiptModal(false)}>
             <div className="receipt-modal" onClick={(e) => e.stopPropagation()}>
@@ -964,7 +935,7 @@ const Applications = () => {
           </div>
         )}
       </div>
-    );
-  };
+  );
+};
 
 export default Applications;
