@@ -20,12 +20,8 @@
   transition: all 0.3s ease;
 }
 
-/* Add padding to the body to account for fixed navbar */
-body {
-  padding-top: 80px;
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-}
+/* REMOVED the body padding that was causing the double spacing */
+/* The dashboard's content-wrapper handles the spacing properly */
 
 .nav-left {
   display: flex;
@@ -603,9 +599,7 @@ body {
     width: 280px;
   }
   
-  body {
-    padding-top: 80px;
-  }
+  /* REMOVED: body padding from mobile view as well */
   
   .logo-image {
     height: 35px;

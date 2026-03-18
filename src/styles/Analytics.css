@@ -1,15 +1,3 @@
-/* ===== DASHBOARD CONTAINER (Inherited from OwnerDashboard) ===== */
-.dashboard-container {
-  min-height: 100vh;
-  background: var(--light-bg);
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-}
-
 /* ===== ANALYTICS MAIN CONTENT ===== */
 .analytics-main-full {
   padding: 40px 48px;
@@ -43,8 +31,22 @@
   display: inline-block;
 }
 
-/* REMOVED: title-glow animation */
-/* .title-glow removed */
+.title-glow {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 4px;
+  background: var(--gradient-primary);
+  border-radius: 4px;
+  animation: widthPulse 3s infinite;
+}
+
+@keyframes widthPulse {
+  0%, 100% { width: 100px; }
+  50% { width: 150px; }
+}
 
 .header-decoration {
   position: absolute;
@@ -90,11 +92,48 @@
   font-size: 18px;
 }
 
-/* ===== TIME RANGE SELECTOR ===== */
+/* ===== ANALYTICS CONTROLS ===== */
+.analytics-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.business-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.business-selector label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.business-select {
+  padding: 10px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 30px;
+  background: white;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.business-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
 .time-range-selector {
   display: flex;
   gap: 12px;
-  margin-bottom: 32px;
   flex-wrap: wrap;
 }
 
@@ -127,7 +166,7 @@
 /* ===== METRICS GRID ===== */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 24px;
   margin-bottom: 40px;
 }
@@ -160,6 +199,7 @@
   justify-content: center;
   font-size: 30px;
   border: 1px solid #c4b5fd;
+  flex-shrink: 0;
 }
 
 .metric-content {
@@ -180,6 +220,62 @@
   font-size: 14px;
   color: var(--text-light);
   font-weight: 500;
+}
+
+.metric-growth {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.growth-icon {
+  font-size: 14px;
+}
+
+.growth-value {
+  font-weight: 600;
+}
+
+.growth-period {
+  color: var(--text-light);
+  font-size: 12px;
+  margin-left: 2px;
+}
+
+.positive-growth {
+  color: #10b981;
+}
+
+.negative-growth {
+  color: #ef4444;
+}
+
+.neutral-growth {
+  color: var(--text-light);
+}
+
+.metric-sub {
+  margin-top: 4px;
+}
+
+.active-badge {
+  font-size: 12px;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.retention-badge {
+  font-size: 12px;
+  color: var(--primary-color);
+  background: rgba(139, 92, 246, 0.1);
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-block;
 }
 
 /* ===== CHARTS ROW ===== */
@@ -245,9 +341,9 @@
 }
 
 .bar {
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
   border-radius: 8px 8px 0 0;
   transition: height 0.3s ease;
+  min-width: 30px;
 }
 
 .revenue-bar {
@@ -264,12 +360,120 @@
   color: var(--text-secondary);
 }
 
+/* ===== PAYMENT BREAKDOWN SECTION ===== */
+.payment-breakdown-section {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 40px;
+  box-shadow: var(--shadow-md);
+}
+
+.payment-breakdown-section .section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 20px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.payment-methods-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.payment-method-card {
+  padding: 20px;
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+
+.payment-method-card.gcash {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px solid #bae6fd;
+}
+
+.payment-method-card.onsite {
+  background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+  border: 1px solid #fde047;
+}
+
+.payment-method-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.method-icon {
+  font-size: 24px;
+  background: white;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+}
+
+.method-name {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.payment-method-card.gcash .method-name {
+  color: #0369a1;
+}
+
+.payment-method-card.onsite .method-name {
+  color: #854d0e;
+}
+
+.method-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+}
+
+.stat-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.payment-method-card.gcash .stat-value {
+  color: #0369a1;
+}
+
+.payment-method-card.onsite .stat-value {
+  color: #854d0e;
+}
+
 /* ===== POPULAR PLANS SECTION ===== */
 .popular-plans-section {
   background: white;
   border: 1px solid var(--border-color);
   border-radius: 20px;
   padding: 24px;
+  margin-bottom: 40px;
   box-shadow: var(--shadow-md);
 }
 
@@ -312,6 +516,7 @@
   color: white;
   font-weight: 600;
   font-size: 14px;
+  flex-shrink: 0;
 }
 
 .plan-rank-info {
@@ -319,18 +524,25 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-width: 0;
 }
 
 .plan-rank-name {
   font-size: 15px;
   font-weight: 500;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 }
 
 .plan-rank-count {
   font-size: 14px;
   color: var(--text-secondary);
   font-weight: 500;
+  white-space: nowrap;
+  margin-left: 12px;
 }
 
 .plan-rank-bar {
@@ -339,6 +551,7 @@
   background: var(--border-color);
   border-radius: 4px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .rank-bar-fill {
@@ -346,6 +559,113 @@
   background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   border-radius: 4px;
   transition: width 0.3s ease;
+}
+
+/* ===== RECENT PAYMENTS SECTION ===== */
+.recent-payments-section {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: var(--shadow-md);
+}
+
+.recent-payments-section .section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 20px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.payments-table-container {
+  overflow-x: auto;
+}
+
+.payments-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.payments-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.payments-table td {
+  padding: 16px;
+  font-size: 14px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.payments-table tr:hover td {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.payments-table .amount-cell {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.method-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.method-badge.gcash {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.method-badge.onsite {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.paid {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.status-badge.pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.status-badge.failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* ===== NO DATA MESSAGE ===== */
+.no-data-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-light);
+  font-size: 14px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px;
+  border: 1px dashed var(--border-color);
 }
 
 /* ===== LOADING STATE ===== */
@@ -358,7 +678,7 @@
   background: var(--light-bg);
 }
 
-.analytics-loading .loading-spinner {
+.loading-spinner {
   width: 50px;
   height: 50px;
   border: 4px solid var(--border-color);
@@ -388,6 +708,12 @@
   }
 }
 
+@media (max-width: 992px) {
+  .payment-methods-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .analytics-main-full {
     padding: 24px;
@@ -397,6 +723,29 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 20px;
+  }
+
+  .analytics-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .business-selector {
+    width: 100%;
+  }
+
+  .business-select {
+    flex: 1;
+    min-width: auto;
+  }
+
+  .time-range-selector {
+    width: 100%;
+  }
+
+  .time-range-btn {
+    flex: 1;
+    text-align: center;
   }
 
   .metrics-grid {
@@ -430,6 +779,12 @@
   .plan-rank-info {
     width: 100%;
   }
+
+  .payments-table th,
+  .payments-table td {
+    padding: 12px 8px;
+    font-size: 13px;
+  }
 }
 
 @media (max-width: 576px) {
@@ -444,22 +799,9 @@
   .greeting-wave {
     font-size: 22px;
   }
-}
 
-@media (max-width: 480px) {
-  .analytics-main-full {
-    padding: 16px;
-  }
-
-  .time-range-selector {
-    justify-content: center;
-  }
-
-  .time-range-btn {
-    flex: 1;
-    text-align: center;
-    padding: 8px 16px;
-    font-size: 13px;
+  .greeting-text {
+    display: none;
   }
 
   .metrics-grid {
@@ -482,7 +824,27 @@
     font-size: 10px;
   }
 
-  .greeting-text {
-    display: none;
+  .payments-table {
+    min-width: 600px;
+  }
+}
+
+@media (max-width: 480px) {
+  .analytics-main-full {
+    padding: 16px;
+  }
+
+  .time-range-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .plan-rank-name {
+    font-size: 13px;
+    max-width: 120px;
+  }
+
+  .plan-rank-count {
+    font-size: 12px;
   }
 }

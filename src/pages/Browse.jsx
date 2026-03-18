@@ -36,6 +36,20 @@ const Browse = () => {
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
 
+  // Review State
+  const [businessReviews, setBusinessReviews] = useState({});
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedBusinessForReview, setSelectedBusinessForReview] =
+    useState(null);
+  const [reviewFormData, setReviewFormData] = useState({
+    rating: 0,
+    comment: "",
+    hoverRating: 0,
+  });
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [userMemberships, setUserMemberships] = useState([]);
+  const [hasMembership, setHasMembership] = useState({});
+
   const navigate = useNavigate();
 
   const locations = [
@@ -66,8 +80,15 @@ const Browse = () => {
   useEffect(() => {
     if (user) {
       fetchBusinesses();
+      fetchUserMemberships();
     }
   }, [selectedBusinessType, user]);
+
+  useEffect(() => {
+    if (selectedBusiness && selectedBusiness.id) {
+      fetchBusinessReviews(selectedBusiness.id);
+    }
+  }, [selectedBusiness]);
 
   const checkUser = async () => {
     try {
@@ -143,6 +164,67 @@ const Browse = () => {
     }
   };
 
+  const fetchUserMemberships = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("memberships")
+        .select("business_id, status")
+        .eq("user_id", user.id)
+        .eq("status", "approved");
+
+      if (error) throw error;
+
+      setUserMemberships(data || []);
+
+      const membershipMap = {};
+      data?.forEach((m) => {
+        membershipMap[m.business_id] = true;
+      });
+      setHasMembership(membershipMap);
+    } catch (error) {
+      console.error("Error fetching user memberships:", error);
+    }
+  };
+
+  const fetchBusinessReviews = async (businessId) => {
+    try {
+      const { data, error } = await supabase
+        .from("reviews")
+        .select(
+          `
+          *,
+          profiles:user_id (
+            first_name,
+            last_name,
+            avatar_url
+          )
+        `,
+        )
+        .eq("business_id", businessId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: data || [],
+      }));
+
+      // Update business rating
+      if (data && data.length > 0) {
+        const avgRating =
+          data.reduce((sum, r) => sum + r.rating, 0) / data.length;
+        await supabase
+          .from("businesses")
+          .update({ rating: avgRating })
+          .eq("id", businessId);
+      }
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+    }
+  };
+
+  // UPDATED: fetchBusinesses with real member counts (ONLY CHANGE HERE)
   const fetchBusinesses = async () => {
     try {
       setLoading(true);
@@ -151,8 +233,8 @@ const Browse = () => {
         .from("businesses")
         .select("*")
         .eq("status", "active")
-        .eq("verification_status", "approved") // Only show fully verified businesses
-        .eq("permit_verified", true); // Must have verified permit
+        .eq("verification_status", "approved")
+        .eq("permit_verified", true);
 
       if (selectedBusinessType !== "all") {
         query = query.eq("business_type", selectedBusinessType);
@@ -161,6 +243,32 @@ const Browse = () => {
       const { data: businessesData, error: businessesError } = await query;
 
       if (businessesError) throw businessesError;
+
+      // Fetch REAL member counts for each business
+      if (businessesData && businessesData.length > 0) {
+        for (let business of businessesData) {
+          // Get count of APPROVED memberships for this business
+          const { count, error } = await supabase
+            .from("memberships")
+            .select("*", { count: "exact", head: true })
+            .eq("business_id", business.id)
+            .eq("status", "approved");
+
+          if (!error) {
+            business.members_count = count || 0;
+          }
+
+          // Get reviews count
+          const { count: reviewCount, error: reviewError } = await supabase
+            .from("reviews")
+            .select("*", { count: "exact", head: true })
+            .eq("business_id", business.id);
+
+          if (!reviewError) {
+            business.review_count = reviewCount || 0;
+          }
+        }
+      }
 
       setBusinesses(businessesData || []);
 
@@ -331,7 +439,6 @@ const Browse = () => {
         receiptPath = fileName;
       }
 
-      // Create membership with correct field name: receipt_path (not receipt_url)
       const membershipData = {
         user_id: user.id,
         business_id: selectedPlanForPayment.businessId,
@@ -342,7 +449,7 @@ const Browse = () => {
         end_date: endDate.toISOString(),
         payment_status: "pending",
         payment_method: paymentFormData.paymentMethod,
-        receipt_path: receiptPath, // Fixed: changed from receipt_url to receipt_path
+        receipt_path: receiptPath,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -397,6 +504,170 @@ const Browse = () => {
   const handlePaymentOption = (method) => {
     setSelectedPaymentMethod(method);
     setShowPaymentModal(true);
+  };
+
+  // ========== REVIEW HANDLERS ==========
+
+  const checkExistingReview = async (businessId) => {
+    try {
+      const { data, error } = await supabase
+        .from("reviews")
+        .select("id, rating, comment")
+        .eq("user_id", user.id)
+        .eq("business_id", businessId)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
+    } catch (error) {
+      console.error("Error checking existing review:", error);
+      return null;
+    }
+  };
+
+  const handleOpenReviewModal = async (business) => {
+    // Check if user already has a review for this business
+    const existingReview = await checkExistingReview(business.id);
+
+    setSelectedBusinessForReview(business);
+    setReviewFormData({
+      rating: existingReview?.rating || 0,
+      comment: existingReview?.comment || "",
+      hoverRating: 0,
+    });
+    setShowReviewModal(true);
+  };
+
+  const handleRatingClick = (rating) => {
+    setReviewFormData((prev) => ({
+      ...prev,
+      rating: rating,
+    }));
+  };
+
+  const handleRatingHover = (rating) => {
+    setReviewFormData((prev) => ({
+      ...prev,
+      hoverRating: rating,
+    }));
+  };
+
+  const handleRatingLeave = () => {
+    setReviewFormData((prev) => ({
+      ...prev,
+      hoverRating: 0,
+    }));
+  };
+
+  const handleSubmitReview = async () => {
+    if (reviewFormData.rating === 0) {
+      alert("Please select a rating");
+      return;
+    }
+
+    if (!reviewFormData.comment.trim()) {
+      alert("Please write a review comment");
+      return;
+    }
+
+    try {
+      setSubmittingReview(true);
+
+      // Check if user already reviewed this business
+      const existingReview = await checkExistingReview(
+        selectedBusinessForReview.id,
+      );
+
+      let result;
+
+      if (existingReview) {
+        // Update existing review
+        const { data, error } = await supabase
+          .from("reviews")
+          .update({
+            rating: reviewFormData.rating,
+            comment: reviewFormData.comment.trim(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingReview.id).select(`
+            *,
+            profiles:user_id (
+              first_name,
+              last_name,
+              avatar_url
+            )
+          `);
+
+        if (error) throw error;
+        result = data[0];
+        alert("Your review has been updated!");
+      } else {
+        // Insert new review
+        const { data, error } = await supabase.from("reviews").insert([
+          {
+            business_id: selectedBusinessForReview.id,
+            user_id: user.id,
+            rating: reviewFormData.rating,
+            comment: reviewFormData.comment.trim(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]).select(`
+            *,
+            profiles:user_id (
+              first_name,
+              last_name,
+              avatar_url
+            )
+          `);
+
+        if (error) throw error;
+        result = data[0];
+        alert("Review submitted successfully!");
+      }
+
+      // Update reviews state
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [selectedBusinessForReview.id]: [
+          result,
+          ...(prev[selectedBusinessForReview.id]?.filter(
+            (r) => r.id !== result.id,
+          ) || []),
+        ],
+      }));
+
+      // Update business rating
+      const allReviews = businessReviews[selectedBusinessForReview.id] || [];
+      const newReviews = [
+        result,
+        ...allReviews.filter((r) => r.id !== result.id),
+      ];
+      const avgRating =
+        newReviews.reduce((sum, r) => sum + r.rating, 0) / newReviews.length;
+
+      await supabase
+        .from("businesses")
+        .update({ rating: avgRating })
+        .eq("id", selectedBusinessForReview.id);
+
+      // Update businesses list with new rating
+      setBusinesses((prev) =>
+        prev.map((b) =>
+          b.id === selectedBusinessForReview.id
+            ? { ...b, rating: avgRating, review_count: newReviews.length }
+            : b,
+        ),
+      );
+
+      setShowReviewModal(false);
+      setSelectedBusinessForReview(null);
+    } catch (error) {
+      console.error("Error submitting review:", error);
+      alert("Failed to submit review. Please try again.");
+    } finally {
+      setSubmittingReview(false);
+    }
   };
 
   const getFirstName = () => {
@@ -505,6 +776,35 @@ const Browse = () => {
     } catch {
       return [];
     }
+  };
+
+  const renderStars = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+
+    for (let i = 1; i <= 5; i++) {
+      if (i <= fullStars) {
+        stars.push(
+          <span key={i} className="star full">
+            ★
+          </span>,
+        );
+      } else if (i === fullStars + 1 && hasHalfStar) {
+        stars.push(
+          <span key={i} className="star half">
+            ★
+          </span>,
+        );
+      } else {
+        stars.push(
+          <span key={i} className="star empty">
+            ☆
+          </span>,
+        );
+      }
+    }
+    return stars;
   };
 
   if (loading) {
@@ -645,7 +945,7 @@ const Browse = () => {
                       </span>
                       <span className="business-rating-tag">
                         <span className="rating-star">⭐</span>
-                        {business.rating || "0.0"}
+                        {business.rating ? business.rating.toFixed(1) : "0.0"}
                       </span>
                     </div>
                   </div>
@@ -671,6 +971,12 @@ const Browse = () => {
                         <span className="detail-icon">👥</span>
                         <span className="detail-text">
                           {business.members_count || 0} members
+                        </span>
+                      </div>
+                      <div className="business-detail-item">
+                        <span className="detail-icon">⭐</span>
+                        <span className="detail-text">
+                          {business.review_count || 0} reviews
                         </span>
                       </div>
                     </div>
@@ -715,7 +1021,7 @@ const Browse = () => {
         </div>
       </div>
 
-      {/* Business Details Modal */}
+      {/* Business Details Modal with Reviews */}
       {showBusinessModal && selectedBusiness && (
         <div
           className="business-modal-overlay"
@@ -760,9 +1066,17 @@ const Browse = () => {
                     {selectedBusiness.business_type}
                   </span>
                   <span className="modal-rating-tag">
-                    <span className="rating-star">⭐</span>
-                    {selectedBusiness.rating || "0.0"} (
-                    {selectedBusiness.members_count || 0} members)
+                    <span className="rating-stars">
+                      {renderStars(selectedBusiness.rating || 0)}
+                    </span>
+                    <span className="rating-number">
+                      {selectedBusiness.rating
+                        ? selectedBusiness.rating.toFixed(1)
+                        : "0.0"}
+                    </span>
+                    <span className="review-count">
+                      ({selectedBusiness.review_count || 0} reviews)
+                    </span>
                   </span>
                 </div>
               </div>
@@ -826,6 +1140,117 @@ const Browse = () => {
                     </p>
                   )}
                 </div>
+              </div>
+
+              {/* Reviews Section */}
+              <div className="modal-section reviews-section">
+                <div className="reviews-header">
+                  <div className="reviews-title-wrapper">
+                    <h3>⭐ Customer Reviews</h3>
+                    {businessReviews[selectedBusiness.id]?.length > 0 && (
+                      <span className="reviews-total-count">
+                        {businessReviews[selectedBusiness.id].length}{" "}
+                        {businessReviews[selectedBusiness.id].length === 1
+                          ? "review"
+                          : "reviews"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="reviews-actions">
+                    {hasMembership[selectedBusiness.id] && (
+                      <button
+                        className="write-review-btn"
+                        onClick={() => handleOpenReviewModal(selectedBusiness)}
+                      >
+                        Write a Review
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {businessReviews[selectedBusiness.id]?.length > 0 ? (
+                  <>
+                    <div className="reviews-list">
+                      {businessReviews[selectedBusiness.id]
+                        .slice(0, 3)
+                        .map((review) => (
+                          <div key={review.id} className="review-item">
+                            <div className="review-header">
+                              <div className="reviewer-info">
+                                <div className="reviewer-avatar">
+                                  {review.profiles?.avatar_url ? (
+                                    <img
+                                      src={review.profiles.avatar_url}
+                                      alt="avatar"
+                                    />
+                                  ) : (
+                                    <span className="avatar-placeholder">
+                                      {review.profiles?.first_name?.[0] || "U"}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="reviewer-details">
+                                  <span className="reviewer-name">
+                                    {review.profiles?.first_name}{" "}
+                                    {review.profiles?.last_name}
+                                  </span>
+                                  <span className="review-date">
+                                    {new Date(
+                                      review.created_at,
+                                    ).toLocaleDateString("en-US", {
+                                      year: "numeric",
+                                      month: "short",
+                                      day: "numeric",
+                                    })}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="review-rating">
+                                {renderStars(review.rating)}
+                              </div>
+                            </div>
+                            <p className="review-comment">{review.comment}</p>
+                          </div>
+                        ))}
+                    </div>
+
+                    {/* View All Reviews Button */}
+                    {businessReviews[selectedBusiness.id]?.length >= 1 && (
+                      <div className="view-all-reviews-container">
+                        <button
+                          className="view-all-reviews-btn"
+                          onClick={() => {
+                            navigate(
+                              `/business-reviews/${selectedBusiness.id}`,
+                              {
+                                state: {
+                                  business: selectedBusiness,
+                                  reviews: businessReviews[selectedBusiness.id],
+                                },
+                              },
+                            );
+                          }}
+                        >
+                          <span>
+                            View All{" "}
+                            {businessReviews[selectedBusiness.id].length}{" "}
+                            {businessReviews[selectedBusiness.id].length === 1 ? "Review" : "Reviews"}
+                          </span>
+                          <span className="btn-arrow">→</span>
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="no-reviews">
+                    <p>No reviews yet for this business.</p>
+                    {hasMembership[selectedBusiness.id] && (
+                      <p className="be-first-review">
+                        Be the first to write a review!
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="modal-section">
@@ -930,6 +1355,118 @@ const Browse = () => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {showReviewModal && selectedBusinessForReview && (
+        <div
+          className="review-modal-overlay"
+          onClick={() => setShowReviewModal(false)}
+        >
+          <div
+            className="review-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="review-modal-close"
+              onClick={() => setShowReviewModal(false)}
+            >
+              ×
+            </button>
+
+            <div className="review-modal-header">
+              <span className="review-modal-icon">⭐</span>
+              <h2>
+                {reviewFormData.rating > 0
+                  ? "Edit Your Review"
+                  : "Write a Review"}
+              </h2>
+            </div>
+
+            <div className="review-business-info">
+              <span className="review-business-icon">
+                {getBusinessIcon(selectedBusinessForReview)}
+              </span>
+              <div className="review-business-details">
+                <h3>{selectedBusinessForReview.name}</h3>
+                <p>{selectedBusinessForReview.location}</p>
+              </div>
+            </div>
+
+            <div className="review-form">
+              <div className="rating-section">
+                <label>Your Rating *</label>
+                <div className="star-rating-container">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span
+                      key={star}
+                      className={`star-rating ${
+                        (reviewFormData.hoverRating || reviewFormData.rating) >=
+                        star
+                          ? "active"
+                          : ""
+                      }`}
+                      onClick={() => handleRatingClick(star)}
+                      onMouseEnter={() => handleRatingHover(star)}
+                      onMouseLeave={handleRatingLeave}
+                    >
+                      ★
+                    </span>
+                  ))}
+                  <span className="rating-label">
+                    {reviewFormData.rating === 1 && "Poor"}
+                    {reviewFormData.rating === 2 && "Fair"}
+                    {reviewFormData.rating === 3 && "Good"}
+                    {reviewFormData.rating === 4 && "Very Good"}
+                    {reviewFormData.rating === 5 && "Excellent"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="comment-section">
+                <label htmlFor="review-comment">Your Review *</label>
+                <textarea
+                  id="review-comment"
+                  rows="5"
+                  placeholder="Share your experience with this business... What did you like? What could be improved?"
+                  value={reviewFormData.comment}
+                  onChange={(e) =>
+                    setReviewFormData((prev) => ({
+                      ...prev,
+                      comment: e.target.value,
+                    }))
+                  }
+                  maxLength="500"
+                />
+                <span className="comment-counter">
+                  {reviewFormData.comment.length}/500
+                </span>
+              </div>
+
+              <div className="review-guidelines">
+                <h4>Review Guidelines:</h4>
+                <ul>
+                  <li>Be respectful and constructive</li>
+                  <li>Share your honest experience</li>
+                  <li>Avoid offensive language</li>
+                  <li>Focus on the business and services</li>
+                </ul>
+              </div>
+
+              <button
+                className="submit-review-btn"
+                onClick={handleSubmitReview}
+                disabled={submittingReview}
+              >
+                {submittingReview
+                  ? "Submitting..."
+                  : reviewFormData.rating > 0 && reviewFormData.comment
+                    ? "Update Review"
+                    : "Submit Review"}
+              </button>
             </div>
           </div>
         </div>

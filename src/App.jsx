@@ -1,6 +1,10 @@
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { supabase, isSupabaseConfigured, testSupabaseConnection } from "./lib/supabase";
+import {
+  supabase,
+  isSupabaseConfigured,
+  testSupabaseConnection,
+} from "./lib/supabase";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -11,6 +15,7 @@ import MyBusinessPage from "./pages/MyBusinessPage";
 import Applications from "./pages/Applications";
 import Analytics from "./pages/Analytics";
 import Browse from "./pages/Browse";
+import BusinessReviews from "./pages/BusinessReviews"; // ✅ ADD THIS IMPORT
 import LandingPage from "./pages/LandingPage";
 import About from "./pages/About";
 import Profile from "./pages/Profile";
@@ -21,6 +26,7 @@ import AdminBusinessManagement from "./pages/AdminBusinessManagement";
 import AdminSettings from "./pages/AdminSettings";
 import AdminProfile from "./components/admin/AdminProfile";
 import OwnerNotifications from "./pages/OwnerNotifications";
+import OwnerSettings from "./pages/OwnerSettings";
 import "./App.css";
 
 function App() {
@@ -53,7 +59,7 @@ function App() {
     const initializeAuth = async () => {
       try {
         console.log("🔍 Initializing auth...");
-        
+
         // Test Supabase connection first
         const isConnected = await testSupabaseConnection();
         if (!isConnected) {
@@ -63,47 +69,54 @@ function App() {
           setAuthChecked(true);
           return;
         }
-        
+
         // Get actual session from Supabase
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
         if (error) {
           console.error("Error getting session:", error);
-          localStorage.removeItem('sb-session');
+          localStorage.removeItem("sb-session");
           setAuthError(error.message);
           setLoading(false);
           setAuthChecked(true);
           return;
         }
 
-        console.log("📦 Initial session:", session?.user?.email || "No session");
-        
+        console.log(
+          "📦 Initial session:",
+          session?.user?.email || "No session",
+        );
+
         if (session?.user) {
           // Validate that the session is still valid
-          const { data: userData, error: userError } = await supabase.auth.getUser();
-          
+          const { data: userData, error: userError } =
+            await supabase.auth.getUser();
+
           if (userError || !userData?.user) {
             console.log("❌ Session is invalid, clearing...");
-            localStorage.removeItem('sb-session');
+            localStorage.removeItem("sb-session");
             setSession(null);
             setLoading(false);
             setAuthChecked(true);
             return;
           }
-          
+
           setSession(session);
           console.log("👤 Valid session found for:", session.user.email);
           await fetchUserRole(session.user.id);
         } else {
           console.log("👤 No valid session");
-          localStorage.removeItem('sb-session');
+          localStorage.removeItem("sb-session");
           setSession(null);
           setLoading(false);
           setAuthChecked(true);
         }
       } catch (error) {
         console.error("Error in auth initialization:", error);
-        localStorage.removeItem('sb-session');
+        localStorage.removeItem("sb-session");
         setAuthError(error.message);
         setLoading(false);
         setAuthChecked(true);
@@ -112,59 +125,61 @@ function App() {
 
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("🔄 Auth state changed - event:", event, "email:", session?.user?.email);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(
+        "🔄 Auth state changed - event:",
+        event,
+        "email:",
+        session?.user?.email,
+      );
 
-        setSession(session);
+      setSession(session);
 
-        if (event === "SIGNED_IN" && session?.user) {
-          console.log("✅ User signed in:", session.user.email);
-          hasProcessedSignIn.current = true;
-          setInitialRedirectDone(false);
-          setAuthError(null);
-          setLoading(true);
+      if (event === "SIGNED_IN" && session?.user) {
+        console.log("✅ User signed in:", session.user.email);
+        hasProcessedSignIn.current = true;
+        setInitialRedirectDone(false);
+        setAuthError(null);
+        setLoading(true);
+        try {
+          await fetchUserRole(session.user.id);
+        } catch (error) {
+          console.error("Error in sign in flow:", error);
+          setLoading(false);
+        }
+      } else if (event === "TOKEN_REFRESHED") {
+        console.log("🔄 Token refreshed");
+        if (session?.user) {
           try {
             await fetchUserRole(session.user.id);
           } catch (error) {
-            console.error("Error in sign in flow:", error);
+            console.error("Error in token refresh:", error);
             setLoading(false);
           }
         }
-        else if (event === "TOKEN_REFRESHED") {
-          console.log("🔄 Token refreshed");
-          if (session?.user) {
-            try {
-              await fetchUserRole(session.user.id);
-            } catch (error) {
-              console.error("Error in token refresh:", error);
-              setLoading(false);
-            }
-          }
-        }
-        else if (event === "SIGNED_OUT") {
-          console.log("👤 User signed out");
-          localStorage.removeItem('sb-session');
-          setUserRole(null);
-          setSession(null);
-          setAuthError(null);
-          setLoading(false);
-          setInitialRedirectDone(false);
-          hasProcessedSignIn.current = false;
-          navigationInProgress.current = false;
-          fetchRetryCount.current = 0;
-          
-          // Navigate to home page on sign out
-          navigate("/", { replace: true });
-        }
-        else if (event === "USER_UPDATED") {
-          console.log("👤 User updated");
-          if (session?.user) {
-            await fetchUserRole(session.user.id);
-          }
+      } else if (event === "SIGNED_OUT") {
+        console.log("👤 User signed out");
+        localStorage.removeItem("sb-session");
+        setUserRole(null);
+        setSession(null);
+        setAuthError(null);
+        setLoading(false);
+        setInitialRedirectDone(false);
+        hasProcessedSignIn.current = false;
+        navigationInProgress.current = false;
+        fetchRetryCount.current = 0;
+
+        // Navigate to home page on sign out
+        navigate("/", { replace: true });
+      } else if (event === "USER_UPDATED") {
+        console.log("👤 User updated");
+        if (session?.user) {
+          await fetchUserRole(session.user.id);
         }
       }
-    );
+    });
 
     return () => {
       subscription.unsubscribe();
@@ -174,12 +189,12 @@ function App() {
 
   const fetchUserRole = async (userId) => {
     fetchRetryCount.current = 0;
-    
+
     try {
       console.log("🔍 Fetching role for user ID:", userId);
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Fetch timeout")), 5000)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Fetch timeout")), 5000),
       );
 
       const fetchPromise = supabase
@@ -188,14 +203,17 @@ function App() {
         .eq("id", userId)
         .maybeSingle();
 
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+      const { data, error } = await Promise.race([
+        fetchPromise,
+        timeoutPromise,
+      ]);
 
       if (error) {
         console.error("❌ Error fetching user role:", error);
         // If we get a permission error, maybe the session is invalid
-        if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+        if (error.code === "PGRST301" || error.message?.includes("JWT")) {
           console.log("❌ JWT error - session may be invalid");
-          localStorage.removeItem('sb-session');
+          localStorage.removeItem("sb-session");
           setSession(null);
         }
         setUserRole("client");
@@ -218,10 +236,12 @@ function App() {
       console.error("❌ Error in fetchUserRole:", error);
       setUserRole("client");
       setAuthError(error.message);
-      
+
       if (fetchRetryCount.current < 2) {
         fetchRetryCount.current++;
-        console.log(`🔄 Retrying fetchUserRole (attempt ${fetchRetryCount.current + 1}/3)...`);
+        console.log(
+          `🔄 Retrying fetchUserRole (attempt ${fetchRetryCount.current + 1}/3)...`,
+        );
         setTimeout(() => {
           fetchUserRole(userId);
         }, 1000 * fetchRetryCount.current);
@@ -238,7 +258,9 @@ function App() {
   useEffect(() => {
     // Don't redirect if still loading or auth not checked
     if (loading || !authChecked) {
-      console.log("⏳ Still loading or auth not checked, waiting before redirect check...");
+      console.log(
+        "⏳ Still loading or auth not checked, waiting before redirect check...",
+      );
       return;
     }
 
@@ -262,8 +284,14 @@ function App() {
     const currentPath = window.location.pathname;
     console.log("📍 Navigation check - Path:", currentPath, "Role:", userRole);
 
-    const publicPaths = ["/login", "/", "/register", "/forgot-password", "/about"];
-    
+    const publicPaths = [
+      "/login",
+      "/",
+      "/register",
+      "/forgot-password",
+      "/about",
+    ];
+
     // Only redirect if on a public path AND logged in with valid session
     if (publicPaths.includes(currentPath)) {
       navigationInProgress.current = true;
@@ -329,7 +357,7 @@ function App() {
       </div>
     );
   }
-  
+
   const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     console.log(
       "🛡️ ProtectedRoute - Session:",
@@ -401,6 +429,15 @@ function App() {
           </ProtectedRoute>
         }
       />
+      {/* ✅ NEW ROUTE FOR BUSINESS REVIEWS */}
+      <Route
+        path="/business-reviews/:businessId"
+        element={
+          <ProtectedRoute allowedRoles={["client"]}>
+            <BusinessReviews />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Owner Routes */}
       <Route
@@ -451,7 +488,15 @@ function App() {
           </ProtectedRoute>
         }
       />
-
+      <Route
+        path="/owner-settings"
+        element={
+          <ProtectedRoute allowedRoles={["owner"]}>
+            <OwnerSettings />
+          </ProtectedRoute>
+        }
+      />
+      
       {/* Admin Routes */}
       <Route
         path="/admin-dashboard"

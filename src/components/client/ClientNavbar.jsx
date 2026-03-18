@@ -12,6 +12,7 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(propUnreadCount || 0);
   const [user, setUser] = useState(null);
+  const [subscription, setSubscription] = useState(null);
 
   useEffect(() => {
     // Get current user
@@ -32,12 +33,20 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   useEffect(() => {
     if (!user) return;
 
-    // Fetch initial unread count
+    console.log('Setting up notifications for user:', user.id);
+
+    // Fetch initial unread count and recent notifications
     fetchUnreadCount();
+    fetchRecentNotifications();
+
+    // Clean up existing subscription
+    if (subscription) {
+      subscription.unsubscribe();
+    }
 
     // Set up real-time subscription for new notifications
-    const subscription = supabase
-      .channel('navbar-notifications-channel')
+    const newSubscription = supabase
+      .channel(`navbar-notifications-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -47,15 +56,20 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('New notification in navbar:', payload);
+          console.log('🔔 New notification received:', payload);
+          
           // Increment unread count
           setUnreadCount(prev => prev + 1);
           
-          // Add to notifications list if dropdown is open
-          setNotifications(prev => [payload.new, ...prev]);
-          
-          // Optional: Show a brief notification toast
-          showNotificationToast(payload.new);
+          // Add to notifications list (keep only 5 most recent)
+          setNotifications(prev => {
+            // Check if notification already exists to prevent duplicates
+            const exists = prev.some(n => n.id === payload.new.id);
+            if (exists) return prev;
+            
+            const newList = [payload.new, ...prev].slice(0, 5);
+            return newList;
+          });
         }
       )
       .on(
@@ -67,6 +81,8 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
+          console.log('📝 Notification updated:', payload);
+          
           // Handle updates (like marking as read)
           if (payload.new.is_read === true && payload.old.is_read === false) {
             setUnreadCount(prev => Math.max(0, prev - 1));
@@ -78,13 +94,17 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
           );
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
 
-    // Fetch recent notifications for dropdown
-    fetchRecentNotifications();
+    setSubscription(newSubscription);
 
     return () => {
-      subscription.unsubscribe();
+      console.log('Cleaning up subscription');
+      if (newSubscription) {
+        newSubscription.unsubscribe();
+      }
     };
   }, [user]);
 
@@ -99,6 +119,7 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
         .eq('is_read', false);
 
       if (error) throw error;
+      console.log('Unread count:', count);
       setUnreadCount(count || 0);
     } catch (error) {
       console.error('Error fetching unread count:', error);
@@ -109,27 +130,26 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     if (!user) return;
     
     try {
+      console.log('Fetching recent notifications for user:', user.id);
+      
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10); // Increased from 5 to 10
 
       if (error) throw error;
+      
+      console.log('Fetched notifications:', data?.length || 0, 'notifications');
       setNotifications(data || []);
+      
+      // Also update unread count
+      const unread = data?.filter(n => !n.is_read).length || 0;
+      setUnreadCount(unread);
     } catch (error) {
       console.error('Error fetching recent notifications:', error);
     }
-  };
-
-  const showNotificationToast = (notification) => {
-    // You can implement a toast notification here
-    // For now, we'll just log it
-    console.log('New notification:', notification);
-    
-    // You could use a library like react-toastify or create a simple toast
-    // Example: toast.success(`New: ${notification.title}`);
   };
 
   const handleNotificationClick = async (notification) => {
@@ -143,13 +163,30 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
             read_at: new Date().toISOString() 
           })
           .eq('id', notification.id);
+        
+        // Update local state
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        setNotifications(prev => 
+          prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
+        );
       } catch (error) {
         console.error('Error marking notification as read:', error);
       }
     }
 
-    // Navigate to notifications page
-    navigate(`/notifications?highlight=${notification.id}`);
+    // Navigate based on notification type
+    if (notification.type === 'membership_pending') {
+      navigate('/ClientDashboard');
+    } else if (notification.type === 'membership_approved') {
+      navigate('/ClientDashboard');
+    } else if (notification.type === 'membership_rejected') {
+      navigate('/browse');
+    } else if (notification.type === 'membership_cancelled') {
+      navigate('/browse');
+    } else {
+      navigate(`/notifications?highlight=${notification.id}`);
+    }
+    
     setShowNotifications(false);
   };
 
@@ -252,10 +289,14 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
         return '📢';
       case 'direct':
         return '✉️';
+      case 'membership_pending':
+        return '📋';
       case 'membership_approved':
         return '✅';
       case 'membership_rejected':
         return '❌';
+      case 'membership_cancelled':
+        return '📢';
       case 'promo':
         return '🏷️';
       default:
@@ -305,7 +346,7 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
               setShowNotifications(!showNotifications);
               setShowDropdown(false);
               if (!showNotifications) {
-                fetchRecentNotifications();
+                fetchRecentNotifications(); // Refresh when opening
               }
             }}
           >

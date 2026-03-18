@@ -307,7 +307,6 @@ const OwnerMemberManagement = () => {
     }
   };
 
-  // FIXED: Updated to use allowed notification types only
   const handleSendMessage = async () => {
     if (!messageSubject.trim() || !messageContent.trim()) {
       alert('Please enter both subject and message');
@@ -326,38 +325,33 @@ const OwnerMemberManagement = () => {
       const recipients = members.filter(m => selectedMembers.includes(m.membershipId));
       
       // Determine notification type - only use allowed types from the constraint
-      // Allowed types: 'welcome', 'announcement', 'membership_approved', 'membership_rejected', 'promo'
       let notificationType = 'announcement'; // Default
       
       if (messageType === 'promo') {
         notificationType = 'promo';
       } else if (messageType === 'direct') {
-        // For direct messages, use 'announcement' as it's the closest allowed type
         notificationType = 'announcement';
       }
       
-      // Create notifications in database with correct column names
+      // Create notifications in database
       const notifications = recipients.map(recipient => ({
         user_id: recipient.userId,
-        type: notificationType, // Only using allowed types
+        type: notificationType,
         title: messageSubject,
         message: messageContent,
         business_id: recipient.businessId,
         is_read: false,
         created_at: new Date().toISOString(),
-        // Store the original message type and sender info in data field
         data: {
           sender: 'owner',
           sender_name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Owner',
           sender_id: profile?.id,
           business_name: recipient.businessName,
           business_id: recipient.businessId,
-          original_message_type: messageType, // Store original type for reference
+          original_message_type: messageType,
           recipient_count: recipients.length
         }
       }));
-
-      console.log('Sending notifications:', notifications);
 
       const { error } = await supabase
         .from('notifications')
@@ -387,56 +381,26 @@ const OwnerMemberManagement = () => {
     }
   };
 
-  // FIXED: Updated to use 'cancelled' status (allowed value)
+  // FIXED: Removed manual notification creation - database trigger handles it
   const handleRemoveMember = async () => {
     if (!memberToRemove) return;
 
     try {
-      // Update membership status to 'cancelled' (allowed value from constraint)
+      // Update membership status to 'cancelled'
       const { error } = await supabase
         .from('memberships')
         .update({ 
-          status: 'cancelled', // Changed from 'inactive' to 'cancelled'
+          status: 'cancelled',
           updated_at: new Date().toISOString()
         })
         .eq('id', memberToRemove.membershipId);
 
       if (error) throw error;
 
-      // Create a notification for the removed member
-      await supabase.from('notifications').insert({
-        user_id: memberToRemove.userId,
-        type: 'announcement', // Using allowed type
-        title: 'Membership Cancelled',
-        message: `Your membership at ${memberToRemove.businessName || 'the business'} has been cancelled. Please contact the business owner for more information.`,
-        business_id: memberToRemove.businessId,
-        data: {
-          membership_id: memberToRemove.membershipId,
-          status: 'cancelled',
-          removed_at: new Date().toISOString(),
-          business_name: memberToRemove.businessName
-        },
-        is_read: false,
-        created_at: new Date().toISOString()
-      });
-
-      // Also create a notification for the owner (for record keeping)
-      await supabase.from('notifications').insert({
-        user_id: profile?.id,
-        type: 'announcement',
-        title: 'Member Removed',
-        message: `${memberToRemove.name} has been removed from your members.`,
-        business_id: memberToRemove.businessId,
-        data: {
-          membership_id: memberToRemove.membershipId,
-          member_name: memberToRemove.name,
-          member_email: memberToRemove.email,
-          removed_at: new Date().toISOString()
-        },
-        is_read: false,
-        created_at: new Date().toISOString()
-      });
-
+      // REMOVED: Manual notification creation
+      // The database trigger 'membership_status_change_trigger' will automatically create
+      // notifications for both the member and the owner
+      
       // Remove from local state
       setMembers(members.filter(m => m.membershipId !== memberToRemove.membershipId));
       setFilteredMembers(filteredMembers.filter(m => m.membershipId !== memberToRemove.membershipId));

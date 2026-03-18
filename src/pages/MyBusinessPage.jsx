@@ -16,7 +16,7 @@ const MyBusinessPage = () => {
   const [activeTab, setActiveTab] = useState("basic");
   const [profile, setProfile] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
-  
+
   // Validation states
   const [touchedFields, setTouchedFields] = useState({});
   const [focusedField, setFocusedField] = useState(null);
@@ -34,7 +34,6 @@ const MyBusinessPage = () => {
   const [uploadingPermit, setUploadingPermit] = useState(false);
   const [permitNumber, setPermitNumber] = useState("");
   const [permitExpiry, setPermitExpiry] = useState("");
-  const [showVerificationBanner, setShowVerificationBanner] = useState(true);
 
   // Membership plans state
   const [membershipPlans, setMembershipPlans] = useState([]);
@@ -48,34 +47,79 @@ const MyBusinessPage = () => {
     is_active: true,
   });
 
-  // Membership applications state
-  const [applications, setApplications] = useState([]);
-  const [applicationsLoading, setApplicationsLoading] = useState(false);
-  const [processingApplication, setProcessingApplication] = useState(null);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [pendingCount, setPendingCount] = useState(0);
-
-  // Business hours state
-  const [businessHours, setBusinessHours] = useState({
-    monday: { open: "09:00", close: "18:00", closed: false },
-    tuesday: { open: "09:00", close: "18:00", closed: false },
-    wednesday: { open: "09:00", close: "18:00", closed: false },
-    thursday: { open: "09:00", close: "18:00", closed: false },
-    friday: { open: "09:00", close: "18:00", closed: false },
-    saturday: { open: "10:00", close: "17:00", closed: false },
-    sunday: { open: "10:00", close: "15:00", closed: true },
+  // Reviews & Ratings State
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [selectedReview, setSelectedReview] = useState(null);
+  const [showDeleteReviewModal, setShowDeleteReviewModal] = useState(false);
+  const [deletingReview, setDeletingReview] = useState(false);
+  const [ratingStats, setRatingStats] = useState({
+    average: 0,
+    total: 0,
+    distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
   });
 
-  // Business categories from RegisterPage
+  // Business hours state with 12-hour format
+  const [businessHours, setBusinessHours] = useState({
+    monday: {
+      open: "09:00",
+      close: "18:00",
+      closed: false,
+      openAMPM: "AM",
+      closeAMPM: "PM",
+    },
+    tuesday: {
+      open: "09:00",
+      close: "18:00",
+      closed: false,
+      openAMPM: "AM",
+      closeAMPM: "PM",
+    },
+    wednesday: {
+      open: "09:00",
+      close: "18:00",
+      closed: false,
+      openAMPM: "AM",
+      closeAMPM: "PM",
+    },
+    thursday: {
+      open: "09:00",
+      close: "18:00",
+      closed: false,
+      openAMPM: "AM",
+      closeAMPM: "PM",
+    },
+    friday: {
+      open: "09:00",
+      close: "18:00",
+      closed: false,
+      openAMPM: "AM",
+      closeAMPM: "PM",
+    },
+    saturday: {
+      open: "10:00",
+      close: "17:00",
+      closed: false,
+      openAMPM: "AM",
+      closeAMPM: "PM",
+    },
+    sunday: {
+      open: "10:00",
+      close: "15:00",
+      closed: true,
+      openAMPM: "AM",
+      closeAMPM: "PM",
+    },
+  });
+
+  // Business categories
   const businessCategories = [
     { id: "gym", label: "Gym / Fitness Center", icon: "🏋️" },
     { id: "cafe", label: "Cafe / Coffee Shop", icon: "☕" },
     { id: "bakery", label: "Bakery / Pastry Shop", icon: "🥐" },
   ];
 
-  // Location options from Browse.jsx
+  // Location options
   const locationOptions = [
     { value: "Downtown", label: "Downtown" },
     { value: "Arellano", label: "Arellano" },
@@ -104,7 +148,7 @@ const MyBusinessPage = () => {
   useEffect(() => {
     if (business?.id) {
       fetchMembershipPlans();
-      fetchApplications();
+      fetchReviews();
       // Parse business hours if they exist
       if (business.business_hours) {
         setBusinessHours(business.business_hours);
@@ -139,91 +183,96 @@ const MyBusinessPage = () => {
   // Validate fields when formData changes
   useEffect(() => {
     if (editMode) {
-      validateField('name');
-      validateField('business_type');
-      validateField('short_description');
-      validateField('description');
-      validateField('location');
-      validateField('address');
-      validateField('price');
-      validateField('contact_phone');
-      validateField('contact_email');
-      validateField('website');
-      validateField('gcash_number');
+      validateField("name");
+      validateField("business_type");
+      validateField("short_description");
+      validateField("location");
+      validateField("address");
+      validateField("price");
+      validateField("contact_phone");
+      validateField("contact_email");
+      validateField("website");
+      validateField("gcash_number");
     }
   }, [formData, editMode]);
 
   const validateField = (fieldName) => {
-    let errorMessage = '';
+    let errorMessage = "";
 
     switch (fieldName) {
-      case 'name':
+      case "name":
         if (!formData.name?.trim()) {
-          errorMessage = 'Business name is required';
+          errorMessage = "Business name is required";
         }
         break;
-
-      case 'business_type':
+      case "business_type":
         if (!formData.business_type) {
-          errorMessage = 'Please select a business category';
+          errorMessage = "Please select a business category";
         }
         break;
-
-      case 'short_description':
+      case "short_description":
         if (formData.short_description?.length > 200) {
-          errorMessage = 'Short description must be less than 200 characters';
+          errorMessage = "Short description must be less than 200 characters";
         }
         break;
-
-      case 'location':
+      case "location":
         if (!formData.location) {
-          errorMessage = 'Please select a location';
+          errorMessage = "Please select a location";
         }
         break;
-
-      case 'address':
+      case "address":
         if (!formData.address?.trim()) {
-          errorMessage = 'Address is required';
+          errorMessage = "Address is required";
         }
         break;
-
-      case 'price':
+      case "price":
         if (formData.price < 0) {
-          errorMessage = 'Price cannot be negative';
+          errorMessage = "Price cannot be negative";
         }
         break;
-
-      case 'contact_phone':
-        if (formData.contact_phone && !/^(\+63|0)[0-9]{10}$/.test(formData.contact_phone.replace(/\s/g, ''))) {
-          errorMessage = 'Invalid phone number format';
+      case "contact_phone":
+        if (
+          formData.contact_phone &&
+          !/^(\+63|0)[0-9]{10}$/.test(formData.contact_phone.replace(/\s/g, ""))
+        ) {
+          errorMessage = "Invalid phone number format";
         }
         break;
-
-      case 'contact_email':
-        if (formData.contact_email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.contact_email)) {
-          errorMessage = 'Invalid email format';
+      case "contact_email":
+        if (
+          formData.contact_email &&
+          !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(
+            formData.contact_email,
+          )
+        ) {
+          errorMessage = "Invalid email format";
         }
         break;
-
-      case 'website':
-        if (formData.website && !/^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(formData.website)) {
-          errorMessage = 'Invalid website URL';
+      case "website":
+        if (
+          formData.website &&
+          !/^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(
+            formData.website,
+          )
+        ) {
+          errorMessage = "Invalid website URL";
         }
         break;
-
-      case 'gcash_number':
-        if (formData.gcash_number && !/^09\d{9}$/.test(formData.gcash_number.replace(/\s/g, ''))) {
-          errorMessage = 'GCash number must be 11 digits starting with 09';
+      case "gcash_number":
+        if (
+          formData.gcash_number &&
+          !/^09\d{9}$/.test(formData.gcash_number.replace(/\s/g, ""))
+        ) {
+          errorMessage = "GCash number must be 11 digits starting with 09";
         }
         break;
-
       default:
         break;
     }
 
-    setFieldErrors(prev => ({
+    setFieldErrors((prev) => ({
       ...prev,
-      [fieldName]: errorMessage
+      [fieldName]: errorMessage,
     }));
 
     return !errorMessage;
@@ -371,168 +420,83 @@ const MyBusinessPage = () => {
     }
   };
 
-  const fetchApplications = async () => {
+  const fetchReviews = async () => {
     if (!business?.id) return;
-    
+
     try {
-      setApplicationsLoading(true);
+      setReviewsLoading(true);
       const { data, error } = await supabase
-        .from("memberships")
-        .select(`
+        .from("reviews")
+        .select(
+          `
           *,
-          user:profiles!memberships_user_id_fkey (
-            id,
-            email,
+          profiles:user_id (
             first_name,
             last_name,
-            mobile
-          ),
-          plan:membership_plans (
-            id,
-            name,
-            price,
-            duration,
-            features
+            avatar_url
           )
-        `)
+        `,
+        )
         .eq("business_id", business.id)
-        .eq("status", "pending")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setApplications(data || []);
-      setPendingCount(data?.length || 0);
+
+      setReviews(data || []);
+
+      if (data && data.length > 0) {
+        const total = data.length;
+        const sum = data.reduce((acc, review) => acc + review.rating, 0);
+        const average = sum / total;
+
+        const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        data.forEach((review) => {
+          distribution[review.rating]++;
+        });
+
+        setRatingStats({
+          average,
+          total,
+          distribution,
+        });
+      } else {
+        setRatingStats({
+          average: 0,
+          total: 0,
+          distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        });
+      }
     } catch (error) {
-      console.error("Error fetching applications:", error);
+      console.error("Error fetching reviews:", error);
     } finally {
-      setApplicationsLoading(false);
+      setReviewsLoading(false);
     }
   };
 
-  const handleApproveApplication = async (application) => {
-    try {
-      setProcessingApplication(application.id);
-
-      // Get current owner
-      const { data: { user } } = await supabase.auth.getUser();
-
-      // 1. Update membership status
-      const { error: membershipError } = await supabase
-        .from("memberships")
-        .update({
-          status: "active",
-          payment_status: "paid",
-          approved_by: user.id,
-          approved_at: new Date().toISOString(),
-          reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", application.id);
-
-      if (membershipError) throw membershipError;
-
-      // 2. Increment business member count
-      const { error: updateError } = await supabase
-        .from("businesses")
-        .update({ 
-          members_count: (business.members_count || 0) + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", business.id);
-
-      if (updateError) throw updateError;
-
-      // 3. Update local business state
-      setBusiness(prev => ({
-        ...prev,
-        members_count: (prev.members_count || 0) + 1
-      }));
-
-      // 4. Send notification to client
-      await supabase
-        .from("notifications")
-        .insert({
-          user_id: application.user_id,
-          type: "membership_approved",
-          title: "✅ Membership Approved!",
-          message: `Your membership application for ${application.plan?.name} has been approved! You can now enjoy your membership benefits.`,
-          data: {
-            membershipId: application.id,
-            businessId: business.id,
-            planName: application.plan?.name
-          },
-          created_at: new Date().toISOString()
-        });
-
-      // Refresh applications
-      await fetchApplications();
-      
-      setSuccessMessage("Membership approved successfully!");
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error) {
-      console.error("Error approving application:", error);
-      setError("Failed to approve application. Please try again.");
-    } finally {
-      setProcessingApplication(null);
-    }
-  };
-
-  const handleRejectApplication = async () => {
-    if (!rejectReason.trim()) {
-      alert("Please provide a reason for rejection");
-      return;
-    }
+  const handleDeleteReview = async () => {
+    if (!selectedReview) return;
 
     try {
-      setProcessingApplication(selectedApplication.id);
+      setDeletingReview(true);
 
-      // Get current owner
-      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("reviews")
+        .delete()
+        .eq("id", selectedReview.id);
 
-      // Update membership status
-      const { error: membershipError } = await supabase
-        .from("memberships")
-        .update({
-          status: "rejected",
-          payment_status: "failed",
-          application_notes: rejectReason,
-          reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", selectedApplication.id);
+      if (error) throw error;
 
-      if (membershipError) throw membershipError;
+      await fetchReviews();
 
-      // Send notification to client
-      await supabase
-        .from("notifications")
-        .insert({
-          user_id: selectedApplication.user_id,
-          type: "membership_rejected",
-          title: "❌ Membership Application Update",
-          message: `Your membership application was not approved. Reason: ${rejectReason}`,
-          data: {
-            membershipId: selectedApplication.id,
-            businessId: business.id,
-            reason: rejectReason
-          },
-          created_at: new Date().toISOString()
-        });
-
-      // Refresh applications
-      await fetchApplications();
-      
-      setShowRejectModal(false);
-      setSelectedApplication(null);
-      setRejectReason("");
-      
-      setSuccessMessage("Application rejected successfully!");
+      setShowDeleteReviewModal(false);
+      setSelectedReview(null);
+      setSuccessMessage("Review deleted successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error) {
-      console.error("Error rejecting application:", error);
-      setError("Failed to reject application. Please try again.");
+      console.error("Error deleting review:", error);
+      setError("Failed to delete review. Please try again.");
     } finally {
-      setProcessingApplication(null);
+      setDeletingReview(false);
     }
   };
 
@@ -549,15 +513,34 @@ const MyBusinessPage = () => {
     }
   };
 
+  // Convert 24h to 12h format
+  const convertTo12Hour = (time24) => {
+    if (!time24) return { time: "09:00", ampm: "AM" };
+    const [hours, minutes] = time24.split(":");
+    const h = parseInt(hours);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return { time: `${h12.toString().padStart(2, "0")}:${minutes}`, ampm };
+  };
+
+  // Convert 12h to 24h format
+  const convertTo24Hour = (time12, ampm) => {
+    if (!time12) return "09:00";
+    const [hours, minutes] = time12.split(":");
+    let h = parseInt(hours);
+    if (ampm === "PM" && h !== 12) h += 12;
+    if (ampm === "AM" && h === 12) h = 0;
+    return `${h.toString().padStart(2, "0")}:${minutes}`;
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
-    // Special handling for phone numbers
-    if (name === 'contact_phone' || name === 'gcash_number') {
-      const numericValue = value.replace(/\D/g, '');
+
+    if (name === "contact_phone" || name === "gcash_number") {
+      const numericValue = value.replace(/\D/g, "");
       setFormData((prev) => ({
         ...prev,
-        [name]: numericValue
+        [name]: numericValue,
       }));
     } else {
       setFormData((prev) => ({
@@ -575,18 +558,6 @@ const MyBusinessPage = () => {
     }));
   };
 
-  const handleJsonChange = (field, value) => {
-    try {
-      const parsed = JSON.parse(value);
-      setFormData((prev) => ({
-        ...prev,
-        [field]: parsed,
-      }));
-    } catch (e) {
-      console.error("Invalid JSON:", e);
-    }
-  };
-
   const handleBusinessHourChange = (day, field, value) => {
     setBusinessHours((prev) => ({
       ...prev,
@@ -597,9 +568,28 @@ const MyBusinessPage = () => {
     }));
   };
 
+  const handleTimeChange = (day, type, value) => {
+    const current = businessHours[day];
+    if (type === "openTime") {
+      handleBusinessHourChange(
+        day,
+        "open",
+        convertTo24Hour(value, current.openAMPM),
+      );
+    } else if (type === "closeTime") {
+      handleBusinessHourChange(
+        day,
+        "close",
+        convertTo24Hour(value, current.closeAMPM),
+      );
+    } else {
+      handleBusinessHourChange(day, type, value);
+    }
+  };
+
   const handleBlur = (fieldName) => {
     setFocusedField(null);
-    setTouchedFields(prev => ({ ...prev, [fieldName]: true }));
+    setTouchedFields((prev) => ({ ...prev, [fieldName]: true }));
     validateField(fieldName);
   };
 
@@ -607,13 +597,11 @@ const MyBusinessPage = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Check file type
     if (!file.type.startsWith("image/")) {
       setError("Please upload an image file");
       return;
     }
 
-    // Check file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       setError("File size must be less than 2MB");
       return;
@@ -629,30 +617,22 @@ const MyBusinessPage = () => {
       } = await supabase.auth.getUser();
       if (userError) throw userError;
 
-      // Create a unique file name
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/gcash-qr-${Date.now()}.${fileExt}`;
 
-      // Upload file to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from("gcash-qr-codes")
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from("gcash-qr-codes")
         .getPublicUrl(fileName);
 
       setGcashQrCode(fileName);
       setGcashQrUrl(urlData.publicUrl);
-
-      // Update formData with the QR code path
-      setFormData((prev) => ({
-        ...prev,
-        gcash_qr_code: fileName,
-      }));
+      setFormData((prev) => ({ ...prev, gcash_qr_code: fileName }));
 
       setSuccessMessage("GCash QR code uploaded successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
@@ -666,10 +646,8 @@ const MyBusinessPage = () => {
 
   const removeGcashQr = async () => {
     if (!gcashQrCode) return;
-
-    if (!window.confirm("Are you sure you want to remove the GCash QR code?")) {
+    if (!window.confirm("Are you sure you want to remove the GCash QR code?"))
       return;
-    }
 
     try {
       const { error } = await supabase.storage
@@ -680,11 +658,7 @@ const MyBusinessPage = () => {
 
       setGcashQrCode(null);
       setGcashQrUrl("");
-      setFormData((prev) => ({
-        ...prev,
-        gcash_qr_code: null,
-      }));
-
+      setFormData((prev) => ({ ...prev, gcash_qr_code: null }));
       setSuccessMessage("GCash QR code removed successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
@@ -693,7 +667,6 @@ const MyBusinessPage = () => {
     }
   };
 
-  // Permit Upload Functions
   const uploadPermit = async () => {
     if (!permitFile) {
       setError("Please select a permit file to upload");
@@ -710,7 +683,6 @@ const MyBusinessPage = () => {
       return;
     }
 
-    // Validate expiry date
     const expiryDate = new Date(permitExpiry);
     const today = new Date();
     if (expiryDate < today) {
@@ -728,18 +700,15 @@ const MyBusinessPage = () => {
       } = await supabase.auth.getUser();
       if (userError) throw userError;
 
-      // Create a unique file name
       const fileExt = permitFile.name.split(".").pop();
       const fileName = `${user.id}/permit_${Date.now()}.${fileExt}`;
 
-      // Upload file to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from("business-permits")
         .upload(fileName, permitFile);
 
       if (uploadError) throw uploadError;
 
-      // Update business with permit information
       const { error: updateError } = await supabase
         .from("businesses")
         .update({
@@ -749,24 +718,21 @@ const MyBusinessPage = () => {
           permit_verified: false,
           permit_uploaded_at: new Date().toISOString(),
           verification_status: "pending",
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq("id", business.id);
 
       if (updateError) throw updateError;
 
-      // Refresh business data
       await fetchBusiness();
-
-      setSuccessMessage("Permit uploaded successfully! Waiting for admin verification.");
+      setSuccessMessage(
+        "Permit uploaded successfully! Waiting for admin verification.",
+      );
       setTimeout(() => setSuccessMessage(""), 3000);
-
-      // Reset form
       setPermitFile(null);
       setPermitPreview(null);
       setPermitNumber("");
       setPermitExpiry("");
-
     } catch (err) {
       console.error("Error uploading permit:", err);
       setError("Failed to upload permit. Please try again.");
@@ -779,41 +745,41 @@ const MyBusinessPage = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Check file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "application/pdf",
+    ];
     if (!allowedTypes.includes(file.type)) {
       setError("Please upload a JPG, PNG, or PDF file");
       return;
     }
 
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError("File size must be less than 5MB");
       return;
     }
 
     setPermitFile(file);
-    
-    // Create preview URL for images
+
     if (permitPreview) {
       URL.revokeObjectURL(permitPreview);
     }
-    
-    if (file.type.startsWith('image/')) {
+
+    if (file.type.startsWith("image/")) {
       setPermitPreview(URL.createObjectURL(file));
     } else {
       setPermitPreview(null);
     }
-    
+
     setError(null);
   };
 
   const removePermit = async () => {
     if (!business?.permit_document) return;
-
-    if (!window.confirm("Are you sure you want to remove the permit document?")) {
+    if (!window.confirm("Are you sure you want to remove the permit document?"))
       return;
-    }
 
     try {
       const { error } = await supabase.storage
@@ -829,12 +795,11 @@ const MyBusinessPage = () => {
           permit_number: null,
           permit_expiry: null,
           permit_verified: false,
-          verification_status: "pending"
+          verification_status: "pending",
         })
         .eq("id", business.id);
 
       await fetchBusiness();
-
       setSuccessMessage("Permit removed successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
@@ -844,18 +809,25 @@ const MyBusinessPage = () => {
   };
 
   const validateForm = () => {
-    const fieldsToValidate = ['name', 'business_type', 'location', 'address', 'price'];
+    const fieldsToValidate = [
+      "name",
+      "business_type",
+      "location",
+      "address",
+      "price",
+    ];
     let isValid = true;
 
-    fieldsToValidate.forEach(field => {
+    fieldsToValidate.forEach((field) => {
       if (!validateField(field)) {
         isValid = false;
       }
     });
 
-    // Mark all fields as touched
     const touched = {};
-    fieldsToValidate.forEach(field => { touched[field] = true; });
+    fieldsToValidate.forEach((field) => {
+      touched[field] = true;
+    });
     setTouchedFields(touched);
 
     return isValid;
@@ -941,34 +913,22 @@ const MyBusinessPage = () => {
   // Membership Plan Handlers
   const handlePlanInputChange = (e) => {
     const { name, value } = e.target;
-    setPlanFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setPlanFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleFeatureChange = (index, value) => {
     const updatedFeatures = [...planFormData.features];
     updatedFeatures[index] = value;
-    setPlanFormData((prev) => ({
-      ...prev,
-      features: updatedFeatures,
-    }));
+    setPlanFormData((prev) => ({ ...prev, features: updatedFeatures }));
   };
 
   const addFeature = () => {
-    setPlanFormData((prev) => ({
-      ...prev,
-      features: [...prev.features, ""],
-    }));
+    setPlanFormData((prev) => ({ ...prev, features: [...prev.features, ""] }));
   };
 
   const removeFeature = (index) => {
     const updatedFeatures = planFormData.features.filter((_, i) => i !== index);
-    setPlanFormData((prev) => ({
-      ...prev,
-      features: updatedFeatures,
-    }));
+    setPlanFormData((prev) => ({ ...prev, features: updatedFeatures }));
   };
 
   const resetPlanForm = () => {
@@ -1050,9 +1010,8 @@ const MyBusinessPage = () => {
   const deletePlan = async (planId) => {
     if (
       !window.confirm("Are you sure you want to delete this membership plan?")
-    ) {
+    )
       return;
-    }
 
     try {
       const { error } = await supabase
@@ -1095,23 +1054,52 @@ const MyBusinessPage = () => {
   };
 
   const getFirstName = () => {
-    if (profile?.first_name) {
-      return profile.first_name;
-    }
+    if (profile?.first_name) return profile.first_name;
     return "Owner";
   };
 
   const getInputClassName = (fieldName) => {
-    let className = 'form-group';
-    if (focusedField === fieldName) className += ' focused';
-    
+    let className = "form-group";
+    if (focusedField === fieldName) className += " focused";
     if (touchedFields[fieldName] && fieldErrors[fieldName]) {
-      className += ' error';
-    } else if (touchedFields[fieldName] && formData[fieldName] && !fieldErrors[fieldName]) {
-      className += ' valid';
+      className += " error";
+    } else if (
+      touchedFields[fieldName] &&
+      formData[fieldName] &&
+      !fieldErrors[fieldName]
+    ) {
+      className += " valid";
     }
-    
     return className;
+  };
+
+  const renderStars = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+
+    for (let i = 1; i <= 5; i++) {
+      if (i <= fullStars) {
+        stars.push(
+          <span key={i} className="star full">
+            ★
+          </span>,
+        );
+      } else if (i === fullStars + 1 && hasHalfStar) {
+        stars.push(
+          <span key={i} className="star half">
+            ★
+          </span>,
+        );
+      } else {
+        stars.push(
+          <span key={i} className="star empty">
+            ☆
+          </span>,
+        );
+      }
+    }
+    return stars;
   };
 
   if (loading) {
@@ -1159,37 +1147,38 @@ const MyBusinessPage = () => {
               <div className="business-success-message">{successMessage}</div>
             )}
 
-            {/* Verification Status Banner */}
-            {business && business.verification_status === 'pending' && showVerificationBanner && (
-              <div className="verification-banner pending">
-                <div className="banner-icon">⏳</div>
-                <div className="banner-content">
-                  <h3>Business Verification Pending</h3>
-                  <p>Please upload your business permit for verification. Once verified, your business will be fully visible to customers.</p>
+            {/* Verification Status Banner - Only show if not verified */}
+            {business &&
+              business.verification_status === "pending" &&
+              !business.permit_verified && (
+                <div className="verification-banner pending">
+                  <div className="banner-icon">⏳</div>
+                  <div className="banner-content">
+                    <h3>Business Verification Pending</h3>
+                    <p>
+                      Please upload your business permit for verification. Once
+                      verified, your business will be fully visible to
+                      customers.
+                    </p>
+                  </div>
                 </div>
-                <button className="banner-close" onClick={() => setShowVerificationBanner(false)}>✕</button>
-              </div>
-            )}
+              )}
 
-            {business && business.verification_status === 'approved' && business.permit_verified && (
-              <div className="verification-banner approved">
-                <div className="banner-icon">✅</div>
-                <div className="banner-content">
-                  <h3>Business Verified!</h3>
-                  <p>Your business is fully verified and visible to customers.</p>
+            {business &&
+              business.verification_status === "rejected" &&
+              !business.permit_verified && (
+                <div className="verification-banner rejected">
+                  <div className="banner-icon">❌</div>
+                  <div className="banner-content">
+                    <h3>Verification Rejected</h3>
+                    <p>
+                      Reason:{" "}
+                      {business.rejection_reason ||
+                        "Your permit was not approved. Please upload a valid permit."}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {business && business.verification_status === 'rejected' && (
-              <div className="verification-banner rejected">
-                <div className="banner-icon">❌</div>
-                <div className="banner-content">
-                  <h3>Verification Rejected</h3>
-                  <p>Reason: {business.rejection_reason || 'Your permit was not approved. Please upload a valid permit.'}</p>
-                </div>
-              </div>
-            )}
+              )}
 
             {!business && !editMode ? (
               <div className="no-business-state">
@@ -1233,6 +1222,7 @@ const MyBusinessPage = () => {
               </div>
             ) : (
               <div className="business-content">
+                {/* Edit Business Button - Reverted to original position above tabs */}
                 {!editMode && business && (
                   <div className="business-page-header">
                     <button
@@ -1250,19 +1240,13 @@ const MyBusinessPage = () => {
                     className={`business-tab ${activeTab === "basic" ? "active" : ""}`}
                     onClick={() => setActiveTab("basic")}
                   >
-                    Basic Info
-                  </button>
-                  <button
-                    className={`business-tab ${activeTab === "details" ? "active" : ""}`}
-                    onClick={() => setActiveTab("details")}
-                  >
-                    Details
+                    Basic Info & Details
                   </button>
                   <button
                     className={`business-tab ${activeTab === "contact" ? "active" : ""}`}
                     onClick={() => setActiveTab("contact")}
                   >
-                    Contact
+                    Contact & Hours
                   </button>
                   <button
                     className={`business-tab ${activeTab === "payment" ? "active" : ""}`}
@@ -1283,13 +1267,13 @@ const MyBusinessPage = () => {
                     Membership Plans
                   </button>
                   <button
-                    className={`business-tab ${activeTab === "applications" ? "active" : ""}`}
+                    className={`business-tab ${activeTab === "reviews" ? "active" : ""}`}
                     onClick={() => {
-                      setActiveTab("applications");
-                      fetchApplications();
+                      setActiveTab("reviews");
+                      fetchReviews();
                     }}
                   >
-                    📋 Applications {pendingCount > 0 && `(${pendingCount})`}
+                    ⭐ Reviews & Ratings ({ratingStats.total})
                   </button>
                   <button
                     className={`business-tab ${activeTab === "preview" ? "active" : ""}`}
@@ -1300,390 +1284,478 @@ const MyBusinessPage = () => {
                 </div>
 
                 <div className="business-tab-content">
-                  {/* Basic Info Tab */}
+                  {/* Basic Info & Details Tab - Combined with Divider */}
                   {activeTab === "basic" && (
                     <div className="business-form-section">
-                      <h2 className="section-subtitle">Basic Information</h2>
+                      <div className="two-column-layout with-divider">
+                        {/* Left Column - Basic Info */}
+                        <div className="left-column">
+                          <h2 className="section-subtitle">
+                            Basic Information
+                          </h2>
 
-                      <div className="form-row">
-                        <div className={editMode ? getInputClassName('name') : 'form-group'}>
-                          <label>Business Name *</label>
-                          {editMode ? (
-                            <>
+                          <div
+                            className={
+                              editMode
+                                ? getInputClassName("name")
+                                : "form-group"
+                            }
+                          >
+                            <label>Business Name *</label>
+                            {editMode ? (
+                              <>
+                                <input
+                                  type="text"
+                                  name="name"
+                                  value={
+                                    formData.name ||
+                                    profile?.business_name ||
+                                    ""
+                                  }
+                                  onChange={handleInputChange}
+                                  onFocus={() => setFocusedField("name")}
+                                  onBlur={() => handleBlur("name")}
+                                  placeholder="Enter business name"
+                                  required
+                                />
+                                {touchedFields.name && fieldErrors.name && (
+                                  <span className="error-hint">
+                                    {fieldErrors.name}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <p className="view-field">
+                                {business?.name ||
+                                  profile?.business_name ||
+                                  "—"}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="form-group">
+                            <label>Owner Name *</label>
+                            {editMode ? (
                               <input
                                 type="text"
-                                name="name"
-                                value={formData.name || profile?.business_name || ""}
+                                name="owner_name"
+                                value={
+                                  formData.owner_name ||
+                                  (profile?.first_name && profile?.last_name
+                                    ? `${profile.first_name} ${profile.last_name}`.trim()
+                                    : "")
+                                }
                                 onChange={handleInputChange}
-                                onFocus={() => setFocusedField('name')}
-                                onBlur={() => handleBlur('name')}
-                                placeholder="Enter business name"
+                                placeholder="Enter owner name"
                                 required
+                                disabled={true}
                               />
-                              {touchedFields.name && fieldErrors.name && (
-                                <span className="error-hint">{fieldErrors.name}</span>
-                              )}
-                            </>
-                          ) : (
-                            <p className="view-field">
-                              {business?.name || profile?.business_name || "—"}
-                            </p>
-                          )}
-                        </div>
+                            ) : (
+                              <p className="view-field">
+                                {business?.owner_name ||
+                                  (profile?.first_name && profile?.last_name
+                                    ? `${profile.first_name} ${profile.last_name}`.trim()
+                                    : "—")}
+                              </p>
+                            )}
+                            {editMode && (
+                              <small className="field-hint">
+                                Auto-filled from your profile
+                              </small>
+                            )}
+                          </div>
 
-                        <div className="form-group">
-                          <label>Owner Name *</label>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="owner_name"
-                              value={
-                                formData.owner_name ||
-                                (profile?.first_name && profile?.last_name
-                                  ? `${profile.first_name} ${profile.last_name}`.trim()
-                                  : "")
-                              }
-                              onChange={handleInputChange}
-                              placeholder="Enter owner name"
-                              required
-                              disabled={true}
-                            />
-                          ) : (
-                            <p className="view-field">
-                              {business?.owner_name ||
-                                (profile?.first_name && profile?.last_name
-                                  ? `${profile.first_name} ${profile.last_name}`.trim()
-                                  : "—")}
-                            </p>
-                          )}
-                          {editMode && (
-                            <small className="field-hint">
-                              Auto-filled from your profile
-                            </small>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="form-row">
-                        <div className={editMode ? getInputClassName('business_type') : 'form-group'}>
-                          <label>Business Category *</label>
-                          {editMode ? (
-                            <>
-                              <select
-                                name="business_type"
-                                value={formData.business_type || profile?.business_category || ""}
-                                onChange={handleInputChange}
-                                onFocus={() => setFocusedField('business_type')}
-                                onBlur={() => handleBlur('business_type')}
-                                required
-                                className="select-input"
-                              >
-                                <option value="">Select a category</option>
-                                {businessCategories.map((cat) => (
-                                  <option key={cat.id} value={cat.id}>
-                                    {cat.icon} {cat.label}
-                                  </option>
-                                ))}
-                              </select>
-                              {touchedFields.business_type && fieldErrors.business_type && (
-                                <span className="error-hint">{fieldErrors.business_type}</span>
-                              )}
-                            </>
-                          ) : (
-                            <p className="view-field">
-                              {business?.business_type ||
-                                profile?.business_category ||
-                                "—"}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="form-group">
-                          <label>Status & Icon</label>
-                          <div className="status-icon-row">
+                          <div
+                            className={
+                              editMode
+                                ? getInputClassName("business_type")
+                                : "form-group"
+                            }
+                          >
+                            <label>Business Category *</label>
                             {editMode ? (
                               <>
                                 <select
-                                  name="status"
-                                  value={formData.status || "active"}
+                                  name="business_type"
+                                  value={
+                                    formData.business_type ||
+                                    profile?.business_category ||
+                                    ""
+                                  }
                                   onChange={handleInputChange}
-                                  className="status-select"
+                                  onFocus={() =>
+                                    setFocusedField("business_type")
+                                  }
+                                  onBlur={() => handleBlur("business_type")}
+                                  required
+                                  className="select-input"
                                 >
-                                  <option value="active">Active</option>
-                                  <option value="pending">Pending</option>
-                                  <option value="inactive">Inactive</option>
+                                  <option value="">Select a category</option>
+                                  {businessCategories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.icon} {cat.label}
+                                    </option>
+                                  ))}
                                 </select>
-                                <div className="icon-input-wrapper">
-                                  <input
-                                    type="text"
-                                    name="emoji"
-                                    value={
-                                      formData.emoji ||
-                                      getEmojiForCategory(
-                                        formData.business_type,
-                                      ) ||
-                                      "🏢"
-                                    }
-                                    onChange={handleInputChange}
-                                    placeholder="🏢"
-                                    className="icon-input"
-                                  />
-                                </div>
+                                {touchedFields.business_type &&
+                                  fieldErrors.business_type && (
+                                    <span className="error-hint">
+                                      {fieldErrors.business_type}
+                                    </span>
+                                  )}
                               </>
                             ) : (
-                              <div className="status-icon-display">
-                                <span
-                                  className={`status-badge ${business?.status}`}
+                              <p className="view-field">
+                                {business?.business_type ||
+                                  profile?.business_category ||
+                                  "—"}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="form-group">
+                            <label>Status & Icon</label>
+                            <div className="status-icon-row">
+                              {editMode ? (
+                                <>
+                                  <select
+                                    name="status"
+                                    value={formData.status || "active"}
+                                    onChange={handleInputChange}
+                                    className="status-select"
+                                  >
+                                    <option value="active">Active</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="inactive">Inactive</option>
+                                  </select>
+                                  <div className="icon-input-wrapper">
+                                    <input
+                                      type="text"
+                                      name="emoji"
+                                      value={
+                                        formData.emoji ||
+                                        getEmojiForCategory(
+                                          formData.business_type,
+                                        ) ||
+                                        "🏢"
+                                      }
+                                      onChange={handleInputChange}
+                                      placeholder="🏢"
+                                      className="icon-input"
+                                    />
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="status-icon-display">
+                                  <span
+                                    className={`status-badge ${business?.status}`}
+                                  >
+                                    {business?.status || "active"}
+                                  </span>
+                                  <span className="display-emoji">
+                                    {business?.emoji ||
+                                      getEmojiForCategory(
+                                        business?.business_type,
+                                      ) ||
+                                      "🏢"}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div
+                            className={
+                              editMode
+                                ? getInputClassName("short_description")
+                                : "form-group"
+                            }
+                          >
+                            <label>Short Description</label>
+                            {editMode ? (
+                              <>
+                                <input
+                                  type="text"
+                                  name="short_description"
+                                  value={formData.short_description || ""}
+                                  onChange={handleInputChange}
+                                  onFocus={() =>
+                                    setFocusedField("short_description")
+                                  }
+                                  onBlur={() => handleBlur("short_description")}
+                                  placeholder="Brief description (max 200 chars)"
+                                  maxLength="200"
+                                />
+                                {touchedFields.short_description &&
+                                  fieldErrors.short_description && (
+                                    <span className="error-hint">
+                                      {fieldErrors.short_description}
+                                    </span>
+                                  )}
+                                <small className="char-count">
+                                  {formData.short_description?.length || 0}/200
+                                </small>
+                              </>
+                            ) : (
+                              <p className="view-field">
+                                {business?.short_description || "—"}
+                              </p>
+                            )}
+                          </div>
+
+                          <div
+                            className={
+                              editMode
+                                ? getInputClassName("description")
+                                : "form-group"
+                            }
+                          >
+                            <label>Full Description</label>
+                            {editMode ? (
+                              <>
+                                <textarea
+                                  name="description"
+                                  value={formData.description || ""}
+                                  onChange={handleInputChange}
+                                  onFocus={() => setFocusedField("description")}
+                                  onBlur={() => handleBlur("description")}
+                                  placeholder="Detailed description of your business"
+                                  rows="5"
+                                />
+                                {touchedFields.description &&
+                                  fieldErrors.description && (
+                                    <span className="error-hint">
+                                      {fieldErrors.description}
+                                    </span>
+                                  )}
+                              </>
+                            ) : (
+                              <p className="view-field description-text">
+                                {business?.description || "—"}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Vertical Divider */}
+                        <div className="column-divider"></div>
+
+                        {/* Right Column - Details */}
+                        <div className="right-column">
+                          <h2 className="section-subtitle">
+                            Location & Pricing
+                          </h2>
+
+                          <div
+                            className={
+                              editMode
+                                ? getInputClassName("location")
+                                : "form-group"
+                            }
+                          >
+                            <label>Location *</label>
+                            {editMode ? (
+                              <>
+                                <select
+                                  name="location"
+                                  value={formData.location || "Downtown"}
+                                  onChange={handleInputChange}
+                                  onFocus={() => setFocusedField("location")}
+                                  onBlur={() => handleBlur("location")}
+                                  required
+                                  className="select-input"
                                 >
-                                  {business?.status || "active"}
-                                </span>
-                                <span className="display-emoji">
-                                  {business?.emoji ||
-                                    getEmojiForCategory(
-                                      business?.business_type,
-                                    ) ||
-                                    "🏢"}
-                                </span>
-                              </div>
+                                  <option value="">Select a location</option>
+                                  {locationOptions.map((loc) => (
+                                    <option key={loc.value} value={loc.value}>
+                                      {loc.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                {touchedFields.location &&
+                                  fieldErrors.location && (
+                                    <span className="error-hint">
+                                      {fieldErrors.location}
+                                    </span>
+                                  )}
+                              </>
+                            ) : (
+                              <p className="view-field">
+                                {business?.location || "—"}
+                              </p>
+                            )}
+                          </div>
+
+                          <div
+                            className={
+                              editMode
+                                ? getInputClassName("address")
+                                : "form-group"
+                            }
+                          >
+                            <label>Address *</label>
+                            {editMode ? (
+                              <>
+                                <input
+                                  type="text"
+                                  name="address"
+                                  value={formData.address || ""}
+                                  onChange={handleInputChange}
+                                  onFocus={() => setFocusedField("address")}
+                                  onBlur={() => handleBlur("address")}
+                                  placeholder="Street address"
+                                  required
+                                />
+                                {touchedFields.address &&
+                                  fieldErrors.address && (
+                                    <span className="error-hint">
+                                      {fieldErrors.address}
+                                    </span>
+                                  )}
+                              </>
+                            ) : (
+                              <p className="view-field">
+                                {business?.address || "—"}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="form-row">
+                            <div className="form-group">
+                              <label>City</label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  value="Dagupan"
+                                  disabled
+                                  className="readonly-field"
+                                />
+                              ) : (
+                                <p className="view-field">
+                                  {business?.city || "Dagupan"}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="form-group">
+                              <label>Province</label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  value="Pangasinan"
+                                  disabled
+                                  className="readonly-field"
+                                />
+                              ) : (
+                                <p className="view-field">
+                                  {business?.province || "Pangasinan"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div
+                            className={
+                              editMode
+                                ? getInputClassName("price")
+                                : "form-group"
+                            }
+                          >
+                            <label>Price *</label>
+                            {editMode ? (
+                              <>
+                                <input
+                                  type="number"
+                                  name="price"
+                                  value={formData.price || 0}
+                                  onChange={handleNumberChange}
+                                  onFocus={() => setFocusedField("price")}
+                                  onBlur={() => handleBlur("price")}
+                                  placeholder="0.00"
+                                  min="0"
+                                  step="0.01"
+                                />
+                                {touchedFields.price && fieldErrors.price && (
+                                  <span className="error-hint">
+                                    {fieldErrors.price}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <p className="view-field">
+                                ₱{business?.price?.toFixed(2) || "0.00"}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="form-group">
+                            <label>Price Unit</label>
+                            {editMode ? (
+                              <select
+                                name="price_unit"
+                                value={formData.price_unit || "month"}
+                                onChange={handleInputChange}
+                              >
+                                <option value="month">per month</option>
+                                <option value="year">per year</option>
+                                <option value="week">per week</option>
+                                <option value="day">per day</option>
+                                <option value="session">per session</option>
+                              </select>
+                            ) : (
+                              <p className="view-field">
+                                per {business?.price_unit || "month"}
+                              </p>
                             )}
                           </div>
                         </div>
                       </div>
-
-                      <div className="form-row">
-                        <div className={editMode ? getInputClassName('short_description') : 'form-group full-width'}>
-                          <label>Short Description</label>
-                          {editMode ? (
-                            <>
-                              <input
-                                type="text"
-                                name="short_description"
-                                value={formData.short_description || ""}
-                                onChange={handleInputChange}
-                                onFocus={() => setFocusedField('short_description')}
-                                onBlur={() => handleBlur('short_description')}
-                                placeholder="Brief description (max 200 chars)"
-                                maxLength="200"
-                              />
-                              {touchedFields.short_description && fieldErrors.short_description && (
-                                <span className="error-hint">{fieldErrors.short_description}</span>
-                              )}
-                              <small className="char-count">
-                                {formData.short_description?.length || 0}/200
-                              </small>
-                            </>
-                          ) : (
-                            <p className="view-field">
-                              {business?.short_description || "—"}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="form-row">
-                        <div className={editMode ? getInputClassName('description') : 'form-group full-width'}>
-                          <label>Full Description</label>
-                          {editMode ? (
-                            <>
-                              <textarea
-                                name="description"
-                                value={formData.description || ""}
-                                onChange={handleInputChange}
-                                onFocus={() => setFocusedField('description')}
-                                onBlur={() => handleBlur('description')}
-                                placeholder="Detailed description of your business"
-                                rows="5"
-                              />
-                              {touchedFields.description && fieldErrors.description && (
-                                <span className="error-hint">{fieldErrors.description}</span>
-                              )}
-                            </>
-                          ) : (
-                            <p className="view-field description-text">
-                              {business?.description || "—"}
-                            </p>
-                          )}
-                        </div>
-                      </div>
                     </div>
                   )}
 
-                  {/* Details Tab */}
-                  {activeTab === "details" && (
-                    <div className="business-form-section">
-                      <h2 className="section-subtitle">Location & Pricing</h2>
-
-                      <div className="form-row">
-                        <div className={editMode ? getInputClassName('location') : 'form-group'}>
-                          <label>Location *</label>
-                          {editMode ? (
-                            <>
-                              <select
-                                name="location"
-                                value={formData.location || "Downtown"}
-                                onChange={handleInputChange}
-                                onFocus={() => setFocusedField('location')}
-                                onBlur={() => handleBlur('location')}
-                                required
-                                className="select-input"
-                              >
-                                <option value="">Select a location</option>
-                                {locationOptions.map((loc) => (
-                                  <option key={loc.value} value={loc.value}>
-                                    {loc.label}
-                                  </option>
-                                ))}
-                              </select>
-                              {touchedFields.location && fieldErrors.location && (
-                                <span className="error-hint">{fieldErrors.location}</span>
-                              )}
-                            </>
-                          ) : (
-                            <p className="view-field">
-                              {business?.location || "—"}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className={editMode ? getInputClassName('address') : 'form-group'}>
-                          <label>Address *</label>
-                          {editMode ? (
-                            <>
-                              <input
-                                type="text"
-                                name="address"
-                                value={formData.address || ""}
-                                onChange={handleInputChange}
-                                onFocus={() => setFocusedField('address')}
-                                onBlur={() => handleBlur('address')}
-                                placeholder="Street address"
-                                required
-                              />
-                              {touchedFields.address && fieldErrors.address && (
-                                <span className="error-hint">{fieldErrors.address}</span>
-                              )}
-                            </>
-                          ) : (
-                            <p className="view-field">
-                              {business?.address || "—"}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="form-row">
-                        <div className="form-group">
-                          <label>City</label>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="city"
-                              value="Dagupan"
-                              disabled
-                              className="readonly-field"
-                            />
-                          ) : (
-                            <p className="view-field">
-                              {business?.city || "Dagupan"}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="form-group">
-                          <label>Province</label>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="province"
-                              value="Pangasinan"
-                              disabled
-                              className="readonly-field"
-                            />
-                          ) : (
-                            <p className="view-field">
-                              {business?.province || "Pangasinan"}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="form-row">
-                        <div className={editMode ? getInputClassName('price') : 'form-group'}>
-                          <label>Price *</label>
-                          {editMode ? (
-                            <>
-                              <input
-                                type="number"
-                                name="price"
-                                value={formData.price || 0}
-                                onChange={handleNumberChange}
-                                onFocus={() => setFocusedField('price')}
-                                onBlur={() => handleBlur('price')}
-                                placeholder="0.00"
-                                min="0"
-                                step="0.01"
-                              />
-                              {touchedFields.price && fieldErrors.price && (
-                                <span className="error-hint">{fieldErrors.price}</span>
-                              )}
-                            </>
-                          ) : (
-                            <p className="view-field">
-                              ₱{business?.price?.toFixed(2) || "0.00"}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="form-group">
-                          <label>Price Unit</label>
-                          {editMode ? (
-                            <select
-                              name="price_unit"
-                              value={formData.price_unit || "month"}
-                              onChange={handleInputChange}
-                            >
-                              <option value="month">per month</option>
-                              <option value="year">per year</option>
-                              <option value="week">per week</option>
-                              <option value="day">per day</option>
-                              <option value="session">per session</option>
-                            </select>
-                          ) : (
-                            <p className="view-field">
-                              per {business?.price_unit || "month"}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Contact Tab */}
+                  {/* Contact Tab with 12-hour format Business Hours */}
                   {activeTab === "contact" && (
                     <div className="business-form-section">
                       <h2 className="section-subtitle">Contact Information</h2>
 
                       <div className="form-row">
-                        <div className={editMode ? getInputClassName('contact_phone') : 'form-group'}>
+                        <div
+                          className={
+                            editMode
+                              ? getInputClassName("contact_phone")
+                              : "form-group"
+                          }
+                        >
                           <label>Contact Phone</label>
                           {editMode ? (
                             <>
                               <input
                                 type="tel"
                                 name="contact_phone"
-                                value={formData.contact_phone || profile?.mobile || ""}
+                                value={
+                                  formData.contact_phone ||
+                                  profile?.mobile ||
+                                  ""
+                                }
                                 onChange={handleInputChange}
-                                onFocus={() => setFocusedField('contact_phone')}
-                                onBlur={() => handleBlur('contact_phone')}
+                                onFocus={() => setFocusedField("contact_phone")}
+                                onBlur={() => handleBlur("contact_phone")}
                                 placeholder="09171234567"
                                 maxLength={11}
                               />
-                              {touchedFields.contact_phone && fieldErrors.contact_phone && (
-                                <span className="error-hint">{fieldErrors.contact_phone}</span>
-                              )}
-                              {formData.contact_phone && formData.contact_phone.length > 0 && !fieldErrors.contact_phone && (
-                                <span className="hint-text">Format: 09xxxxxxxxx (11 digits)</span>
-                              )}
+                              {touchedFields.contact_phone &&
+                                fieldErrors.contact_phone && (
+                                  <span className="error-hint">
+                                    {fieldErrors.contact_phone}
+                                  </span>
+                                )}
+                              {formData.contact_phone &&
+                                formData.contact_phone.length > 0 &&
+                                !fieldErrors.contact_phone && (
+                                  <span className="hint-text">
+                                    Format: 09xxxxxxxxx (11 digits)
+                                  </span>
+                                )}
                             </>
                           ) : (
                             <p className="view-field">
@@ -1694,22 +1766,33 @@ const MyBusinessPage = () => {
                           )}
                         </div>
 
-                        <div className={editMode ? getInputClassName('contact_email') : 'form-group'}>
+                        <div
+                          className={
+                            editMode
+                              ? getInputClassName("contact_email")
+                              : "form-group"
+                          }
+                        >
                           <label>Contact Email</label>
                           {editMode ? (
                             <>
                               <input
                                 type="email"
                                 name="contact_email"
-                                value={formData.contact_email || profile?.email || ""}
+                                value={
+                                  formData.contact_email || profile?.email || ""
+                                }
                                 onChange={handleInputChange}
-                                onFocus={() => setFocusedField('contact_email')}
-                                onBlur={() => handleBlur('contact_email')}
+                                onFocus={() => setFocusedField("contact_email")}
+                                onBlur={() => handleBlur("contact_email")}
                                 placeholder="business@example.com"
                               />
-                              {touchedFields.contact_email && fieldErrors.contact_email && (
-                                <span className="error-hint">{fieldErrors.contact_email}</span>
-                              )}
+                              {touchedFields.contact_email &&
+                                fieldErrors.contact_email && (
+                                  <span className="error-hint">
+                                    {fieldErrors.contact_email}
+                                  </span>
+                                )}
                             </>
                           ) : (
                             <p className="view-field">
@@ -1720,7 +1803,13 @@ const MyBusinessPage = () => {
                       </div>
 
                       <div className="form-row">
-                        <div className={editMode ? getInputClassName('website') : 'form-group full-width'}>
+                        <div
+                          className={
+                            editMode
+                              ? getInputClassName("website")
+                              : "form-group"
+                          }
+                        >
                           <label>Website</label>
                           {editMode ? (
                             <>
@@ -1729,12 +1818,14 @@ const MyBusinessPage = () => {
                                 name="website"
                                 value={formData.website || ""}
                                 onChange={handleInputChange}
-                                onFocus={() => setFocusedField('website')}
-                                onBlur={() => handleBlur('website')}
+                                onFocus={() => setFocusedField("website")}
+                                onBlur={() => handleBlur("website")}
                                 placeholder="https://example.com"
                               />
                               {touchedFields.website && fieldErrors.website && (
-                                <span className="error-hint">{fieldErrors.website}</span>
+                                <span className="error-hint">
+                                  {fieldErrors.website}
+                                </span>
                               )}
                             </>
                           ) : (
@@ -1743,9 +1834,7 @@ const MyBusinessPage = () => {
                             </p>
                           )}
                         </div>
-                      </div>
 
-                      <div className="form-row">
                         <div className="form-group">
                           <label>Amenities</label>
                           {editMode ? (
@@ -1755,9 +1844,17 @@ const MyBusinessPage = () => {
                                   ? JSON.stringify(formData.amenities, null, 2)
                                   : "[]"
                               }
-                              onChange={(e) =>
-                                handleJsonChange("amenities", e.target.value)
-                              }
+                              onChange={(e) => {
+                                try {
+                                  const parsed = JSON.parse(e.target.value);
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    amenities: parsed,
+                                  }));
+                                } catch (e) {
+                                  console.error("Invalid JSON:", e);
+                                }
+                              }}
                               placeholder='["wifi", "parking", "lockers"]'
                               rows="4"
                             />
@@ -1777,85 +1874,136 @@ const MyBusinessPage = () => {
                         <label>Business Hours</label>
                         {editMode ? (
                           <div className="business-hours-container">
-                            {daysOfWeek.map((day) => (
-                              <div key={day.id} className="business-hour-row">
-                                <div className="day-label">{day.label}</div>
-                                <div className="hour-controls">
-                                  <label className="closed-checkbox">
-                                    <input
-                                      type="checkbox"
-                                      checked={
-                                        businessHours[day.id]?.closed || false
-                                      }
-                                      onChange={(e) =>
-                                        handleBusinessHourChange(
-                                          day.id,
-                                          "closed",
-                                          e.target.checked,
-                                        )
-                                      }
-                                    />
-                                    Closed
-                                  </label>
-                                  {!businessHours[day.id]?.closed && (
-                                    <>
-                                      <div className="time-input">
-                                        <span>Open:</span>
-                                        <input
-                                          type="time"
-                                          value={
-                                            businessHours[day.id]?.open ||
-                                            "09:00"
-                                          }
-                                          onChange={(e) =>
-                                            handleBusinessHourChange(
-                                              day.id,
-                                              "open",
-                                              e.target.value,
-                                            )
-                                          }
-                                        />
-                                      </div>
-                                      <div className="time-input">
-                                        <span>Close:</span>
-                                        <input
-                                          type="time"
-                                          value={
-                                            businessHours[day.id]?.close ||
-                                            "18:00"
-                                          }
-                                          onChange={(e) =>
-                                            handleBusinessHourChange(
-                                              day.id,
-                                              "close",
-                                              e.target.value,
-                                            )
-                                          }
-                                        />
-                                      </div>
-                                    </>
-                                  )}
+                            {daysOfWeek.map((day) => {
+                              const dayHours = businessHours[day.id];
+                              const openTime = dayHours?.open
+                                ? convertTo12Hour(dayHours.open)
+                                : { time: "09:00", ampm: "AM" };
+                              const closeTime = dayHours?.close
+                                ? convertTo12Hour(dayHours.close)
+                                : { time: "18:00", ampm: "PM" };
+
+                              return (
+                                <div key={day.id} className="business-hour-row">
+                                  <div className="day-label">{day.label}</div>
+                                  <div className="hour-controls">
+                                    <label className="closed-checkbox">
+                                      <input
+                                        type="checkbox"
+                                        checked={dayHours?.closed || false}
+                                        onChange={(e) =>
+                                          handleBusinessHourChange(
+                                            day.id,
+                                            "closed",
+                                            e.target.checked,
+                                          )
+                                        }
+                                      />
+                                      Closed
+                                    </label>
+                                    {!dayHours?.closed && (
+                                      <>
+                                        <div className="time-input">
+                                          <span>Open:</span>
+                                          <input
+                                            type="text"
+                                            value={openTime.time}
+                                            onChange={(e) =>
+                                              handleTimeChange(
+                                                day.id,
+                                                "openTime",
+                                                e.target.value,
+                                              )
+                                            }
+                                            placeholder="09:00"
+                                            pattern="[0-9]{2}:[0-9]{2}"
+                                            className="time-input-field"
+                                          />
+                                          <select
+                                            value={
+                                              dayHours?.openAMPM ||
+                                              openTime.ampm
+                                            }
+                                            onChange={(e) =>
+                                              handleBusinessHourChange(
+                                                day.id,
+                                                "openAMPM",
+                                                e.target.value,
+                                              )
+                                            }
+                                            className="ampm-select"
+                                          >
+                                            <option value="AM">AM</option>
+                                            <option value="PM">PM</option>
+                                          </select>
+                                        </div>
+                                        <div className="time-input">
+                                          <span>Close:</span>
+                                          <input
+                                            type="text"
+                                            value={closeTime.time}
+                                            onChange={(e) =>
+                                              handleTimeChange(
+                                                day.id,
+                                                "closeTime",
+                                                e.target.value,
+                                              )
+                                            }
+                                            placeholder="18:00"
+                                            pattern="[0-9]{2}:[0-9]{2}"
+                                            className="time-input-field"
+                                          />
+                                          <select
+                                            value={
+                                              dayHours?.closeAMPM ||
+                                              closeTime.ampm
+                                            }
+                                            onChange={(e) =>
+                                              handleBusinessHourChange(
+                                                day.id,
+                                                "closeAMPM",
+                                                e.target.value,
+                                              )
+                                            }
+                                            className="ampm-select"
+                                          >
+                                            <option value="AM">AM</option>
+                                            <option value="PM">PM</option>
+                                          </select>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                             <p className="hours-hint">
                               Set your business hours for each day of the week
+                              (12-hour format)
                             </p>
                           </div>
                         ) : (
                           <div className="business-hours-display">
                             {business?.business_hours ? (
                               Object.entries(business.business_hours).map(
-                                ([day, hours]) => (
-                                  <div key={day} className="hour-display-row">
-                                    <span className="day">{day}:</span>
-                                    <span className="hours">
-                                      {hours.closed
-                                        ? "Closed"
-                                        : `${hours.open} - ${hours.close}`}
-                                    </span>
-                                  </div>
-                                ),
+                                ([day, hours]) => {
+                                  const openTime = hours.open
+                                    ? convertTo12Hour(hours.open)
+                                    : null;
+                                  const closeTime = hours.close
+                                    ? convertTo12Hour(hours.close)
+                                    : null;
+                                  return (
+                                    <div key={day} className="hour-display-row">
+                                      <span className="day">{day}:</span>
+                                      <span className="hours">
+                                        {hours.closed
+                                          ? "Closed"
+                                          : `${openTime?.time || "09:00"} ${openTime?.ampm || "AM"} - ${closeTime?.time || "06:00"} ${closeTime?.ampm || "PM"}`}
+                                      </span>
+                                    </div>
+                                  );
+                                },
                               )
                             ) : (
                               <p className="view-field">
@@ -1868,7 +2016,7 @@ const MyBusinessPage = () => {
                     </div>
                   )}
 
-                  {/* Payment Tab - GCash QR Code */}
+                  {/* Payment Tab */}
                   {activeTab === "payment" && (
                     <div className="business-form-section">
                       <h2 className="section-subtitle">Payment Settings</h2>
@@ -1887,7 +2035,13 @@ const MyBusinessPage = () => {
                         </div>
 
                         <div className="form-row">
-                          <div className={editMode ? getInputClassName('gcash_number') : 'form-group full-width'}>
+                          <div
+                            className={
+                              editMode
+                                ? getInputClassName("gcash_number")
+                                : "form-group full-width"
+                            }
+                          >
                             <label>GCash Mobile Number</label>
                             {editMode ? (
                               <>
@@ -1896,22 +2050,37 @@ const MyBusinessPage = () => {
                                   name="gcash_number"
                                   value={gcashNumber}
                                   onChange={(e) => {
-                                    const numericValue = e.target.value.replace(/\D/g, '');
+                                    const numericValue = e.target.value.replace(
+                                      /\D/g,
+                                      "",
+                                    );
                                     setGcashNumber(numericValue);
-                                    setFormData(prev => ({ ...prev, gcash_number: numericValue }));
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      gcash_number: numericValue,
+                                    }));
                                   }}
-                                  onFocus={() => setFocusedField('gcash_number')}
-                                  onBlur={() => handleBlur('gcash_number')}
+                                  onFocus={() =>
+                                    setFocusedField("gcash_number")
+                                  }
+                                  onBlur={() => handleBlur("gcash_number")}
                                   placeholder="09171234567"
                                   className="gcash-input"
                                   maxLength={11}
                                 />
-                                {touchedFields.gcash_number && fieldErrors.gcash_number && (
-                                  <span className="error-hint">{fieldErrors.gcash_number}</span>
-                                )}
-                                {gcashNumber && gcashNumber.length > 0 && !fieldErrors.gcash_number && (
-                                  <span className="hint-text">Format: 09xxxxxxxxx (11 digits)</span>
-                                )}
+                                {touchedFields.gcash_number &&
+                                  fieldErrors.gcash_number && (
+                                    <span className="error-hint">
+                                      {fieldErrors.gcash_number}
+                                    </span>
+                                  )}
+                                {gcashNumber &&
+                                  gcashNumber.length > 0 &&
+                                  !fieldErrors.gcash_number && (
+                                    <span className="hint-text">
+                                      Format: 09xxxxxxxxx (11 digits)
+                                    </span>
+                                  )}
                               </>
                             ) : (
                               <p className="view-field">
@@ -2007,37 +2176,57 @@ const MyBusinessPage = () => {
                   {/* Business Permit Tab */}
                   {activeTab === "permit" && (
                     <div className="business-form-section">
-                      <h2 className="section-subtitle">Business Permit Verification</h2>
-                      
+                      <h2 className="section-subtitle">
+                        Business Permit Verification
+                      </h2>
+
                       <div className="permit-section">
                         <div className="permit-info">
                           <div className="permit-icon">📄</div>
                           <div className="permit-description">
                             <h3>Upload Your Business Permit</h3>
                             <p>
-                              To verify your business, please upload a clear image or PDF of your current business permit.
+                              To verify your business, please upload a clear
+                              image or PDF of your current business permit.
                               Maximum file size: 5MB (JPG, PNG, PDF)
                             </p>
                           </div>
                         </div>
 
-                        {/* Current Permit Status */}
                         {business?.permit_document && (
                           <div className="current-permit">
                             <h4>Current Permit Document</h4>
                             <div className="permit-document-info">
-                              <span className="permit-number">Permit #: {business.permit_number || 'N/A'}</span>
-                              <span className="permit-expiry">Expires: {business.permit_expiry ? new Date(business.permit_expiry).toLocaleDateString() : 'N/A'}</span>
-                              <span className={`permit-status ${business.permit_verified ? 'verified' : 'pending'}`}>
-                                {business.permit_verified ? '✅ Verified' : '⏳ Pending Verification'}
+                              <span className="permit-number">
+                                Permit #: {business.permit_number || "N/A"}
+                              </span>
+                              <span className="permit-expiry">
+                                Expires:{" "}
+                                {business.permit_expiry
+                                  ? new Date(
+                                      business.permit_expiry,
+                                    ).toLocaleDateString()
+                                  : "N/A"}
+                              </span>
+                              <span
+                                className={`permit-status ${business.permit_verified ? "verified" : "pending"}`}
+                              >
+                                {business.permit_verified
+                                  ? "✅ Verified"
+                                  : "⏳ Pending Verification"}
                               </span>
                             </div>
                             <div className="permit-document-preview">
                               {business.permit_document && (
                                 <div className="permit-file-link">
-                                  <a 
-                                    href={supabase.storage.from('business-permits').getPublicUrl(business.permit_document).data.publicUrl} 
-                                    target="_blank" 
+                                  <a
+                                    href={
+                                      supabase.storage
+                                        .from("business-permits")
+                                        .getPublicUrl(business.permit_document)
+                                        .data.publicUrl
+                                    }
+                                    target="_blank"
                                     rel="noopener noreferrer"
                                     className="btn-view-permit"
                                   >
@@ -2056,18 +2245,24 @@ const MyBusinessPage = () => {
                           </div>
                         )}
 
-                        {/* Upload New Permit Form */}
-                        {(!business?.permit_document || business?.verification_status === 'rejected') && (
+                        {(!business?.permit_document ||
+                          business?.verification_status === "rejected") && (
                           <div className="permit-upload-form">
-                            <h4>{business?.permit_document ? 'Re-upload New Permit' : 'Upload Your Permit'}</h4>
-                            
+                            <h4>
+                              {business?.permit_document
+                                ? "Re-upload New Permit"
+                                : "Upload Your Permit"}
+                            </h4>
+
                             <div className="form-row">
                               <div className="form-group">
                                 <label>Permit Number *</label>
                                 <input
                                   type="text"
                                   value={permitNumber}
-                                  onChange={(e) => setPermitNumber(e.target.value)}
+                                  onChange={(e) =>
+                                    setPermitNumber(e.target.value)
+                                  }
                                   placeholder="Enter permit number"
                                   disabled={uploadingPermit}
                                 />
@@ -2078,8 +2273,10 @@ const MyBusinessPage = () => {
                                 <input
                                   type="date"
                                   value={permitExpiry}
-                                  onChange={(e) => setPermitExpiry(e.target.value)}
-                                  min={new Date().toISOString().split('T')[0]}
+                                  onChange={(e) =>
+                                    setPermitExpiry(e.target.value)
+                                  }
+                                  min={new Date().toISOString().split("T")[0]}
                                   disabled={uploadingPermit}
                                 />
                               </div>
@@ -2089,7 +2286,11 @@ const MyBusinessPage = () => {
                               <div className="file-upload-area">
                                 {permitPreview ? (
                                   <div className="permit-preview">
-                                    <img src={permitPreview} alt="Permit Preview" className="permit-preview-image" />
+                                    <img
+                                      src={permitPreview}
+                                      alt="Permit Preview"
+                                      className="permit-preview-image"
+                                    />
                                     <button
                                       type="button"
                                       className="btn-remove-file"
@@ -2111,38 +2312,53 @@ const MyBusinessPage = () => {
                                       disabled={uploadingPermit}
                                       className="file-input"
                                     />
-                                    <label htmlFor="permit-upload" className="file-upload-label">
+                                    <label
+                                      htmlFor="permit-upload"
+                                      className="file-upload-label"
+                                    >
                                       <span className="upload-icon">📎</span>
                                       <span className="upload-text">
-                                        {permitFile ? permitFile.name : 'Choose file or drag here'}
+                                        {permitFile
+                                          ? permitFile.name
+                                          : "Choose file or drag here"}
                                       </span>
                                     </label>
                                   </>
                                 )}
                               </div>
-                              
+
                               <button
                                 className="btn-upload-permit"
                                 onClick={uploadPermit}
-                                disabled={!permitFile || !permitNumber || !permitExpiry || uploadingPermit}
+                                disabled={
+                                  !permitFile ||
+                                  !permitNumber ||
+                                  !permitExpiry ||
+                                  uploadingPermit
+                                }
                               >
-                                {uploadingPermit ? 'Uploading...' : 'Upload Permit'}
+                                {uploadingPermit
+                                  ? "Uploading..."
+                                  : "Upload Permit"}
                               </button>
                             </div>
 
                             <p className="permit-note">
-                              ℹ️ After uploading, your permit will be reviewed by an admin. This usually takes 1-2 business days.
+                              ℹ️ After uploading, your permit will be reviewed
+                              by an admin. This usually takes 1-2 business days.
                             </p>
                           </div>
                         )}
 
-                        {/* Verified Message */}
                         {business?.permit_verified && (
                           <div className="permit-verified-message">
                             <div className="verified-icon">✅</div>
                             <div className="verified-content">
                               <h4>Permit Verified!</h4>
-                              <p>Your business permit has been verified. You now have full access to all business features.</p>
+                              <p>
+                                Your business permit has been verified. You now
+                                have full access to all business features.
+                              </p>
                             </div>
                           </div>
                         )}
@@ -2162,8 +2378,7 @@ const MyBusinessPage = () => {
                             setShowPlanForm(true);
                           }}
                         >
-                          <span className="btn-icon">➕</span>
-                          Add New Plan
+                          <span className="btn-icon">➕</span> Add New Plan
                         </button>
                       </div>
 
@@ -2399,101 +2614,134 @@ const MyBusinessPage = () => {
                     </div>
                   )}
 
-                  {/* Membership Applications Tab */}
-                  {activeTab === "applications" && (
-                    <div className="applications-tab">
-                      <h2 className="section-subtitle">Membership Applications</h2>
-                      
-                      {applicationsLoading ? (
-                        <div className="applications-loading">
-                          <div className="loading-spinner"></div>
-                          <p>Loading applications...</p>
+                  {/* Reviews & Ratings Tab */}
+                  {activeTab === "reviews" && (
+                    <div className="reviews-tab">
+                      <h2 className="section-subtitle">
+                        Customer Reviews & Ratings
+                      </h2>
+
+                      <div className="rating-summary-section">
+                        <div className="average-rating-card">
+                          <div className="average-rating-display">
+                            <span className="big-rating">
+                              {ratingStats.average.toFixed(1)}
+                            </span>
+                            <div className="stars-display">
+                              {renderStars(ratingStats.average)}
+                            </div>
+                            <span className="total-reviews">
+                              Based on {ratingStats.total}{" "}
+                              {ratingStats.total === 1 ? "review" : "reviews"}
+                            </span>
+                          </div>
                         </div>
-                      ) : applications.length > 0 ? (
-                        <div className="applications-grid">
-                          {applications.map((app) => (
-                            <div key={app.id} className="application-card">
-                              <div className="application-header">
-                                <div className="applicant-info">
-                                  <span className="applicant-icon">👤</span>
-                                  <div>
-                                    <h4>{app.user?.first_name} {app.user?.last_name}</h4>
-                                    <p className="applicant-email">{app.user?.email}</p>
-                                    <p className="applicant-phone">{app.user?.mobile}</p>
+
+                        <div className="rating-distribution">
+                          <h4>Rating Distribution</h4>
+                          {[5, 4, 3, 2, 1].map((stars) => {
+                            const count = ratingStats.distribution[stars];
+                            const percentage =
+                              ratingStats.total > 0
+                                ? Math.round((count / ratingStats.total) * 100)
+                                : 0;
+                            return (
+                              <div key={stars} className="distribution-row">
+                                <span className="stars-label">{stars} ★</span>
+                                <div className="progress-bar-container">
+                                  <div
+                                    className="progress-bar-fill"
+                                    style={{ width: `${percentage}%` }}
+                                  ></div>
+                                </div>
+                                <span className="count-label">{count}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="reviews-list-section">
+                        <h3>All Reviews</h3>
+
+                        {reviewsLoading ? (
+                          <div className="reviews-loading">
+                            <div className="loading-spinner-small"></div>
+                            <p>Loading reviews...</p>
+                          </div>
+                        ) : reviews.length > 0 ? (
+                          <div className="reviews-grid">
+                            {reviews.map((review) => (
+                              <div
+                                key={review.id}
+                                className="review-card-owner"
+                              >
+                                <div className="review-card-header">
+                                  <div className="reviewer-info">
+                                    <div className="reviewer-avatar">
+                                      {review.profiles?.avatar_url ? (
+                                        <img
+                                          src={review.profiles.avatar_url}
+                                          alt="avatar"
+                                        />
+                                      ) : (
+                                        <span className="avatar-placeholder">
+                                          {review.profiles?.first_name?.[0] ||
+                                            "U"}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <h4 className="reviewer-name">
+                                        {review.profiles?.first_name}{" "}
+                                        {review.profiles?.last_name}
+                                      </h4>
+                                      <span className="review-date">
+                                        {new Date(
+                                          review.created_at,
+                                        ).toLocaleDateString("en-US", {
+                                          year: "numeric",
+                                          month: "long",
+                                          day: "numeric",
+                                        })}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="review-rating-display">
+                                    {renderStars(review.rating)}
                                   </div>
                                 </div>
-                                <span className="application-badge pending">Pending</span>
-                              </div>
-
-                              <div className="application-details">
-                                <div className="detail-row">
-                                  <span className="detail-label">Plan:</span>
-                                  <span className="detail-value">{app.plan?.name}</span>
+                                <div className="review-content">
+                                  <p className="review-comment">
+                                    {review.comment}
+                                  </p>
                                 </div>
-                                <div className="detail-row">
-                                  <span className="detail-label">Price:</span>
-                                  <span className="detail-value">₱{app.price_paid?.toLocaleString()}/{app.plan?.duration}</span>
-                                </div>
-                                <div className="detail-row">
-                                  <span className="detail-label">Payment:</span>
-                                  <span className="detail-value">{app.payment_method}</span>
-                                </div>
-                                <div className="detail-row">
-                                  <span className="detail-label">Applied:</span>
-                                  <span className="detail-value">{new Date(app.created_at).toLocaleDateString()}</span>
-                                </div>
-                              </div>
-
-                              {app.receipt_path && (
-                                <div className="receipt-preview">
-                                  <a 
-                                    href={supabase.storage.from('payment-receipts').getPublicUrl(app.receipt_path).data.publicUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="view-receipt-btn"
+                                <div className="review-footer">
+                                  <button
+                                    className="delete-review-btn"
+                                    onClick={() => {
+                                      setSelectedReview(review);
+                                      setShowDeleteReviewModal(true);
+                                    }}
                                   >
-                                    📄 View Receipt
-                                  </a>
+                                    <span className="btn-icon">🗑️</span> Delete
+                                    Review
+                                  </button>
                                 </div>
-                              )}
-
-                              <div className="application-actions">
-                                <button
-                                  className="action-btn approve"
-                                  onClick={() => handleApproveApplication(app)}
-                                  disabled={processingApplication === app.id}
-                                >
-                                  {processingApplication === app.id ? (
-                                    <span className="loading-spinner-small"></span>
-                                  ) : (
-                                    <>
-                                      <span className="btn-icon">✓</span>
-                                      Approve
-                                    </>
-                                  )}
-                                </button>
-                                <button
-                                  className="action-btn reject"
-                                  onClick={() => {
-                                    setSelectedApplication(app);
-                                    setShowRejectModal(true);
-                                  }}
-                                  disabled={processingApplication === app.id}
-                                >
-                                  <span className="btn-icon">✗</span>
-                                  Reject
-                                </button>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="no-applications-state">
-                          <div className="empty-icon">📋</div>
-                          <h3>No Pending Applications</h3>
-                          <p>When clients apply for memberships, they will appear here.</p>
-                        </div>
-                      )}
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="no-reviews-state">
+                            <div className="empty-icon">⭐</div>
+                            <h3>No Reviews Yet</h3>
+                            <p>
+                              When customers leave reviews, they will appear
+                              here.
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -2504,7 +2752,6 @@ const MyBusinessPage = () => {
                         Preview - How your business will appear in Browse
                       </h3>
 
-                      {/* Business Card Preview */}
                       <div className="preview-business-card">
                         <div className="business-card-glow"></div>
                         <div className="business-card-content">
@@ -2574,20 +2821,18 @@ const MyBusinessPage = () => {
                               className="view-details-btn-preview"
                               disabled
                             >
-                              <span>View Details →</span>
+                              View Details →
                             </button>
                           </div>
                         </div>
                       </div>
 
-                      {/* Payment Methods Preview - How clients will see payment options */}
                       <div className="payment-methods-preview">
                         <h4 className="preview-subtitle">
                           Payment Methods - How clients will pay
                         </h4>
 
                         <div className="payment-options-preview">
-                          {/* GCash Payment Option */}
                           <div className="payment-option-card">
                             <div className="payment-option-header">
                               <span className="payment-option-icon">📱</span>
@@ -2647,7 +2892,6 @@ const MyBusinessPage = () => {
                             )}
                           </div>
 
-                          {/* On-site Payment Option (always available) */}
                           <div className="payment-option-card">
                             <div className="payment-option-header">
                               <span className="payment-option-icon">🏪</span>
@@ -2683,7 +2927,6 @@ const MyBusinessPage = () => {
                           </div>
                         </div>
 
-                        {/* Preview Note */}
                         <div className="preview-note">
                           <p>
                             ✨ This is how payment options will appear to
@@ -2726,34 +2969,52 @@ const MyBusinessPage = () => {
         </main>
       </div>
 
-      {/* Reject Application Modal */}
-      {showRejectModal && (
-        <div className="modal-overlay" onClick={() => setShowRejectModal(false)}>
-          <div className="modal-content reject-modal" onClick={(e) => e.stopPropagation()}>
+      {/* Delete Review Confirmation Modal */}
+      {showDeleteReviewModal && selectedReview && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowDeleteReviewModal(false)}
+        >
+          <div
+            className="modal-content delete-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
-              <h2>Reject Application</h2>
-              <button className="modal-close" onClick={() => setShowRejectModal(false)}>×</button>
+              <h2>Delete Review</h2>
+              <button
+                className="modal-close"
+                onClick={() => setShowDeleteReviewModal(false)}
+              >
+                ×
+              </button>
             </div>
             <div className="modal-body">
-              <p>Please provide a reason for rejecting this application:</p>
-              <textarea
-                className="reject-reason-input"
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Enter rejection reason..."
-                rows="4"
-              />
+              <p>Are you sure you want to delete this review?</p>
+              <div className="review-preview">
+                <div className="preview-rating">
+                  {renderStars(selectedReview.rating)}
+                </div>
+                <p className="preview-comment">"{selectedReview.comment}"</p>
+                <p className="preview-author">
+                  - {selectedReview.profiles?.first_name}{" "}
+                  {selectedReview.profiles?.last_name}
+                </p>
+              </div>
+              <p className="warning-text">This action cannot be undone.</p>
             </div>
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowRejectModal(false)}>
+              <button
+                className="btn-secondary"
+                onClick={() => setShowDeleteReviewModal(false)}
+              >
                 Cancel
               </button>
-              <button 
-                className="btn-reject"
-                onClick={handleRejectApplication}
-                disabled={!rejectReason.trim() || processingApplication === selectedApplication?.id}
+              <button
+                className="btn-delete"
+                onClick={handleDeleteReview}
+                disabled={deletingReview}
               >
-                {processingApplication === selectedApplication?.id ? 'Rejecting...' : 'Reject Application'}
+                {deletingReview ? "Deleting..." : "Delete Review"}
               </button>
             </div>
           </div>

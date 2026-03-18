@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import OwnerNavbar from '../components/owner/OwnerNavbar';
-import '../styles/OwnerDashboard.css';
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import OwnerNavbar from "../components/owner/OwnerNavbar";
+import "../styles/OwnerDashboard.css";
 
 const OwnerDashboard = () => {
   const navigate = useNavigate();
@@ -13,22 +13,24 @@ const OwnerDashboard = () => {
   const [error, setError] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
-  const [businessVerificationStatus, setBusinessVerificationStatus] = useState({});
-  
+  const [businessVerificationStatus, setBusinessVerificationStatus] = useState(
+    {},
+  );
+
   const [stats, setStats] = useState({
     totalMembers: 0,
     pendingRenewals: 0,
     newApplications: 0,
-    monthlyRevenue: '0'
+    monthlyRevenue: "0",
   });
-  
+
   const [recentApplications, setRecentApplications] = useState([]);
   const [clientAvatars, setClientAvatars] = useState({});
 
   useEffect(() => {
     // Check if owner was just approved (from URL or state)
     const params = new URLSearchParams(location.search);
-    if (params.get('approved') === 'true') {
+    if (params.get("approved") === "true") {
       setShowWelcomeBanner(true);
       setTimeout(() => setShowWelcomeBanner(false), 5000);
     }
@@ -41,30 +43,33 @@ const OwnerDashboard = () => {
   const fetchOwnerData = async () => {
     try {
       setLoading(true);
-      
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
       if (userError) throw userError;
-      
+
       if (!user) {
-        navigate('/login');
+        navigate("/login");
         return;
       }
 
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
         .single();
 
       if (profileError) throw profileError;
-      
+
       // Check if user is approved owner
-      if (profileData?.role !== 'owner') {
-        navigate('/ClientDashboard');
+      if (profileData?.role !== "owner") {
+        navigate("/ClientDashboard");
         return;
       }
-      
+
       setProfile(profileData);
 
       if (profileData?.avatar_url) {
@@ -72,29 +77,28 @@ const OwnerDashboard = () => {
       }
 
       const { data: businessesData, error: businessesError } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('owner_id', user.id);
+        .from("businesses")
+        .select("*")
+        .eq("owner_id", user.id);
 
       if (businessesError) throw businessesError;
-      
+
       setBusinesses(businessesData || []);
-      
+
       // Track verification status for each business
       const verificationStatus = {};
-      businessesData?.forEach(b => {
+      businessesData?.forEach((b) => {
         verificationStatus[b.id] = b.verification_status;
       });
       setBusinessVerificationStatus(verificationStatus);
-      
+
       if (businessesData && businessesData.length > 0) {
-        const businessIds = businessesData.map(b => b.id);
+        const businessIds = businessesData.map((b) => b.id);
         await fetchBusinessStats(businessIds);
         await fetchRecentApplications(businessIds);
       }
-
     } catch (err) {
-      console.error('Error fetching owner data:', err);
+      console.error("Error fetching owner data:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -103,40 +107,44 @@ const OwnerDashboard = () => {
 
   const getClientAvatarUrl = async (avatarPath, userId) => {
     if (!avatarPath) return null;
-    
+
     if (clientAvatars[userId]) {
       return clientAvatars[userId];
     }
 
     try {
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('avatars')
+      const { data: publicUrlData } = supabase.storage
+        .from("avatars")
         .getPublicUrl(avatarPath);
-      
+
       if (publicUrlData?.publicUrl) {
         try {
-          const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
+          const response = await fetch(publicUrlData.publicUrl, {
+            method: "HEAD",
+          });
           if (response.ok) {
-            setClientAvatars(prev => ({ ...prev, [userId]: publicUrlData.publicUrl }));
+            setClientAvatars((prev) => ({
+              ...prev,
+              [userId]: publicUrlData.publicUrl,
+            }));
             return publicUrlData.publicUrl;
           }
         } catch (e) {
-          console.log('Public URL not accessible, trying download...');
+          console.log("Public URL not accessible, trying download...");
         }
       }
 
       const { data, error } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .download(avatarPath);
 
       if (error) throw error;
 
       const url = URL.createObjectURL(data);
-      setClientAvatars(prev => ({ ...prev, [userId]: url }));
+      setClientAvatars((prev) => ({ ...prev, [userId]: url }));
       return url;
     } catch (error) {
-      console.error('Error getting client avatar:', error);
+      console.error("Error getting client avatar:", error);
       return null;
     }
   };
@@ -144,27 +152,27 @@ const OwnerDashboard = () => {
   const fetchBusinessStats = async (businessIds) => {
     try {
       const { count: totalMembers } = await supabase
-        .from('memberships')
-        .select('*', { count: 'exact', head: true })
-        .in('business_id', businessIds)
-        .eq('status', 'approved');
+        .from("memberships")
+        .select("*", { count: "exact", head: true })
+        .in("business_id", businessIds)
+        .eq("status", "approved");
 
       const nextWeek = new Date();
       nextWeek.setDate(nextWeek.getDate() + 7);
-      
+
       const { count: pendingRenewals } = await supabase
-        .from('memberships')
-        .select('*', { count: 'exact', head: true })
-        .in('business_id', businessIds)
-        .eq('status', 'approved')
-        .lte('end_date', nextWeek.toISOString())
-        .gte('end_date', new Date().toISOString());
+        .from("memberships")
+        .select("*", { count: "exact", head: true })
+        .in("business_id", businessIds)
+        .eq("status", "approved")
+        .lte("end_date", nextWeek.toISOString())
+        .gte("end_date", new Date().toISOString());
 
       const { count: newApplications } = await supabase
-        .from('memberships')
-        .select('*', { count: 'exact', head: true })
-        .in('business_id', businessIds)
-        .eq('status', 'pending');
+        .from("memberships")
+        .select("*", { count: "exact", head: true })
+        .in("business_id", businessIds)
+        .eq("status", "pending");
 
       const firstDayOfMonth = new Date();
       firstDayOfMonth.setDate(1);
@@ -176,42 +184,47 @@ const OwnerDashboard = () => {
       lastDayOfMonth.setHours(23, 59, 59, 999);
 
       const { data: monthlyApprovals } = await supabase
-        .from('memberships')
-        .select('price_paid')
-        .in('business_id', businessIds)
-        .eq('status', 'approved')
-        .gte('created_at', firstDayOfMonth.toISOString())
-        .lte('created_at', lastDayOfMonth.toISOString());
+        .from("memberships")
+        .select("price_paid")
+        .in("business_id", businessIds)
+        .eq("status", "approved")
+        .gte("created_at", firstDayOfMonth.toISOString())
+        .lte("created_at", lastDayOfMonth.toISOString());
 
       const { data: monthlyPayments } = await supabase
-        .from('payments')
-        .select('amount')
-        .in('business_id', businessIds)
-        .eq('payment_status', 'paid')
-        .gte('paid_at', firstDayOfMonth.toISOString())
-        .lte('paid_at', lastDayOfMonth.toISOString());
+        .from("payments")
+        .select("amount")
+        .in("business_id", businessIds)
+        .eq("payment_status", "paid")
+        .gte("paid_at", firstDayOfMonth.toISOString())
+        .lte("paid_at", lastDayOfMonth.toISOString());
 
-      const membershipRevenue = monthlyApprovals?.reduce((sum, m) => sum + (m.price_paid || 0), 0) || 0;
-      const paymentRevenue = monthlyPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+      const membershipRevenue =
+        monthlyApprovals?.reduce((sum, m) => sum + (m.price_paid || 0), 0) || 0;
+      const paymentRevenue =
+        monthlyPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
       const totalMonthlyRevenue = membershipRevenue + paymentRevenue;
 
       setStats({
         totalMembers: totalMembers || 0,
         pendingRenewals: pendingRenewals || 0,
         newApplications: newApplications || 0,
-        monthlyRevenue: totalMonthlyRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+        monthlyRevenue: totalMonthlyRevenue.toLocaleString("en-US", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        }),
       });
-
     } catch (error) {
-      console.error('Error fetching business stats:', error);
+      console.error("Error fetching business stats:", error);
     }
   };
 
   const fetchRecentApplications = async (businessIds) => {
     try {
       const { data: memberships } = await supabase
-        .from('memberships')
-        .select(`
+        .from("memberships")
+        .select(
+          `
           id,
           status,
           price_paid,
@@ -235,78 +248,87 @@ const OwnerDashboard = () => {
             name,
             verification_status
           )
-        `)
-        .in('business_id', businessIds)
-        .order('created_at', { ascending: false })
+        `,
+        )
+        .in("business_id", businessIds)
+        .order("created_at", { ascending: false })
         .limit(5);
 
-      const processedApplications = await Promise.all((memberships || []).map(async (app) => {
-        let avatarUrl = null;
-        if (app.profiles?.avatar_url) {
-          avatarUrl = await getClientAvatarUrl(app.profiles.avatar_url, app.profiles.id);
-        }
+      const processedApplications = await Promise.all(
+        (memberships || []).map(async (app) => {
+          let avatarUrl = null;
+          if (app.profiles?.avatar_url) {
+            avatarUrl = await getClientAvatarUrl(
+              app.profiles.avatar_url,
+              app.profiles.id,
+            );
+          }
 
-        const timeAgo = getTimeAgo(new Date(app.created_at));
-        const formattedDate = new Date(app.created_at).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
+          const timeAgo = getTimeAgo(new Date(app.created_at));
+          const formattedDate = new Date(app.created_at).toLocaleDateString(
+            "en-US",
+            {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            },
+          );
 
-        return {
-          id: app.id,
-          name: app.profiles ? 
-            `${app.profiles.first_name || ''} ${app.profiles.last_name || ''}`.trim() || 
-            app.profiles.email?.split('@')[0] || 
-            'Unknown User' : 
-            'Unknown User',
-          email: app.profiles?.email || 'No email',
-          plan: app.plans?.name || 'Standard Plan',
-          amount: `₱${app.price_paid?.toLocaleString() || '0'}`,
-          status: app.status,
-          paymentStatus: app.payment_status,
-          paymentMethod: app.payment_method,
-          timeAgo: timeAgo,
-          formattedDate: formattedDate,
-          avatarUrl: avatarUrl,
-          businessName: app.business?.name || 'Unknown Business',
-          businessVerification: app.business?.verification_status || 'pending'
-        };
-      }));
+          return {
+            id: app.id,
+            name: app.profiles
+              ? `${app.profiles.first_name || ""} ${app.profiles.last_name || ""}`.trim() ||
+                app.profiles.email?.split("@")[0] ||
+                "Unknown User"
+              : "Unknown User",
+            email: app.profiles?.email || "No email",
+            plan: app.plans?.name || "Standard Plan",
+            amount: `₱${app.price_paid?.toLocaleString() || "0"}`,
+            status: app.status,
+            paymentStatus: app.payment_status,
+            paymentMethod: app.payment_method,
+            timeAgo: timeAgo,
+            formattedDate: formattedDate,
+            avatarUrl: avatarUrl,
+            businessName: app.business?.name || "Unknown Business",
+            businessVerification:
+              app.business?.verification_status || "pending",
+          };
+        }),
+      );
 
       setRecentApplications(processedApplications);
-
     } catch (error) {
-      console.error('Error fetching recent applications:', error);
+      console.error("Error fetching recent applications:", error);
     }
   };
 
   const getTimeAgo = (date) => {
     const seconds = Math.floor((new Date() - date) / 1000);
-    
+
     let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + ' years ago';
-    
+    if (interval > 1) return Math.floor(interval) + " years ago";
+
     interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + ' months ago';
-    
+    if (interval > 1) return Math.floor(interval) + " months ago";
+
     interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + ' days ago';
-    
+    if (interval > 1) return Math.floor(interval) + " days ago";
+
     interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + ' hours ago';
-    
+    if (interval > 1) return Math.floor(interval) + " hours ago";
+
     interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + ' minutes ago';
-    
-    return Math.floor(seconds) + ' seconds ago';
+    if (interval > 1) return Math.floor(interval) + " minutes ago";
+
+    return Math.floor(seconds) + " seconds ago";
   };
 
   const downloadAvatar = async (path) => {
     try {
       const { data, error } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .download(path);
 
       if (error) throw error;
@@ -314,7 +336,7 @@ const OwnerDashboard = () => {
       const url = URL.createObjectURL(data);
       setAvatarUrl(url);
     } catch (error) {
-      console.error('Error downloading avatar:', error);
+      console.error("Error downloading avatar:", error);
     }
   };
 
@@ -322,15 +344,15 @@ const OwnerDashboard = () => {
     if (profile?.first_name) {
       return profile.first_name;
     }
-    return 'Owner';
+    return "Owner";
   };
 
   const getInitials = (firstName, lastName) => {
-    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+    return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
   };
 
   const handleViewApplication = (appId) => {
-    navigate('/applications', { state: { highlightId: appId } });
+    navigate("/applications", { state: { highlightId: appId } });
   };
 
   if (loading) {
@@ -358,10 +380,7 @@ const OwnerDashboard = () => {
 
   return (
     <div className="dashboard-container">
-      <OwnerNavbar 
-        profile={profile} 
-        avatarUrl={avatarUrl}
-      />
+      <OwnerNavbar profile={profile} avatarUrl={avatarUrl} />
 
       <div className="content-wrapper">
         <main className="dashboard-main">
@@ -371,24 +390,37 @@ const OwnerDashboard = () => {
               <span className="welcome-icon">🎉</span>
               <div className="welcome-content">
                 <h3>Welcome to Owner Dashboard!</h3>
-                <p>Your business application has been approved. Start managing your business now.</p>
+                <p>
+                  Your business application has been approved. Start managing
+                  your business now.
+                </p>
               </div>
-              <button className="welcome-close" onClick={() => setShowWelcomeBanner(false)}>×</button>
+              <button
+                className="welcome-close"
+                onClick={() => setShowWelcomeBanner(false)}
+              >
+                ×
+              </button>
             </div>
           )}
 
           {/* Business Verification Status Banner */}
-          {Object.values(businessVerificationStatus).some(status => status === 'pending') && (
+          {Object.values(businessVerificationStatus).some(
+            (status) => status === "pending",
+          ) && (
             <div className="verification-banner">
               <span className="verification-icon">⏳</span>
               <div className="verification-content">
                 <h4>Business Verification Pending</h4>
-                <p>Some of your businesses are still pending admin verification. Features may be limited until verified.</p>
+                <p>
+                  Some of your businesses are still pending admin verification.
+                  Features may be limited until verified.
+                </p>
               </div>
             </div>
           )}
 
-          {/* Header */}
+          {/* Header - FIXED: Title and greeting on SAME row */}
           <div className="dashboard-header">
             <h1 className="page-title">
               Owner Dashboard
@@ -412,7 +444,7 @@ const OwnerDashboard = () => {
                 <span className="stat-label">Total Members</span>
               </div>
             </div>
-            
+
             <div className="stat-card-enhanced">
               <div className="stat-icon-wrapper renewals">
                 <span className="stat-icon">🔄</span>
@@ -422,7 +454,7 @@ const OwnerDashboard = () => {
                 <span className="stat-label">Pending Renewals</span>
               </div>
             </div>
-            
+
             <div className="stat-card-enhanced highlight">
               <div className="stat-icon-wrapper applications">
                 <span className="stat-icon">📝</span>
@@ -435,7 +467,7 @@ const OwnerDashboard = () => {
                 )}
               </div>
             </div>
-            
+
             <div className="stat-card-enhanced">
               <div className="stat-icon-wrapper revenue">
                 <span className="stat-icon">💰</span>
@@ -455,17 +487,19 @@ const OwnerDashboard = () => {
                   <span className="title-icon">📋</span>
                   Recent Applications
                 </h3>
-                <p className="section-subtitle-enhanced">Latest membership requests</p>
+                <p className="section-subtitle-enhanced">
+                  Latest membership requests
+                </p>
               </div>
-              <button 
+              <button
                 className="view-all-btn-enhanced"
-                onClick={() => navigate('/applications')}
+                onClick={() => navigate("/applications")}
               >
                 View All Applications
                 <span className="btn-arrow">→</span>
               </button>
             </div>
-            
+
             {recentApplications.length > 0 ? (
               <div className="applications-table-container">
                 <table className="applications-table">
@@ -483,31 +517,38 @@ const OwnerDashboard = () => {
                   </thead>
                   <tbody>
                     {recentApplications.map((app) => (
-                      <tr 
-                        key={app.id} 
+                      <tr
+                        key={app.id}
                         onClick={() => handleViewApplication(app.id)}
                       >
                         <td>
                           <div className="applicant-cell">
                             <div className="applicant-avatar-small">
                               {app.avatarUrl ? (
-                                <img 
-                                  src={app.avatarUrl} 
+                                <img
+                                  src={app.avatarUrl}
                                   alt={app.name}
                                   onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    e.target.parentNode.innerHTML = `<div class="avatar-placeholder-small">${getInitials(app.name.split(' ')[0], app.name.split(' ')[1])}</div>`;
+                                    e.target.style.display = "none";
+                                    e.target.parentNode.innerHTML = `<div class="avatar-placeholder-small">${getInitials(app.name.split(" ")[0], app.name.split(" ")[1])}</div>`;
                                   }}
                                 />
                               ) : (
                                 <div className="avatar-placeholder-small">
-                                  {getInitials(app.name.split(' ')[0], app.name.split(' ')[1])}
+                                  {getInitials(
+                                    app.name.split(" ")[0],
+                                    app.name.split(" ")[1],
+                                  )}
                                 </div>
                               )}
                             </div>
                             <div className="applicant-info-small">
-                              <span className="applicant-name-small">{app.name}</span>
-                              <span className="applicant-email-small">{app.email}</span>
+                              <span className="applicant-name-small">
+                                {app.name}
+                              </span>
+                              <span className="applicant-email-small">
+                                {app.email}
+                              </span>
                             </div>
                           </div>
                         </td>
@@ -521,45 +562,52 @@ const OwnerDashboard = () => {
                           <div className="business-cell">
                             <span className="business-icon">🏢</span>
                             <span>{app.businessName}</span>
-                            {app.businessVerification === 'pending' && (
-                              <span className="verification-dot" title="Pending verification">⏳</span>
+                            {app.businessVerification === "pending" && (
+                              <span
+                                className="verification-dot"
+                                title="Pending verification"
+                              >
+                                ⏳
+                              </span>
                             )}
                           </div>
                         </td>
                         <td>
                           <div className="payment-cell">
                             <span className="payment-icon">💳</span>
-                            <span className="capitalize">{app.paymentMethod || 'Not specified'}</span>
+                            <span className="capitalize">
+                              {app.paymentMethod || "Not specified"}
+                            </span>
                           </div>
                         </td>
                         <td>
                           <div className="badges-container">
-                            {app.status === 'pending' && (
+                            {app.status === "pending" && (
                               <span className="status-badge-table pending">
                                 <span className="status-icon">⏳</span>
                                 Pending
                               </span>
                             )}
-                            {app.status === 'approved' && (
+                            {app.status === "approved" && (
                               <span className="status-badge-table approved">
                                 <span className="status-icon">✅</span>
                                 Approved
                               </span>
                             )}
-                            {app.status === 'rejected' && (
+                            {app.status === "rejected" && (
                               <span className="status-badge-table rejected">
                                 <span className="status-icon">❌</span>
                                 Rejected
                               </span>
                             )}
-                            
-                            {app.paymentStatus === 'paid' && (
+
+                            {app.paymentStatus === "paid" && (
                               <span className="payment-badge-table paid">
                                 <span className="payment-icon">✓</span>
                                 Paid
                               </span>
                             )}
-                            {app.paymentStatus === 'pending' && (
+                            {app.paymentStatus === "pending" && (
                               <span className="payment-badge-table pending">
                                 <span className="payment-icon">⏳</span>
                                 Pending
@@ -574,7 +622,7 @@ const OwnerDashboard = () => {
                           </span>
                         </td>
                         <td>
-                          <button 
+                          <button
                             className="action-btn"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -594,9 +642,9 @@ const OwnerDashboard = () => {
                 <div className="empty-icon">📋</div>
                 <h3>No Recent Applications</h3>
                 <p>When customers apply for memberships, they'll appear here</p>
-                <button 
+                <button
                   className="btn-view-pending"
-                  onClick={() => navigate('/applications')}
+                  onClick={() => navigate("/applications")}
                 >
                   Go to Applications
                 </button>
@@ -614,21 +662,33 @@ const OwnerDashboard = () => {
                 </h3>
               </div>
               <div className="businesses-grid-enhanced">
-                {businesses.map(business => (
+                {businesses.map((business) => (
                   <div key={business.id} className="business-card-enhanced">
-                    <span className="business-emoji-large">{business.emoji || '🏢'}</span>
+                    <span className="business-emoji-large">
+                      {business.emoji || "🏢"}
+                    </span>
                     <div className="business-card-info">
                       <h4 className="business-card-name">{business.name}</h4>
-                      <p className="business-card-location">{business.location || 'No location set'}</p>
-                      <span className="business-type-badge-large">{business.business_type}</span>
-                      {business.verification_status === 'pending' && (
-                        <span className="verification-badge-small pending">Pending Verification</span>
+                      <p className="business-card-location">
+                        {business.location || "No location set"}
+                      </p>
+                      <span className="business-type-badge-large">
+                        {business.business_type}
+                      </span>
+                      {business.verification_status === "pending" && (
+                        <span className="verification-badge-small pending">
+                          Pending Verification
+                        </span>
                       )}
-                      {business.verification_status === 'approved' && (
-                        <span className="verification-badge-small approved">✓ Verified</span>
+                      {business.verification_status === "approved" && (
+                        <span className="verification-badge-small approved">
+                          ✓ Verified
+                        </span>
                       )}
-                      {business.verification_status === 'rejected' && (
-                        <span className="verification-badge-small rejected">✗ Rejected</span>
+                      {business.verification_status === "rejected" && (
+                        <span className="verification-badge-small rejected">
+                          ✗ Rejected
+                        </span>
                       )}
                     </div>
                   </div>
