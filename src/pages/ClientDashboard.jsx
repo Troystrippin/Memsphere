@@ -4,21 +4,86 @@ import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
 import "../styles/ClientDashboard.css";
 import {
+  // Navigation & Actions
   ChevronRight,
   Compass,
+  Home,
+  Search,
+  Filter,
+  Bookmark,
+  Share2,
+  MoreVertical,
+  Download,
+  Upload,
+  RefreshCw,
+  Settings,
+  HelpCircle,
+  LogOut,
+
+  // User & Profile
+  User,
+  Mail,
+  Phone,
+  Globe,
   Crown,
+  Medal,
+  Target,
+  Flag,
+
+  // Business & Memberships
+  Briefcase,
+  GraduationCap,
+  Coffee,
+  Dumbbell,
+  Brain,
+  BookOpen,
+  Music,
+  Camera,
+  Video,
+  Palette,
+  Code,
+  PenTool,
+
+  // Health & Wellness
+  Heart,
+  HeartPulse,
+  Activity,
+  Shield,
+  Zap,
+
+  // Status & Indicators
   CheckCircle,
   XCircle,
+  AlertCircle,
+  Info,
+  Award,
+  Star,
+  TrendingUp,
+  Sparkles,
+  Bell,
+  Gift,
+  CreditCard,
+  DollarSign,
+
+  // Time & Date
   Clock,
   Calendar,
-  Award,
-  TrendingUp,
-  Heart,
-  Bookmark,
-  Star,
-  Users,
+  Play,
+
+  // Location
   MapPin,
+  Map,
+  PhoneCall,
+  MessageCircle,
+
+  // Social
+  Users,
+
+  // Actions
   Plus,
+
+  // Misc
+  MoreHorizontal,
 } from "lucide-react";
 
 const ClientDashboard = () => {
@@ -155,6 +220,8 @@ const ClientDashboard = () => {
       }
 
       console.log("Memberships found:", data?.length || 0);
+      console.log("All memberships data:", data);
+
       setMemberships(data || []);
       updateTimeRemaining(data || []);
     } catch (error) {
@@ -201,6 +268,12 @@ const ClientDashboard = () => {
         console.error("Error fetching recommended businesses:", error);
         throw error;
       }
+
+      console.log("Recommended businesses found:", data?.length || 0);
+      console.log(
+        "Business ratings:",
+        data?.map((b) => ({ name: b.name, rating: b.rating })),
+      );
 
       const businessesWithRatings = data?.filter((b) => b.rating != null) || [];
       const businessesWithoutRatings =
@@ -252,10 +325,14 @@ const ClientDashboard = () => {
           const diffHours = Math.floor(
             (diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
           );
+          const diffMinutes = Math.floor(
+            (diffTime % (1000 * 60 * 60)) / (1000 * 60),
+          );
 
           newTimeRemaining[membership.id] = {
             days: diffDays,
             hours: diffHours,
+            minutes: diffMinutes,
             expired: false,
             endDate: membership.end_date,
           };
@@ -263,6 +340,7 @@ const ClientDashboard = () => {
           newTimeRemaining[membership.id] = {
             days: 0,
             hours: 0,
+            minutes: 0,
             expired: true,
             endDate: membership.end_date,
           };
@@ -327,6 +405,10 @@ const ClientDashboard = () => {
           id: activeMembership.id,
           businessId: activeMembership.businesses?.id,
           businessName: activeMembership.businesses?.name || "Business",
+          businessLocation:
+            activeMembership.businesses?.city ||
+            activeMembership.businesses?.location ||
+            "Unknown location",
           planName:
             activeMembership.membership_plans?.name || "Membership Plan",
           applied: new Date(activeMembership.created_at).toLocaleDateString(
@@ -354,7 +436,12 @@ const ClientDashboard = () => {
                 day: "numeric",
               })
             : "N/A",
+          price:
+            activeMembership.membership_plans?.price ||
+            activeMembership.price_paid,
+          duration: activeMembership.membership_plans?.duration || "month",
           features: activeMembership.membership_plans?.features || [],
+          businessType: activeMembership.businesses?.business_type,
           emoji: activeMembership.businesses?.emoji || "🏢",
           timeRemaining: timeRemaining[activeMembership.id],
         };
@@ -371,7 +458,7 @@ const ClientDashboard = () => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
-      month: "short",
+      month: "long",
       day: "numeric",
     });
   };
@@ -437,12 +524,15 @@ const ClientDashboard = () => {
   const activeMembership = getActiveMembership();
   const sortedMemberships = getSortedMemberships();
 
+  console.log("Total memberships:", memberships.length);
+  console.log("Sorted memberships:", sortedMemberships.length);
+
   return (
     <div className="dashboard-container">
       <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
 
       <div className="dashboard-main">
-        {/* Header Section */}
+        {/* Header Section - Only greeting, no welcome back text */}
         <div className="dashboard-header">
           <div className="user-greeting">
             <span className="greeting-wave">👋</span>
@@ -451,7 +541,7 @@ const ClientDashboard = () => {
           </div>
         </div>
 
-        {/* Stats Cards */}
+        {/* Enhanced Stats Cards with Smaller Icons */}
         <div className="enhanced-stats-grid">
           <div className="enhanced-stat-card">
             <div className="stat-icon-wrapper gradient-blue">
@@ -506,7 +596,7 @@ const ClientDashboard = () => {
           </div>
         </div>
 
-        {/* Membership Status */}
+        {/* Membership Status - Removed count badge */}
         <div className="membership-header">
           <div className="membership-status">
             <div className="status-badge">
@@ -531,6 +621,14 @@ const ClientDashboard = () => {
             </button>
           </div>
         </div>
+
+        {/* Loading State */}
+        {loadingMemberships && (
+          <div className="loading-container">
+            <div className="spinner-small"></div>
+            <p className="loading-text">Loading your memberships...</p>
+          </div>
+        )}
 
         {/* Active Membership Card */}
         {!loadingMemberships && activeMembership ? (
@@ -632,7 +730,7 @@ const ClientDashboard = () => {
           )
         )}
 
-        {/* All Memberships Table */}
+        {/* All Memberships Table - No count badge, no blue line */}
         {!loadingMemberships && memberships.length > 0 && (
           <div className="memberships-table-container">
             <div className="section-header no-bottom-border">
@@ -649,7 +747,7 @@ const ClientDashboard = () => {
             </div>
 
             <div className="memberships-table">
-              <div className="table-header">
+              <div className="table-header blue-theme">
                 <div className="table-cell">Business</div>
                 <div className="table-cell">Plan</div>
                 <div className="table-cell">Applied</div>
@@ -664,8 +762,8 @@ const ClientDashboard = () => {
                   return (
                     <div key={membership.id} className="table-row">
                       <div className="table-cell business-cell">
-                        <div className="business-mini-icon">
-                          <span>{membership.businesses?.emoji || "🏢"}</span>
+                        <div className="business-mini-icon centered">
+                          {membership.businesses?.emoji || "🏢"}
                         </div>
                         <span className="business-name-mini">
                           {membership.businesses?.name}
@@ -703,7 +801,7 @@ const ClientDashboard = () => {
           </div>
         )}
 
-        {/* Recommended Section */}
+        {/* Recommended Section - Fire icon on the right, no blue line */}
         <div className="recommended-section">
           <div className="section-header no-bottom-border">
             <div className="section-title">
