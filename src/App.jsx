@@ -15,9 +15,10 @@ import MyBusinessPage from "./pages/MyBusinessPage";
 import Applications from "./pages/Applications";
 import Analytics from "./pages/Analytics";
 import Browse from "./pages/Browse";
-import BusinessReviews from "./pages/BusinessReviews"; // ✅ ADD THIS IMPORT
+import BusinessReviews from "./pages/BusinessReviews";
 import LandingPage from "./pages/LandingPage";
 import About from "./pages/About";
+import Contact from "./pages/Contact"; // ✅ ADD THIS IMPORT
 import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import OwnerMemberManagement from "./pages/OwnerMemberManagement";
@@ -290,6 +291,7 @@ function App() {
       "/register",
       "/forgot-password",
       "/about",
+      "/contact", // ✅ ADDED CONTACT TO PUBLIC PATHS
     ];
 
     // Only redirect if on a public path AND logged in with valid session
@@ -411,6 +413,7 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/about" element={<About />} />
+      <Route path="/contact" element={<Contact />} /> {/* ✅ ADDED CONTACT ROUTE */}
 
       {/* Client Routes */}
       <Route
@@ -429,7 +432,7 @@ function App() {
           </ProtectedRoute>
         }
       />
-      {/* ✅ NEW ROUTE FOR BUSINESS REVIEWS */}
+      {/* Business Reviews Route */}
       <Route
         path="/business-reviews/:businessId"
         element={

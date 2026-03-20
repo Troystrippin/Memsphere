@@ -1,8 +1,39 @@
-import React, { useState, useEffect } from 'react';
+// src/components/ClientNavbar/ClientNavbar.jsx
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import logo from '../../assets/logo.png';
-import './ClientNavbar.css';
+import './ClientNavbar.css'; // Import the CSS file
+import {
+  Bell,
+  User,
+  Settings,
+  LogOut,
+  ChevronDown,
+  LayoutDashboard,
+  Compass,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Mail,
+  AlertCircle,
+  Sparkles,
+  Menu,
+  X,
+  Gift,
+  BellRing,
+  CheckCheck,
+  RefreshCw,
+  Crown,
+  Shield,
+  Camera,
+  HelpCircle,
+  Moon,
+  Sun,
+  Mail as MailIcon,
+  Info,
+  PhoneCall
+} from 'lucide-react';
 
 const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   const navigate = useNavigate();
@@ -13,9 +44,14 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   const [unreadCount, setUnreadCount] = useState(propUnreadCount || 0);
   const [user, setUser] = useState(null);
   const [subscription, setSubscription] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  const dropdownRef = useRef(null);
+  const notificationRef = useRef(null);
+  const mobileMenuRef = useRef(null);
 
   useEffect(() => {
-    // Get current user
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
@@ -24,7 +60,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   }, []);
 
   useEffect(() => {
-    // Update unread count when prop changes
     if (propUnreadCount !== undefined) {
       setUnreadCount(propUnreadCount);
     }
@@ -33,18 +68,13 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   useEffect(() => {
     if (!user) return;
 
-    console.log('Setting up notifications for user:', user.id);
-
-    // Fetch initial unread count and recent notifications
     fetchUnreadCount();
     fetchRecentNotifications();
 
-    // Clean up existing subscription
     if (subscription) {
       subscription.unsubscribe();
     }
 
-    // Set up real-time subscription for new notifications
     const newSubscription = supabase
       .channel(`navbar-notifications-${user.id}`)
       .on(
@@ -56,20 +86,20 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('🔔 New notification received:', payload);
-          
-          // Increment unread count
           setUnreadCount(prev => prev + 1);
-          
-          // Add to notifications list (keep only 5 most recent)
           setNotifications(prev => {
-            // Check if notification already exists to prevent duplicates
             const exists = prev.some(n => n.id === payload.new.id);
             if (exists) return prev;
-            
             const newList = [payload.new, ...prev].slice(0, 5);
             return newList;
           });
+          
+          if (Notification.permission === 'granted') {
+            new Notification('New Notification', {
+              body: payload.new.title || 'You have a new notification',
+              icon: logo
+            });
+          }
         }
       )
       .on(
@@ -81,32 +111,49 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('📝 Notification updated:', payload);
-          
-          // Handle updates (like marking as read)
           if (payload.new.is_read === true && payload.old.is_read === false) {
             setUnreadCount(prev => Math.max(0, prev - 1));
           }
-          
-          // Update notifications list
           setNotifications(prev => 
             prev.map(n => n.id === payload.new.id ? payload.new : n)
           );
         }
       )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
+      .subscribe();
 
     setSubscription(newSubscription);
 
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
     return () => {
-      console.log('Cleaning up subscription');
       if (newSubscription) {
         newSubscription.unsubscribe();
       }
     };
   }, [user]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target) && !event.target.closest('.md\\:hidden')) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const fetchUnreadCount = async () => {
     if (!user) return;
@@ -119,7 +166,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
         .eq('is_read', false);
 
       if (error) throw error;
-      console.log('Unread count:', count);
       setUnreadCount(count || 0);
     } catch (error) {
       console.error('Error fetching unread count:', error);
@@ -130,21 +176,16 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     if (!user) return;
     
     try {
-      console.log('Fetching recent notifications for user:', user.id);
-      
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(10); // Increased from 5 to 10
+        .limit(10);
 
       if (error) throw error;
       
-      console.log('Fetched notifications:', data?.length || 0, 'notifications');
       setNotifications(data || []);
-      
-      // Also update unread count
       const unread = data?.filter(n => !n.is_read).length || 0;
       setUnreadCount(unread);
     } catch (error) {
@@ -153,7 +194,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   };
 
   const handleNotificationClick = async (notification) => {
-    // Mark as read
     if (!notification.is_read) {
       try {
         await supabase
@@ -164,7 +204,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
           })
           .eq('id', notification.id);
         
-        // Update local state
         setUnreadCount(prev => Math.max(0, prev - 1));
         setNotifications(prev => 
           prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
@@ -174,19 +213,18 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
       }
     }
 
-    // Navigate based on notification type
-    if (notification.type === 'membership_pending') {
-      navigate('/ClientDashboard');
-    } else if (notification.type === 'membership_approved') {
-      navigate('/ClientDashboard');
-    } else if (notification.type === 'membership_rejected') {
-      navigate('/browse');
-    } else if (notification.type === 'membership_cancelled') {
-      navigate('/browse');
-    } else {
-      navigate(`/notifications?highlight=${notification.id}`);
-    }
-    
+    const navigationMap = {
+      'membership_pending': '/ClientDashboard',
+      'membership_approved': '/ClientDashboard',
+      'membership_rejected': '/browse',
+      'membership_cancelled': '/browse',
+      'welcome': '/profile',
+      'announcement': '/announcements',
+      'promo': '/offers',
+    };
+
+    const path = navigationMap[notification.type] || `/notifications?highlight=${notification.id}`;
+    navigate(path);
     setShowNotifications(false);
   };
 
@@ -210,23 +248,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     }
   };
 
-  const handleViewAll = () => {
-    navigate('/notifications');
-    setShowNotifications(false);
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.user-menu') && !event.target.closest('.notifications-container')) {
-        setShowDropdown(false);
-        setShowNotifications(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const handleSignOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -241,258 +262,453 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     navigate(path);
     setShowDropdown(false);
     setShowNotifications(false);
+    setMobileMenuOpen(false);
   };
 
-  const getFirstName = () => {
-    if (profile?.first_name) {
-      return profile.first_name;
+  const getFirstName = () => profile?.first_name || 'Client';
+  const getFullName = () => {
+    if (profile?.first_name && profile?.last_name) {
+      return `${profile.first_name} ${profile.last_name}`;
     }
-    return 'Client';
+    return profile?.first_name || 'Client User';
   };
-
   const getInitials = () => {
-    if (profile?.first_name) {
-      return profile.first_name.charAt(0).toUpperCase();
+    if (profile?.first_name && profile?.last_name) {
+      return `${profile.first_name.charAt(0)}${profile.last_name.charAt(0)}`.toUpperCase();
     }
-    return 'C';
+    return profile?.first_name?.charAt(0).toUpperCase() || 'C';
   };
-
   const getUserRole = () => {
-    if (profile?.role === 'client') return 'Member';
-    return 'Client';
+    if (profile?.role === 'client') return 'Client';
+    if (profile?.role === 'admin') return 'Administrator';
+    if (profile?.role === 'Owner') return 'Business Owner';
+    return 'Member';
   };
 
   const formatTime = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
+    const diffMins = Math.floor((now - date) / (1000 * 60));
+    
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hour ago`;
-    if (diffDays < 7) return `${diffDays} day ago`;
-    
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
+    if (diffMins < 1440) return `${Math.floor(diffMins / 60)} hour ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const getNotificationIcon = (type) => {
-    switch(type) {
-      case 'welcome':
-        return '🎉';
-      case 'announcement':
-        return '📢';
-      case 'direct':
-        return '✉️';
-      case 'membership_pending':
-        return '📋';
-      case 'membership_approved':
-        return '✅';
-      case 'membership_rejected':
-        return '❌';
-      case 'membership_cancelled':
-        return '📢';
-      case 'promo':
-        return '🏷️';
-      default:
-        return '📋';
-    }
+    const iconMap = {
+      'welcome': <Sparkles className="w-5 h-5 text-yellow-500" />,
+      'announcement': <BellRing className="w-5 h-5 text-purple-500" />,
+      'direct': <Mail className="w-5 h-5 text-blue-500" />,
+      'membership_pending': <Clock className="w-5 h-5 text-orange-500" />,
+      'membership_approved': <CheckCircle className="w-5 h-5 text-green-500" />,
+      'membership_rejected': <XCircle className="w-5 h-5 text-red-500" />,
+      'membership_cancelled': <AlertCircle className="w-5 h-5 text-gray-500" />,
+      'promo': <Gift className="w-5 h-5 text-pink-500" />,
+      'subscription_renewed': <RefreshCw className="w-5 h-5 text-blue-500" />,
+    };
+    return iconMap[type] || <Bell className="w-5 h-5 text-blue-500" />;
   };
 
   const firstName = getFirstName();
+  const fullName = getFullName();
   const userRole = getUserRole();
   const initials = getInitials();
 
-  return (
-    <nav className="top-navbar">
-      <div className="nav-left">
-        <div 
-          className="navbar-logo" 
-          onClick={() => handleNavigation('/ClientDashboard')}
-        >
-          <img src={logo} alt="Memsphere Logo" className="logo-image" />
-          <span className="logo-text">MEMSPHERE</span>
-        </div>
-        
-        <div className="nav-links">
-          <button
-            className={`nav-link ${location.pathname === '/ClientDashboard' ? 'active' : ''}`}
-            onClick={() => handleNavigation('/ClientDashboard')}
-          >
-            <span className="nav-label">Dashboard</span>
-            {location.pathname === '/ClientDashboard' && <span className="nav-indicator"></span>}
-          </button>
-          <button
-            className={`nav-link ${location.pathname === '/browse' ? 'active' : ''}`}
-            onClick={() => handleNavigation('/browse')}
-          >
-            <span className="nav-label">Browse</span>
-            {location.pathname === '/browse' && <span className="nav-indicator"></span>}
-          </button>
-        </div>
-      </div>
+  // Nav items - Dashboard, Browse, About, and Contact
+  const navItems = [
+    { path: '/ClientDashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/browse', label: 'Browse', icon: Compass },
+    { path: '/about', label: 'About', icon: Info },
+    { path: '/contact', label: 'Contact', icon: PhoneCall },
+  ];
 
-      <div className="nav-right">
-        {/* Notification Section */}
-        <div className="notifications-container">
-          <button 
-            className="notification-icon"
-            onClick={() => {
-              setShowNotifications(!showNotifications);
-              setShowDropdown(false);
-              if (!showNotifications) {
-                fetchRecentNotifications(); // Refresh when opening
-              }
-            }}
-          >
-            🔔
-            {unreadCount > 0 && (
-              <span className="notification-badge">{unreadCount}</span>
-            )}
-          </button>
-          
-          {showNotifications && (
-            <div className="notification-dropdown">
-              <div className="notification-header">
-                <h3>Notifications</h3>
+  return (
+    <nav className={`
+      fixed top-0 left-0 right-0 z-50 w-full
+      transition-all duration-300
+      ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-r from-blue-600 to-blue-700'}
+      shadow-lg
+    `}>
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-20">
+          {/* Left section - Logo (positioned at left corner) */}
+          <div className="flex items-center flex-shrink-0">
+            <div 
+              onClick={() => handleNavigation('/ClientDashboard')}
+              className="flex items-center space-x-3 cursor-pointer transform transition-all duration-300 hover:scale-105 active:scale-95"
+            >
+              <img 
+                src={logo} 
+                alt="Memsphere Logo" 
+                className="h-12 w-auto"
+              />
+              <span className="text-2xl font-bold text-white tracking-wider">
+                MEMSPHERE
+              </span>
+            </div>
+          </div>
+
+          {/* Center section - Navigation Links (Dashboard, Browse, About, Contact) */}
+          <div className="hidden md:flex items-center justify-center flex-1 space-x-2">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => handleNavigation(item.path)}
+                  className={`
+                    relative px-6 py-2.5 rounded-xl font-medium text-sm transition-all duration-300
+                    flex items-center space-x-2 whitespace-nowrap
+                    ${isActive
+                      ? 'bg-white text-blue-600 shadow-lg scale-105' 
+                      : 'text-white hover:bg-white/20 hover:scale-105'
+                    }
+                  `}
+                >
+                  <Icon className={`w-4 h-4 ${
+                    isActive ? 'text-blue-600' : 'text-white'
+                  }`} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right section - Notifications & User Menu only (no search) */}
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="hidden sm:block p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-all duration-300 group"
+            >
+              {isDarkMode ? (
+                <Sun className="w-5 h-5 text-white group-hover:rotate-180 transition-transform duration-500" />
+              ) : (
+                <Moon className="w-5 h-5 text-white group-hover:rotate-180 transition-transform duration-500" />
+              )}
+            </button>
+
+            {/* Notifications */}
+            <div ref={notificationRef} className="relative">
+              <button
+                onClick={() => {
+                  setShowNotifications(!showNotifications);
+                  setShowDropdown(false);
+                }}
+                className="relative p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-all duration-300 group"
+              >
+                <Bell className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
                 {unreadCount > 0 && (
-                  <button onClick={markAllAsRead} className="mark-read-btn">
-                    Mark all as read
-                  </button>
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 border-2 border-blue-600 animate-bounce">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
                 )}
-              </div>
-              <div className="notification-list">
-                {notifications.length > 0 ? (
-                  notifications.map(notification => (
-                    <div 
-                      key={notification.id} 
-                      className={`notification-item ${!notification.is_read ? 'unread' : ''}`}
-                      onClick={() => handleNotificationClick(notification)}
-                    >
-                      <div className="notification-item-icon">
-                        {getNotificationIcon(notification.type)}
+              </button>
+
+              {/* Notifications Dropdown */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-slideDown">
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Bell className="w-5 h-5 text-blue-600" />
+                        <h3 className="font-semibold text-gray-800">Notifications</h3>
                       </div>
-                      <div className="notification-item-content">
-                        <p className="notification-text">
-                          {notification.title || notification.type}
-                        </p>
-                        <span className="notification-time">
-                          {formatTime(notification.created_at)}
-                        </span>
-                      </div>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={markAllAsRead}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center space-x-1 px-3 py-1.5 bg-white rounded-lg shadow-sm hover:shadow transition-all"
+                        >
+                          <CheckCheck className="w-4 h-4" />
+                          <span>Mark all read</span>
+                        </button>
+                      )}
                     </div>
-                  ))
-                ) : (
-                  <div className="no-notifications">
-                    No new notifications
                   </div>
-                )}
-              </div>
-              {notifications.length > 0 && (
-                <div className="notification-footer">
-                  <button onClick={handleViewAll} className="view-all-btn">
-                    View All
-                  </button>
+
+                  <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                    {notifications.length > 0 ? (
+                      notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          onClick={() => handleNotificationClick(notification)}
+                          className={`
+                            flex items-start space-x-3 p-4 border-b border-gray-50 cursor-pointer
+                            transition-all duration-300 hover:bg-gray-50 hover:pl-6
+                            ${!notification.is_read ? 'bg-blue-50/30' : ''}
+                          `}
+                        >
+                          <div className="flex-shrink-0 w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center">
+                            {getNotificationIcon(notification.type)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 mb-1 line-clamp-2">
+                              {notification.title || notification.type}
+                            </p>
+                            {notification.message && (
+                              <p className="text-xs text-gray-600 mb-2 line-clamp-1">
+                                {notification.message}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-500 flex items-center">
+                              <Clock className="w-3 h-3 mr-1" />
+                              {formatTime(notification.created_at)}
+                            </p>
+                          </div>
+                          {!notification.is_read && (
+                            <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-12 text-center">
+                        <Bell className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                        <p className="text-gray-700 font-semibold mb-1">All caught up!</p>
+                        <p className="text-sm text-gray-500">No new notifications</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {notifications.length > 0 && (
+                    <div className="p-3 bg-gray-50 border-t border-gray-100">
+                      <button
+                        onClick={() => {
+                          navigate('/notifications');
+                          setShowNotifications(false);
+                        }}
+                        className="w-full py-3 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-white rounded-xl transition-all duration-300"
+                      >
+                        View All Notifications
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
 
-        {/* User Menu */}
-        <div className="user-menu" onClick={() => setShowDropdown(!showDropdown)}>
-          <div className="user-avatar-wrapper">
-            {avatarUrl ? (
-              <img 
-                src={avatarUrl} 
-                alt={firstName} 
-                className="user-avatar-image"
-              />
-            ) : (
-              <div className="user-avatar">
-                {initials}
-              </div>
-            )}
-            <span className="user-status"></span>
-          </div>
-          <div className="user-info">
-            <span className="user-name">{firstName}</span>
-            <span className="user-role">{userRole}</span>
-          </div>
-          <span className="dropdown-arrow">▼</span>
-          
-          {showDropdown && (
-            <div className="profile-dropdown">
-              <div className="dropdown-header">
-                <div className="dropdown-avatar">
+            {/* User Menu */}
+            <div ref={dropdownRef} className="relative">
+              <button
+                onClick={() => {
+                  setShowDropdown(!showDropdown);
+                  setShowNotifications(false);
+                }}
+                className="flex items-center space-x-3 bg-white/10 hover:bg-white/20 rounded-full pl-2 pr-4 py-2 transition-all duration-300 group hover:scale-105 active:scale-95"
+              >
+                <div className="relative">
                   {avatarUrl ? (
-                    <img src={avatarUrl} alt={firstName} />
+                    <img
+                      src={avatarUrl}
+                      alt={firstName}
+                      className="w-10 h-10 rounded-full border-2 border-white object-cover"
+                    />
                   ) : (
-                    <div className="dropdown-avatar-placeholder">{initials}</div>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-white flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                      {initials}
+                    </div>
                   )}
+                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full animate-pulse"></span>
                 </div>
-                <div className="dropdown-user-info">
-                  <span className="dropdown-user-name">{firstName}</span>
-                  <span className="dropdown-user-email">{profile?.email || user?.email || 'client@example.com'}</span>
-                  <span className="dropdown-user-role">{userRole}</span>
+                
+                <div className="hidden lg:block text-left">
+                  <p className="text-sm font-semibold text-white flex items-center space-x-1">
+                    <span>{firstName}</span>
+                    {profile?.membership_tier === 'premium' && (
+                      <Crown className="w-3 h-3 text-yellow-300 ml-1" />
+                    )}
+                  </p>
+                  <p className="text-xs text-blue-100">
+                    {userRole}
+                  </p>
                 </div>
-              </div>
-              <div className="dropdown-menu">
-                <button 
-                  className="dropdown-item"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNavigation('/profile');
-                  }}
-                >
-                  <span className="dropdown-icon">👤</span>
-                  <span className="dropdown-item-text">My Profile</span>
-                </button>
-                <button 
-                  className="dropdown-item"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNavigation('/notifications');
-                  }}
-                >
-                  <span className="dropdown-icon">🔔</span>
-                  <span className="dropdown-item-text">
-                    Notifications
-                    {unreadCount > 0 && <span className="dropdown-badge">{unreadCount}</span>}
-                  </span>
-                </button>
-                <button 
-                  className="dropdown-item"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDropdown(false);
-                    alert('Settings page coming soon!');
-                  }}
-                >
-                  <span className="dropdown-icon">⚙️</span>
-                  <span className="dropdown-item-text">Settings</span>
-                </button>
-                <div className="dropdown-divider"></div>
-                <button 
-                  className="dropdown-item logout"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSignOut();
-                  }}
-                >
-                  <span className="dropdown-icon">🚪</span>
-                  <span className="dropdown-item-text">Logout</span>
-                </button>
-              </div>
+                
+                <ChevronDown className={`w-4 h-4 text-white transition-all duration-300 ${showDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Profile Dropdown - Simplified without stats and messages */}
+              {showDropdown && (
+                <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-slideDown">
+                  {/* Header */}
+                  <div className="p-5 bg-gradient-to-r from-blue-600 to-blue-700 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-8 -mt-8"></div>
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-8 -mb-8"></div>
+                    
+                    <div className="relative flex items-center space-x-4">
+                      <div className="relative group/avatar">
+                        {avatarUrl ? (
+                          <img
+                            src={avatarUrl}
+                            alt={fullName}
+                            className="w-16 h-16 rounded-full border-3 border-white/50 object-cover shadow-xl"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-full bg-white/20 border-3 border-white/50 flex items-center justify-center text-white font-bold text-2xl shadow-xl">
+                            {initials}
+                          </div>
+                        )}
+                        <button className="absolute bottom-0 right-0 w-6 h-6 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                          <Camera className="w-3 h-3 text-white" />
+                        </button>
+                      </div>
+                      <div className="flex-1 text-white min-w-0">
+                        <p className="font-bold text-lg truncate">{fullName}</p>
+                        <p className="text-sm text-blue-100 truncate flex items-center space-x-1">
+                          <MailIcon className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{profile?.email || user?.email}</span>
+                        </p>
+                        <div className="flex items-center space-x-2 mt-2">
+                          <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-medium flex items-center space-x-1">
+                            <Shield className="w-3 h-3" />
+                            <span>{userRole}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Menu Items - Simplified (no messages, no events) */}
+                  <div className="p-2">
+                    {/* Profile */}
+                    <button
+                      onClick={() => handleNavigation('/profile')}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-xl transition-all duration-300 group"
+                    >
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-600 transition-colors">
+                        <User className="w-4 h-4 text-blue-600 group-hover:text-white" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <span className="font-medium block">My Profile</span>
+                        <span className="text-xs text-gray-500">View and edit your profile</span>
+                      </div>
+                    </button>
+
+                    {/* Notifications */}
+                    <button
+                      onClick={() => handleNavigation('/notifications')}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-xl transition-all duration-300 group"
+                    >
+                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-600 transition-colors">
+                        <Bell className="w-4 h-4 text-purple-600 group-hover:text-white" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <span className="font-medium block">Notifications</span>
+                        <span className="text-xs text-gray-500">Stay updated</span>
+                      </div>
+                      {unreadCount > 0 && (
+                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Settings */}
+                    <button
+                      onClick={() => handleNavigation('/settings')}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-300 group"
+                    >
+                      <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gray-600 transition-colors">
+                        <Settings className="w-4 h-4 text-gray-600 group-hover:text-white" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <span className="font-medium block">Settings</span>
+                        <span className="text-xs text-gray-500">Account preferences</span>
+                      </div>
+                    </button>
+
+                    {/* Help & Support */}
+                    <button
+                      onClick={() => handleNavigation('/help')}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-xl transition-all duration-300 group"
+                    >
+                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-600 transition-colors">
+                        <HelpCircle className="w-4 h-4 text-purple-600 group-hover:text-white" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <span className="font-medium block">Help & Support</span>
+                        <span className="text-xs text-gray-500">Get assistance</span>
+                      </div>
+                    </button>
+
+                    <div className="my-2 border-t border-gray-100"></div>
+
+                    {/* Logout */}
+                    <button
+                      onClick={handleSignOut}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300 group"
+                    >
+                      <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-600 transition-colors">
+                        <LogOut className="w-4 h-4 text-red-600 group-hover:text-white" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <span className="font-medium block">Logout</span>
+                        <span className="text-xs text-red-400">Sign out of your account</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-all duration-300"
+            >
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6 text-white" />
+              ) : (
+                <Menu className="w-6 h-6 text-white" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Mobile Navigation Menu - Updated with About and Contact */}
+      {mobileMenuOpen && (
+        <div ref={mobileMenuRef} className="md:hidden bg-white border-t border-gray-100 animate-slideDown shadow-xl">
+          <div className="px-4 py-3 space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => handleNavigation(item.path)}
+                  className={`
+                    w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300
+                    ${isActive 
+                      ? 'bg-blue-50 text-blue-600' 
+                      : 'text-gray-700 hover:bg-gray-50'
+                    }
+                  `}
+                >
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-gray-500'}`} />
+                  <span className="font-medium">{item.label}</span>
+                </button>
+              );
+            })}
+            
+            <div className="border-t border-gray-100 my-2 pt-2">
+              <button
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-xl transition-all"
+              >
+                {isDarkMode ? (
+                  <Sun className="w-5 h-5 text-yellow-500" />
+                ) : (
+                  <Moon className="w-5 h-5 text-gray-500" />
+                )}
+                <span className="font-medium">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

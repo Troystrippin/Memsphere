@@ -3,6 +3,96 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
 import "../styles/Browse.css";
+import {
+  // Navigation & Actions
+  ChevronRight,
+  Compass,
+  Search,
+  Filter,
+  Bookmark,
+  Share2,
+  MoreVertical,
+  Download,
+  Upload,
+  RefreshCw,
+  Settings,
+  HelpCircle,
+  LogOut,
+  
+  // User & Profile
+  User,
+  Mail,
+  Phone,
+  Globe,
+  Crown,
+  Medal,
+  Target,
+  Flag,
+  
+  // Business & Memberships
+  Briefcase,
+  GraduationCap,
+  Coffee,
+  Dumbbell,
+  Brain,
+  BookOpen,
+  Music,
+  Camera,
+  Video,
+  Palette,
+  Code,
+  PenTool,
+  
+  // Health & Wellness
+  Heart,
+  HeartPulse,
+  Activity,
+  Shield,
+  Zap,
+  
+  // Status & Indicators
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Info,
+  Award,
+  Star,
+  TrendingUp,
+  Sparkles,
+  Bell,
+  Gift,
+  CreditCard,
+  
+  // Time & Date
+  Clock,
+  Calendar,
+  Play,
+  
+  // Location
+  MapPin,
+  Map,
+  PhoneCall,
+  MessageCircle,
+  
+  // Social
+  Users,
+  
+  // Actions
+  Plus,
+  Minus,
+  Edit,
+  Trash2,
+  Copy,
+  Check,
+  
+  // Misc
+  MoreHorizontal,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  X
+} from 'lucide-react';
 
 const Browse = () => {
   const [selectedBusinessType, setSelectedBusinessType] = useState("all");
@@ -224,7 +314,6 @@ const Browse = () => {
     }
   };
 
-  // UPDATED: fetchBusinesses with real member counts (ONLY CHANGE HERE)
   const fetchBusinesses = async () => {
     try {
       setLoading(true);
@@ -271,6 +360,7 @@ const Browse = () => {
       }
 
       setBusinesses(businessesData || []);
+      setLoading(false);
 
       if (businessesData && businessesData.length > 0) {
         const businessIds = businessesData.map((b) => b.id);
@@ -295,7 +385,6 @@ const Browse = () => {
       }
     } catch (error) {
       console.error("Error fetching businesses:", error);
-    } finally {
       setLoading(false);
     }
   };
@@ -778,7 +867,7 @@ const Browse = () => {
     }
   };
 
-  const renderStars = (rating) => {
+  const renderStars = (rating, isYellow = true) => {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
@@ -786,19 +875,19 @@ const Browse = () => {
     for (let i = 1; i <= 5; i++) {
       if (i <= fullStars) {
         stars.push(
-          <span key={i} className="star full">
+          <span key={i} className={`star full ${isYellow ? 'yellow' : ''}`}>
             ★
           </span>,
         );
       } else if (i === fullStars + 1 && hasHalfStar) {
         stars.push(
-          <span key={i} className="star half">
+          <span key={i} className={`star half ${isYellow ? 'yellow' : ''}`}>
             ★
           </span>,
         );
       } else {
         stars.push(
-          <span key={i} className="star empty">
+          <span key={i} className={`star empty ${isYellow ? 'yellow' : ''}`}>
             ☆
           </span>,
         );
@@ -811,53 +900,28 @@ const Browse = () => {
     return (
       <div className="browse-loading">
         <div className="loading-spinner"></div>
-        <p>Loading businesses...</p>
+        <p className="loading-text">Loading amazing businesses for you...</p>
       </div>
     );
   }
-
-  const firstName = getFirstName();
 
   return (
     <div className="browse-container">
       <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
 
-      <div className="mobile-welcome">
-        <p>Welcome, {firstName}!</p>
-      </div>
-
       <div className="browse-main">
+        {/* Header Section */}
         <div className="browse-header">
           <h1 className="browse-title">
-            Find Your Perfect Business
+            Discover & Connect
             <span className="title-glow"></span>
           </h1>
           <p className="browse-subtitle">
-            Discover and explore the best gyms, cafes, and bakeries near you
+            Find the perfect gym, cafe, or bakery that matches your lifestyle
           </p>
         </div>
 
-        <div className="search-section">
-          <div className="search-container">
-            <span className="search-icon">🔍</span>
-            <input
-              type="text"
-              placeholder={`Search ${selectedBusinessType === "all" ? "businesses" : selectedBusinessType + "s"} by name or owner...`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="search-input"
-            />
-            {searchQuery && (
-              <button
-                className="clear-search"
-                onClick={() => setSearchQuery("")}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        </div>
-
+        {/* Business Type Selector */}
         <div className="business-type-section">
           <div className="business-type-scroll">
             {businessTypes.map((type) => (
@@ -875,24 +939,31 @@ const Browse = () => {
           </div>
         </div>
 
+        {/* Filters Bar - Switched order: Price first, then Location */}
         <div className="filters-bar">
-          <div className="filter-group">
-            <span className="filter-label">📍 Location:</span>
-            <select
-              className="filter-select"
-              value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
-            >
-              {locations.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
-            </select>
+          {/* Search Input */}
+          <div className="search-container">
+            <Search className="search-icon" size={18} />
+            <input
+              type="text"
+              placeholder={`Search ${selectedBusinessType === "all" ? "businesses" : selectedBusinessType + "s"}...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+            {searchQuery && (
+              <button
+                className="clear-search"
+                onClick={() => setSearchQuery("")}
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
 
+          {/* Price Range - Now first */}
           <div className="filter-group">
-            <span className="filter-label">💰 Price Range (₱):</span>
+            <span className="filter-label">Price:</span>
             <div className="price-range">
               <input
                 type="range"
@@ -912,21 +983,43 @@ const Browse = () => {
             </div>
           </div>
 
+          {/* Location - Now second */}
           <div className="filter-group">
-            <span className="results-count">
-              {filteredBusinesses.length} businesses found
-            </span>
+            <MapPin size={16} className="filter-icon" />
+            <span className="filter-label">Location:</span>
+            <select
+              className="filter-select"
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+            >
+              {locations.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="results-badge">
+            <span className="results-count">{filteredBusinesses.length}</span>
+            <span className="results-label">found</span>
           </div>
         </div>
 
+        {/* Business Grid - Wider Cards */}
         <div className="business-grid">
           {filteredBusinesses.length > 0 ? (
-            filteredBusinesses.map((business) => (
-              <div key={business.id} className="business-card">
-                <div className="business-card-glow"></div>
-                <div className="business-card-content">
-                  <div className="business-card-header">
-                    <div className="business-image-large">
+            filteredBusinesses.map((business, index) => (
+              <div 
+                key={business.id} 
+                className="business-card-enhanced"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <div className="card-gradient-bg"></div>
+                <div className="card-content">
+                  {/* Card Header with Image/Icon */}
+                  <div className="card-header">
+                    <div className="business-image-wrapper">
                       {business.image_url ? (
                         <img
                           src={business.image_url}
@@ -934,79 +1027,82 @@ const Browse = () => {
                           className="business-image"
                         />
                       ) : (
-                        <span className="business-emoji">
+                        <span className="business-emoji-large">
                           {getBusinessIcon(business)}
                         </span>
                       )}
                     </div>
-                    <div className="business-card-tags">
-                      <span className="business-type-tag">
+                    <div className="business-tags">
+                      <span className="business-type-badge">
                         {business.business_type}
                       </span>
-                      <span className="business-rating-tag">
-                        <span className="rating-star">⭐</span>
-                        {business.rating ? business.rating.toFixed(1) : "0.0"}
+                      <span className="rating-badge">
+                        <Star size={12} fill="currentColor" />
+                        <span>
+                          {business.rating ? business.rating.toFixed(1) : "0.0"}
+                        </span>
                       </span>
                     </div>
                   </div>
 
-                  <div className="business-card-body">
-                    <h3 className="business-card-title">{business.name}</h3>
-                    <p className="business-card-owner">
-                      <span className="owner-icon">👑</span>
-                      {business.owner_name}
-                    </p>
-                    <p className="business-card-description">
+                  {/* Business Details */}
+                  <div className="business-details">
+                    <h3 className="business-title">{business.name}</h3>
+                    
+                    <div className="owner-highlight">
+                      <Crown size={14} className="owner-icon" />
+                      <span className="owner-name">{business.owner_name}</span>
+                      <span className="owner-badge">Owner</span>
+                    </div>
+
+                    <p className="business-description">
                       {business.short_description ||
-                        business.description?.substring(0, 100)}
-                      ...
+                        business.description?.substring(0, 80)}
+                      {!business.short_description && business.description?.length > 80 ? "..." : ""}
                     </p>
 
-                    <div className="business-card-details">
-                      <div className="business-detail-item">
-                        <span className="detail-icon">📍</span>
-                        <span className="detail-text">{business.location}</span>
+                    <div className="business-stats">
+                      <div className="stat-item">
+                        <MapPin size={14} />
+                        <span>{business.location}</span>
                       </div>
-                      <div className="business-detail-item">
-                        <span className="detail-icon">👥</span>
-                        <span className="detail-text">
-                          {business.members_count || 0} members
-                        </span>
+                      <div className="stat-item">
+                        <Users size={14} />
+                        <span>{business.members_count || 0} members</span>
                       </div>
-                      <div className="business-detail-item">
-                        <span className="detail-icon">⭐</span>
-                        <span className="detail-text">
-                          {business.review_count || 0} reviews
-                        </span>
+                      <div className="stat-item">
+                        <MessageCircle size={14} />
+                        <span>{business.review_count || 0} reviews</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="business-card-footer">
-                    <div className="business-price">
+                  {/* Card Footer */}
+                  <div className="card-footer">
+                    <div className="price-tag">
                       <span className="price-amount">
                         ₱{business.price?.toLocaleString()}
                       </span>
-                      <span className="price-period">/month</span>
+                      <span className="price-period">/mo</span>
                     </div>
                     <button
-                      className="view-details-btn"
+                      className="view-details-btn-enhanced"
                       onClick={() => handleViewDetails(business)}
                     >
-                      <span>View Details</span>
-                      <span className="btn-icon">→</span>
+                      <span>View</span>
+                      <ChevronRight size={16} className="btn-icon" />
                     </button>
                   </div>
                 </div>
               </div>
             ))
           ) : (
-            <div className="no-results">
-              <span className="no-results-icon">🔍</span>
+            <div className="no-results-enhanced">
+              <Search className="no-results-icon" size={48} />
               <h3>No businesses found</h3>
               <p>Try adjusting your filters or search query</p>
               <button
-                className="clear-filters-btn"
+                className="clear-filters-btn-enhanced"
                 onClick={() => {
                   setSearchQuery("");
                   setSelectedBusinessType("all");
@@ -1014,38 +1110,40 @@ const Browse = () => {
                   setPriceRange([0, 10000]);
                 }}
               >
-                Clear All Filters
+                <RefreshCw size={16} />
+                <span>Clear All Filters</span>
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Business Details Modal with Reviews */}
+      {/* Business Details Modal */}
       {showBusinessModal && selectedBusiness && (
         <div
-          className="business-modal-overlay"
+          className="modal-overlay"
           onClick={() => {
             setShowBusinessModal(false);
             setGcashQrUrl("");
           }}
         >
           <div
-            className="business-modal-content"
+            className="modal-content business-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              className="modal-close-btn"
+              className="modal-close"
               onClick={() => {
                 setShowBusinessModal(false);
                 setGcashQrUrl("");
               }}
             >
-              ×
+              <X size={20} />
             </button>
 
-            <div className="modal-header">
-              <div className="modal-business-icon">
+            {/* Modal Header */}
+            <div className="modal-header-enhanced">
+              <div className="modal-business-icon-large">
                 {selectedBusiness.image_url ? (
                   <img
                     src={selectedBusiness.image_url}
@@ -1057,18 +1155,19 @@ const Browse = () => {
               </div>
               <div className="modal-business-info">
                 <h2>{selectedBusiness.name}</h2>
-                <p className="modal-owner">
-                  <span className="owner-icon">👑</span>
-                  {selectedBusiness.owner_name}
-                </p>
+                <div className="modal-owner-highlight">
+                  <Crown size={16} />
+                  <span>{selectedBusiness.owner_name}</span>
+                  <span className="owner-badge">Business Owner</span>
+                </div>
                 <div className="modal-tags">
-                  <span className="modal-type-tag">
+                  <span className="business-type-tag">
                     {selectedBusiness.business_type}
                   </span>
-                  <span className="modal-rating-tag">
-                    <span className="rating-stars">
-                      {renderStars(selectedBusiness.rating || 0)}
-                    </span>
+                  <div className="rating-container">
+                    <div className="stars">
+                      {renderStars(selectedBusiness.rating || 0, true)}
+                    </div>
                     <span className="rating-number">
                       {selectedBusiness.rating
                         ? selectedBusiness.rating.toFixed(1)
@@ -1077,136 +1176,155 @@ const Browse = () => {
                     <span className="review-count">
                       ({selectedBusiness.review_count || 0} reviews)
                     </span>
-                  </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="modal-body">
-              <div className="modal-section">
-                <h3>📍 Location</h3>
-                <p>{selectedBusiness.address || selectedBusiness.location}</p>
-                <p className="location-detail">
-                  {selectedBusiness.city}, {selectedBusiness.province}
-                </p>
+            {/* Modal Body */}
+            <div className="modal-body-enhanced">
+              {/* Location */}
+              <div className="info-section">
+                <h3>
+                  <MapPin size={18} />
+                  Location
+                </h3>
+                <p className="address">{selectedBusiness.address || selectedBusiness.location}</p>
+                <p className="city">{selectedBusiness.city}, {selectedBusiness.province}</p>
               </div>
 
-              <div className="modal-section">
-                <h3>📝 Description</h3>
-                <p>{selectedBusiness.description}</p>
-              </div>
+              {/* Description */}
+              {selectedBusiness.description && (
+                <div className="info-section">
+                  <h3>
+                    <Info size={18} />
+                    Description
+                  </h3>
+                  <p>{selectedBusiness.description}</p>
+                </div>
+              )}
 
-              <div className="modal-section">
-                <h3>⏰ Business Hours</h3>
-                {formatBusinessHours(selectedBusiness.business_hours)}
-              </div>
+              {/* Business Hours */}
+              {selectedBusiness.business_hours && (
+                <div className="info-section">
+                  <h3>
+                    <Clock size={18} />
+                    Business Hours
+                  </h3>
+                  {formatBusinessHours(selectedBusiness.business_hours)}
+                </div>
+              )}
 
-              {selectedBusiness.amenities &&
-                selectedBusiness.amenities.length > 0 && (
-                  <div className="modal-section">
-                    <h3>✨ Amenities</h3>
-                    <div className="amenities-grid">
-                      {formatAmenities(selectedBusiness.amenities).map(
-                        (amenity, index) => (
-                          <div key={index} className="amenity-item">
-                            <span className="amenity-check">✓</span>
-                            {amenity}
-                          </div>
-                        ),
-                      )}
-                    </div>
+              {/* Amenities */}
+              {selectedBusiness.amenities && selectedBusiness.amenities.length > 0 && (
+                <div className="info-section">
+                  <h3>
+                    <Sparkles size={18} />
+                    Amenities
+                  </h3>
+                  <div className="amenities-grid-enhanced">
+                    {formatAmenities(selectedBusiness.amenities).map(
+                      (amenity, index) => (
+                        <div key={index} className="amenity-chip">
+                          <CheckCircle size={14} />
+                          {amenity}
+                        </div>
+                      ),
+                    )}
                   </div>
-                )}
+                </div>
+              )}
 
-              <div className="modal-section">
-                <h3>📞 Contact Information</h3>
-                <div className="contact-info">
+              {/* Contact Information */}
+              <div className="info-section">
+                <h3>
+                  <PhoneCall size={18} />
+                  Contact Information
+                </h3>
+                <div className="contact-info-enhanced">
                   {selectedBusiness.contact_phone && (
-                    <p>
-                      <span className="contact-icon">📱</span>{" "}
-                      {selectedBusiness.contact_phone}
-                    </p>
+                    <div className="contact-item">
+                      <Phone size={16} />
+                      <span>{selectedBusiness.contact_phone}</span>
+                    </div>
                   )}
                   {selectedBusiness.contact_email && (
-                    <p>
-                      <span className="contact-icon">✉️</span>{" "}
-                      {selectedBusiness.contact_email}
-                    </p>
+                    <div className="contact-item">
+                      <Mail size={16} />
+                      <span>{selectedBusiness.contact_email}</span>
+                    </div>
                   )}
                   {selectedBusiness.website && (
-                    <p>
-                      <span className="contact-icon">🌐</span>{" "}
-                      {selectedBusiness.website}
-                    </p>
+                    <div className="contact-item">
+                      <Globe size={16} />
+                      <span>{selectedBusiness.website}</span>
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Reviews Section */}
-              <div className="modal-section reviews-section">
-                <div className="reviews-header">
-                  <div className="reviews-title-wrapper">
-                    <h3>⭐ Customer Reviews</h3>
+              {/* Reviews Section - Fixed avatar and stars */}
+              <div className="info-section reviews-section-enhanced">
+                <div className="reviews-header-enhanced">
+                  <div className="reviews-title">
+                    <MessageCircle size={18} />
+                    <h3>Customer Reviews</h3>
                     {businessReviews[selectedBusiness.id]?.length > 0 && (
-                      <span className="reviews-total-count">
-                        {businessReviews[selectedBusiness.id].length}{" "}
-                        {businessReviews[selectedBusiness.id].length === 1
-                          ? "review"
-                          : "reviews"}
+                      <span className="reviews-count">
+                        {businessReviews[selectedBusiness.id].length}
                       </span>
                     )}
                   </div>
-                  <div className="reviews-actions">
-                    {hasMembership[selectedBusiness.id] && (
-                      <button
-                        className="write-review-btn"
-                        onClick={() => handleOpenReviewModal(selectedBusiness)}
-                      >
-                        Write a Review
-                      </button>
-                    )}
-                  </div>
+                  {hasMembership[selectedBusiness.id] && (
+                    <button
+                      className="write-review-btn-enhanced"
+                      onClick={() => handleOpenReviewModal(selectedBusiness)}
+                    >
+                      <Star size={14} />
+                      <span>Write a Review</span>
+                    </button>
+                  )}
                 </div>
 
                 {businessReviews[selectedBusiness.id]?.length > 0 ? (
                   <>
-                    <div className="reviews-list">
+                    <div className="reviews-list-enhanced">
                       {businessReviews[selectedBusiness.id]
                         .slice(0, 3)
                         .map((review) => (
-                          <div key={review.id} className="review-item">
-                            <div className="review-header">
+                          <div key={review.id} className="review-card">
+                            <div className="review-card-header">
+                              <div className="reviewer-avatar">
+                                {review.profiles?.avatar_url ? (
+                                  <img
+                                    src={review.profiles.avatar_url}
+                                    alt={review.profiles?.first_name}
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.style.display = 'none';
+                                      e.target.parentElement.innerHTML = '<div class="avatar-placeholder">' + (review.profiles?.first_name?.[0] || 'U') + '</div>';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="avatar-placeholder">
+                                    {review.profiles?.first_name?.[0] || "U"}
+                                  </div>
+                                )}
+                              </div>
                               <div className="reviewer-info">
-                                <div className="reviewer-avatar">
-                                  {review.profiles?.avatar_url ? (
-                                    <img
-                                      src={review.profiles.avatar_url}
-                                      alt="avatar"
-                                    />
-                                  ) : (
-                                    <span className="avatar-placeholder">
-                                      {review.profiles?.first_name?.[0] || "U"}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="reviewer-details">
-                                  <span className="reviewer-name">
-                                    {review.profiles?.first_name}{" "}
-                                    {review.profiles?.last_name}
-                                  </span>
-                                  <span className="review-date">
-                                    {new Date(
-                                      review.created_at,
-                                    ).toLocaleDateString("en-US", {
-                                      year: "numeric",
-                                      month: "short",
-                                      day: "numeric",
-                                    })}
-                                  </span>
-                                </div>
+                                <span className="reviewer-name">
+                                  {review.profiles?.first_name} {review.profiles?.last_name}
+                                </span>
+                                <span className="review-date">
+                                  {new Date(review.created_at).toLocaleDateString("en-US", {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </span>
                               </div>
                               <div className="review-rating">
-                                {renderStars(review.rating)}
+                                {renderStars(review.rating, true)}
                               </div>
                             </div>
                             <p className="review-comment">{review.comment}</p>
@@ -1214,137 +1332,116 @@ const Browse = () => {
                         ))}
                     </div>
 
-                    {/* View All Reviews Button */}
                     {businessReviews[selectedBusiness.id]?.length >= 1 && (
-                      <div className="view-all-reviews-container">
-                        <button
-                          className="view-all-reviews-btn"
-                          onClick={() => {
-                            navigate(
-                              `/business-reviews/${selectedBusiness.id}`,
-                              {
-                                state: {
-                                  business: selectedBusiness,
-                                  reviews: businessReviews[selectedBusiness.id],
-                                },
-                              },
-                            );
-                          }}
-                        >
-                          <span>
-                            View All{" "}
-                            {businessReviews[selectedBusiness.id].length}{" "}
-                            {businessReviews[selectedBusiness.id].length === 1 ? "Review" : "Reviews"}
-                          </span>
-                          <span className="btn-arrow">→</span>
-                        </button>
-                      </div>
+                      <button
+                        className="view-all-reviews-btn-enhanced"
+                        onClick={() => {
+                          navigate(`/business-reviews/${selectedBusiness.id}`, {
+                            state: {
+                              business: selectedBusiness,
+                              reviews: businessReviews[selectedBusiness.id],
+                            },
+                          });
+                        }}
+                      >
+                        <span>View All Reviews</span>
+                        <ChevronRight size={16} />
+                      </button>
                     )}
                   </>
                 ) : (
-                  <div className="no-reviews">
+                  <div className="no-reviews-enhanced">
+                    <MessageCircle size={32} />
                     <p>No reviews yet for this business.</p>
                     {hasMembership[selectedBusiness.id] && (
-                      <p className="be-first-review">
-                        Be the first to write a review!
-                      </p>
+                      <p className="be-first">Be the first to write a review!</p>
                     )}
                   </div>
                 )}
               </div>
 
-              <div className="modal-section">
-                <h3>💳 Payment Options</h3>
-                <div className="payment-options-grid">
-                  <div className="payment-option-card">
+              {/* Payment Options */}
+              <div className="info-section">
+                <h3>
+                  <CreditCard size={18} />
+                  Payment Options
+                </h3>
+                <div className="payment-options-enhanced">
+                  <div className="payment-option">
                     <div className="payment-option-header">
-                      <span className="payment-option-icon">📱</span>
-                      <span className="payment-option-title">GCash</span>
+                      <span className="payment-icon">📱</span>
+                      <span className="payment-title">GCash</span>
                       {selectedBusiness.gcash_qr_code ? (
-                        <span className="payment-option-badge available">
-                          Available
-                        </span>
+                        <span className="payment-badge available">Available</span>
                       ) : (
-                        <span className="payment-option-badge unavailable">
-                          Not Available
-                        </span>
+                        <span className="payment-badge unavailable">Not Available</span>
                       )}
                     </div>
-                    {selectedBusiness.gcash_qr_code ? (
-                      <div className="payment-option-preview">
-                        <p className="payment-instruction">
-                          Scan QR code to pay via GCash
-                        </p>
-                        <button
-                          className="view-payment-btn"
-                          onClick={() => handlePaymentOption("gcash")}
-                        >
-                          View QR Code
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="payment-unavailable">
-                        <p>GCash payment not available</p>
-                      </div>
+                    {selectedBusiness.gcash_qr_code && (
+                      <button
+                        className="view-payment-btn-enhanced"
+                        onClick={() => handlePaymentOption("gcash")}
+                      >
+                        View QR Code
+                      </button>
                     )}
                   </div>
 
-                  <div className="payment-option-card">
+                  <div className="payment-option">
                     <div className="payment-option-header">
-                      <span className="payment-option-icon">🏪</span>
-                      <span className="payment-option-title">
-                        Pay at Business
-                      </span>
-                      <span className="payment-option-badge available">
-                        Available
-                      </span>
+                      <span className="payment-icon">🏪</span>
+                      <span className="payment-title">Pay at Business</span>
+                      <span className="payment-badge available">Available</span>
                     </div>
-                    <div className="payment-option-preview">
-                      <p className="payment-instruction">
-                        Pay directly at the business premises
-                      </p>
-                      <button
-                        className="view-payment-btn"
-                        onClick={() => handlePaymentOption("onsite")}
-                      >
-                        View Details
-                      </button>
-                    </div>
+                    <button
+                      className="view-payment-btn-enhanced"
+                      onClick={() => handlePaymentOption("onsite")}
+                    >
+                      View Details
+                    </button>
                   </div>
                 </div>
               </div>
 
-              <div className="modal-section">
-                <h3>💎 Membership Plans</h3>
+              {/* Membership Plans */}
+              <div className="info-section">
+                <h3>
+                  <Award size={18} />
+                  Membership Plans
+                </h3>
                 {selectedBusiness.plans && selectedBusiness.plans.length > 0 ? (
-                  <div className="plans-grid">
+                  <div className="plans-grid-enhanced">
                     {selectedBusiness.plans.map((plan) => (
-                      <div key={plan.id} className="plan-card">
+                      <div key={plan.id} className="plan-card-enhanced">
                         <h4>{plan.name}</h4>
                         <div className="plan-price">
                           ₱{plan.price.toLocaleString()}
-                          <span className="plan-duration">
-                            /{plan.duration}
-                          </span>
+                          <span className="plan-duration">/{plan.duration}</span>
                         </div>
                         <ul className="plan-features">
                           {plan.features.map((feature, idx) => (
                             <li key={idx}>
-                              <span className="feature-check">✓</span>
+                              <CheckCircle size={14} />
                               {feature}
                             </li>
                           ))}
                         </ul>
                         <button
-                          className="join-plan-btn"
-                          onClick={() =>
-                            handleJoinNow(selectedBusiness.id, plan)
-                          }
+                          className="join-plan-btn-enhanced"
+                          onClick={() => handleJoinNow(selectedBusiness.id, plan)}
                           disabled={joiningPlan === plan.id}
                         >
-                          {joiningPlan === plan.id
-                            ? "Processing..."
-                            : "Join Now"}
+                          {joiningPlan === plan.id ? (
+                            <>
+                              <RefreshCw size={16} className="spinning" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              Join Now
+                              <ChevronRight size={16} />
+                            </>
+                          )}
                         </button>
                       </div>
                     ))}
@@ -1362,41 +1459,34 @@ const Browse = () => {
 
       {/* Review Modal */}
       {showReviewModal && selectedBusinessForReview && (
-        <div
-          className="review-modal-overlay"
-          onClick={() => setShowReviewModal(false)}
-        >
+        <div className="modal-overlay" onClick={() => setShowReviewModal(false)}>
           <div
-            className="review-modal-content"
+            className="modal-content review-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              className="review-modal-close"
-              onClick={() => setShowReviewModal(false)}
-            >
-              ×
+            <button className="modal-close" onClick={() => setShowReviewModal(false)}>
+              <X size={20} />
             </button>
 
             <div className="review-modal-header">
-              <span className="review-modal-icon">⭐</span>
+              <Star size={32} className="review-icon" />
               <h2>
-                {reviewFormData.rating > 0
-                  ? "Edit Your Review"
-                  : "Write a Review"}
+                {reviewFormData.rating > 0 ? "Edit Your Review" : "Write a Review"}
               </h2>
             </div>
 
             <div className="review-business-info">
-              <span className="review-business-icon">
+              <div className="review-business-icon">
                 {getBusinessIcon(selectedBusinessForReview)}
-              </span>
-              <div className="review-business-details">
+              </div>
+              <div>
                 <h3>{selectedBusinessForReview.name}</h3>
                 <p>{selectedBusinessForReview.location}</p>
               </div>
             </div>
 
             <div className="review-form">
+              {/* Rating Stars */}
               <div className="rating-section">
                 <label>Your Rating *</label>
                 <div className="star-rating-container">
@@ -1404,8 +1494,7 @@ const Browse = () => {
                     <span
                       key={star}
                       className={`star-rating ${
-                        (reviewFormData.hoverRating || reviewFormData.rating) >=
-                        star
+                        (reviewFormData.hoverRating || reviewFormData.rating) >= star
                           ? "active"
                           : ""
                       }`}
@@ -1426,6 +1515,7 @@ const Browse = () => {
                 </div>
               </div>
 
+              {/* Comment */}
               <div className="comment-section">
                 <label htmlFor="review-comment">Your Review *</label>
                 <textarea
@@ -1441,31 +1531,37 @@ const Browse = () => {
                   }
                   maxLength="500"
                 />
-                <span className="comment-counter">
+                <div className="comment-counter">
                   {reviewFormData.comment.length}/500
-                </span>
+                </div>
               </div>
 
+              {/* Guidelines */}
               <div className="review-guidelines">
                 <h4>Review Guidelines:</h4>
                 <ul>
-                  <li>Be respectful and constructive</li>
-                  <li>Share your honest experience</li>
-                  <li>Avoid offensive language</li>
-                  <li>Focus on the business and services</li>
+                  <li>✓ Be respectful and constructive</li>
+                  <li>✓ Share your honest experience</li>
+                  <li>✓ Avoid offensive language</li>
+                  <li>✓ Focus on the business and services</li>
                 </ul>
               </div>
 
               <button
-                className="submit-review-btn"
+                className="submit-review-btn-enhanced"
                 onClick={handleSubmitReview}
                 disabled={submittingReview}
               >
-                {submittingReview
-                  ? "Submitting..."
-                  : reviewFormData.rating > 0 && reviewFormData.comment
-                    ? "Update Review"
-                    : "Submit Review"}
+                {submittingReview ? (
+                  <>
+                    <RefreshCw size={16} className="spinning" />
+                    Submitting...
+                  </>
+                ) : reviewFormData.rating > 0 && reviewFormData.comment ? (
+                  "Update Review"
+                ) : (
+                  "Submit Review"
+                )}
               </button>
             </div>
           </div>
@@ -1474,72 +1570,60 @@ const Browse = () => {
 
       {/* Payment Form Modal */}
       {showPaymentFormModal && selectedPlanForPayment && (
-        <div
-          className="payment-modal-overlay"
-          onClick={() => setShowPaymentFormModal(false)}
-        >
+        <div className="modal-overlay" onClick={() => setShowPaymentFormModal(false)}>
           <div
-            className="payment-modal-content payment-form-modal"
+            className="modal-content payment-form-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              className="payment-modal-close"
-              onClick={() => setShowPaymentFormModal(false)}
-            >
-              ×
+            <button className="modal-close" onClick={() => setShowPaymentFormModal(false)}>
+              <X size={20} />
             </button>
 
             <div className="payment-modal-header">
-              <span className="payment-modal-icon">💳</span>
+              <CreditCard size={32} className="payment-icon" />
               <h2>Complete Your Membership</h2>
             </div>
 
             <div className="payment-form-content">
-              <div className="membership-summary-card">
-                <h3>Membership Summary</h3>
-                <div className="summary-row">
-                  <span className="summary-label">Plan:</span>
-                  <span className="summary-value">
-                    {selectedPlanForPayment.name}
-                  </span>
+              {/* Summary Cards */}
+              <div className="summary-cards">
+                <div className="summary-card">
+                  <h3>Membership Summary</h3>
+                  <div className="summary-row">
+                    <span>Plan:</span>
+                    <strong>{selectedPlanForPayment.name}</strong>
+                  </div>
+                  <div className="summary-row">
+                    <span>Price:</span>
+                    <strong className="price">
+                      ₱{selectedPlanForPayment.price.toLocaleString()}/
+                      {selectedPlanForPayment.duration}
+                    </strong>
+                  </div>
+                  <div className="summary-row">
+                    <span>Duration:</span>
+                    <span>{selectedPlanForPayment.duration}</span>
+                  </div>
                 </div>
-                <div className="summary-row">
-                  <span className="summary-label">Price:</span>
-                  <span className="summary-value price">
-                    ₱{selectedPlanForPayment.price.toLocaleString()}/
-                    {selectedPlanForPayment.duration}
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Duration:</span>
-                  <span className="summary-value">
-                    {selectedPlanForPayment.duration}
-                  </span>
+
+                <div className="summary-card">
+                  <h3>Your Information</h3>
+                  <div className="summary-row">
+                    <span>Name:</span>
+                    <span>{profile?.first_name} {profile?.last_name}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span>Email:</span>
+                    <span>{profile?.email || user?.email}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span>Phone:</span>
+                    <span>{profile?.mobile || "Not provided"}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="client-details-card">
-                <h3>Your Information</h3>
-                <div className="details-row">
-                  <span className="details-label">Name:</span>
-                  <span className="details-value">
-                    {profile?.first_name} {profile?.last_name}
-                  </span>
-                </div>
-                <div className="details-row">
-                  <span className="details-label">Email:</span>
-                  <span className="details-value">
-                    {profile?.email || user?.email}
-                  </span>
-                </div>
-                <div className="details-row">
-                  <span className="details-label">Phone:</span>
-                  <span className="details-value">
-                    {profile?.mobile || "Not provided"}
-                  </span>
-                </div>
-              </div>
-
+              {/* Payment Method Selection */}
               <div className="payment-method-section">
                 <h3>Select Payment Method</h3>
                 <div className="payment-method-options">
@@ -1587,12 +1671,12 @@ const Browse = () => {
                 </div>
               </div>
 
+              {/* Receipt Upload for GCash */}
               {paymentFormData.paymentMethod === "gcash" && (
                 <div className="receipt-upload-section">
                   <h3>Upload Payment Receipt</h3>
                   <p className="upload-instruction">
-                    Please upload a screenshot of your GCash payment
-                    confirmation
+                    Please upload a screenshot of your GCash payment confirmation
                   </p>
 
                   {!paymentFormData.receiptPreview ? (
@@ -1606,10 +1690,8 @@ const Browse = () => {
                         disabled={uploadingReceipt}
                       />
                       <label htmlFor="receipt-upload" className="upload-label">
-                        <span className="upload-icon">📎</span>
-                        <span className="upload-text">
-                          Click to upload receipt
-                        </span>
+                        <Upload size={32} />
+                        <span className="upload-text">Click to upload receipt</span>
                         <span className="upload-hint">PNG, JPG up to 5MB</span>
                       </label>
                     </div>
@@ -1623,6 +1705,7 @@ const Browse = () => {
                         className="remove-receipt-btn"
                         onClick={removeReceipt}
                       >
+                        <Trash2 size={14} />
                         Remove
                       </button>
                     </div>
@@ -1630,6 +1713,7 @@ const Browse = () => {
                 </div>
               )}
 
+              {/* Terms Agreement */}
               <div className="terms-section">
                 <label className="terms-checkbox">
                   <input
@@ -1653,11 +1737,18 @@ const Browse = () => {
               </div>
 
               <button
-                className="submit-payment-btn"
+                className="submit-payment-btn-enhanced"
                 onClick={handleSubmitPayment}
                 disabled={submittingPayment}
               >
-                {submittingPayment ? "Processing..." : "Submit Application"}
+                {submittingPayment ? (
+                  <>
+                    <RefreshCw size={16} className="spinning" />
+                    Processing...
+                  </>
+                ) : (
+                  "Submit Application"
+                )}
               </button>
             </div>
           </div>
@@ -1667,88 +1758,84 @@ const Browse = () => {
       {/* Payment Modal */}
       {showPaymentModal && selectedPaymentMethod && (
         <div
-          className="payment-modal-overlay"
+          className="modal-overlay"
           onClick={() => {
             setShowPaymentModal(false);
             setSelectedPaymentMethod(null);
           }}
         >
           <div
-            className="payment-modal-content"
+            className="modal-content payment-info-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              className="payment-modal-close"
+              className="modal-close"
               onClick={() => {
                 setShowPaymentModal(false);
                 setSelectedPaymentMethod(null);
               }}
             >
-              ×
+              <X size={20} />
             </button>
 
-            {selectedPaymentMethod === "gcash" &&
-              selectedBusiness?.gcash_qr_code && (
-                <>
-                  <div className="payment-modal-header">
-                    <span className="payment-modal-icon">📱</span>
-                    <h2>GCash Payment</h2>
-                  </div>
+            {selectedPaymentMethod === "gcash" && selectedBusiness?.gcash_qr_code && (
+              <>
+                <div className="payment-info-header">
+                  <span className="info-icon">📱</span>
+                  <h2>GCash Payment</h2>
+                </div>
 
-                  <div className="gcash-payment-content">
-                    <div className="qr-code-container">
-                      {gcashQrUrl ? (
-                        <img
-                          src={gcashQrUrl}
-                          alt="GCash QR Code"
-                          className="gcash-qr-large"
-                        />
-                      ) : (
-                        <div className="qr-loading">Loading QR code...</div>
-                      )}
-                    </div>
-
-                    {selectedBusiness.gcash_number && (
-                      <div className="gcash-number-container">
-                        <span className="gcash-number-label">
-                          GCash Number:
-                        </span>
-                        <span className="gcash-number-value">
-                          {selectedBusiness.gcash_number}
-                        </span>
-                      </div>
+                <div className="gcash-payment-content">
+                  <div className="qr-code-container">
+                    {gcashQrUrl ? (
+                      <img
+                        src={gcashQrUrl}
+                        alt="GCash QR Code"
+                        className="gcash-qr-large"
+                      />
+                    ) : (
+                      <div className="qr-loading">Loading QR code...</div>
                     )}
-
-                    <div className="payment-steps">
-                      <h3>How to pay with GCash:</h3>
-                      <ol className="steps-list">
-                        <li>Open your GCash app</li>
-                        <li>Tap on "Scan QR"</li>
-                        <li>Scan the QR code above</li>
-                        <li>
-                          Enter the exact amount: ₱
-                          {selectedPlanForPayment?.price?.toLocaleString() ||
-                            "Plan price"}
-                        </li>
-                        <li>Confirm payment</li>
-                        <li>Take a screenshot of the confirmation</li>
-                      </ol>
-                    </div>
-
-                    <div className="payment-note">
-                      <p>
-                        ⚠️ Please screenshot the payment confirmation. You'll
-                        need to upload it when applying.
-                      </p>
-                    </div>
                   </div>
-                </>
-              )}
+
+                  {selectedBusiness.gcash_number && (
+                    <div className="gcash-number">
+                      <span className="number-label">GCash Number:</span>
+                      <span className="number-value">{selectedBusiness.gcash_number}</span>
+                    </div>
+                  )}
+
+                  <div className="payment-steps">
+                    <h3>How to pay with GCash:</h3>
+                    <ol className="steps-list">
+                      <li>Open your GCash app</li>
+                      <li>Tap on "Scan QR"</li>
+                      <li>Scan the QR code above</li>
+                      <li>
+                        Enter the exact amount: ₱
+                        {selectedPlanForPayment?.price?.toLocaleString() ||
+                          "Plan price"}
+                      </li>
+                      <li>Confirm payment</li>
+                      <li>Take a screenshot of the confirmation</li>
+                    </ol>
+                  </div>
+
+                  <div className="payment-note">
+                    <AlertCircle size={16} />
+                    <p>
+                      Please screenshot the payment confirmation. You'll need to
+                      upload it when applying.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
 
             {selectedPaymentMethod === "onsite" && (
               <>
-                <div className="payment-modal-header">
-                  <span className="payment-modal-icon">🏪</span>
+                <div className="payment-info-header">
+                  <span className="info-icon">🏪</span>
                   <h2>Pay at Business</h2>
                 </div>
 
@@ -1768,9 +1855,7 @@ const Browse = () => {
                     <h3>How to pay on-site:</h3>
                     <ol className="steps-list">
                       <li>Visit the business at the address above</li>
-                      <li>
-                        Inform the staff that you're applying for a membership
-                      </li>
+                      <li>Inform the staff that you're applying for a membership</li>
                       <li>Proceed to the counter to make your payment</li>
                       <li>Keep the receipt as proof of payment</li>
                     </ol>
@@ -1784,9 +1869,9 @@ const Browse = () => {
               </>
             )}
 
-            <div className="payment-modal-actions">
+            <div className="modal-actions">
               <button
-                className="payment-modal-btn primary"
+                className="modal-btn primary"
                 onClick={() => {
                   setShowPaymentModal(false);
                   setSelectedPaymentMethod(null);
@@ -1801,85 +1886,70 @@ const Browse = () => {
 
       {/* Success Modal */}
       {showSuccessModal && (
-        <div
-          className="success-modal-overlay"
-          onClick={() => setShowSuccessModal(false)}
-        >
+        <div className="modal-overlay" onClick={() => setShowSuccessModal(false)}>
           <div
-            className="success-modal-content"
+            className="modal-content success-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              className="success-modal-close"
+              className="modal-close"
               onClick={() => setShowSuccessModal(false)}
             >
-              ×
+              <X size={20} />
             </button>
 
-            <div className="success-modal-icon">
+            <div className="success-icon">
               {successData.paymentMethod === "gcash" ? "📱" : "✅"}
             </div>
 
-            <h2 className="success-modal-title">Application Submitted!</h2>
+            <h2 className="success-title">Application Submitted!</h2>
 
-            <p className="success-modal-message">
+            <p className="success-message">
               Your application for <strong>{successData.plan?.name}</strong> at{" "}
               <strong>{successData.business?.name}</strong> has been submitted
               successfully!
             </p>
 
-            <div className="success-modal-payment">
-              <div className="payment-instruction">
-                <span className="payment-icon">
-                  {successData.paymentMethod === "gcash" ? "⏳" : "💰"}
-                </span>
-                <div className="payment-text">
-                  <p className="payment-title">
-                    {successData.paymentMethod === "gcash"
-                      ? "Pending Owner Approval"
-                      : "Complete Payment at Business"}
-                  </p>
-                  <p className="payment-detail">
-                    {successData.paymentMethod === "gcash"
-                      ? "Your receipt has been uploaded and is now pending review. The business owner will verify your payment and activate your membership within 24-48 hours. You will receive a notification once your membership is approved."
-                      : `Please visit ${successData.business?.name} at their premises within 7 days to complete your payment and finalize your membership. Bring a valid ID and mention your application.`}
-                  </p>
-                </div>
+            <div className="success-payment-info">
+              <div className="payment-icon">
+                {successData.paymentMethod === "gcash" ? "⏳" : "💰"}
+              </div>
+              <div className="payment-text">
+                <h4>
+                  {successData.paymentMethod === "gcash"
+                    ? "Pending Owner Approval"
+                    : "Complete Payment at Business"}
+                </h4>
+                <p>
+                  {successData.paymentMethod === "gcash"
+                    ? "Your receipt has been uploaded and is now pending review. The business owner will verify your payment and activate your membership within 24-48 hours. You will receive a notification once your membership is approved."
+                    : `Please visit ${successData.business?.name} at their premises within 7 days to complete your payment and finalize your membership. Bring a valid ID and mention your application.`}
+                </p>
               </div>
             </div>
 
             {successData.paymentMethod === "onsite" && (
-              <div className="business-address-highlight">
-                <span className="address-icon">📍</span>
-                <div className="address-details">
+              <div className="business-address">
+                <MapPin size={16} />
+                <div>
                   <strong>{successData.business?.name}</strong>
-                  <p>
-                    {successData.business?.address ||
-                      successData.business?.location}
-                  </p>
-                  <p>
-                    {successData.business?.city},{" "}
-                    {successData.business?.province}
-                  </p>
+                  <p>{successData.business?.address || successData.business?.location}</p>
+                  <p>{successData.business?.city}, {successData.business?.province}</p>
                 </div>
               </div>
             )}
 
             {successData.paymentMethod === "gcash" && (
-              <div className="approval-timeline">
+              <div className="timeline">
                 <h4>What happens next?</h4>
                 <div className="timeline-steps">
                   <div className="timeline-step">
                     <span className="step-number">1</span>
-                    <span className="step-text">
-                      Owner reviews your receipt
-                    </span>
+                    <span className="step-text">Owner reviews your receipt</span>
                   </div>
                   <div className="timeline-step">
                     <span className="step-number">2</span>
-                    <span className="step-text">
-                      Payment verified (24-48 hours)
-                    </span>
+                    <span className="step-text">Payment verified (24-48 hours)</span>
                   </div>
                   <div className="timeline-step">
                     <span className="step-number">3</span>
@@ -1893,9 +1963,9 @@ const Browse = () => {
               </div>
             )}
 
-            <div className="success-modal-actions">
+            <div className="modal-actions">
               <button
-                className="success-modal-btn primary"
+                className="modal-btn primary"
                 onClick={() => {
                   setShowSuccessModal(false);
                   navigate("/ClientDashboard");
@@ -1904,7 +1974,7 @@ const Browse = () => {
                 Go to Dashboard
               </button>
               <button
-                className="success-modal-btn secondary"
+                className="modal-btn secondary"
                 onClick={() => setShowSuccessModal(false)}
               >
                 Continue Browsing
