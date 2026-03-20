@@ -625,7 +625,7 @@ const AdminDashboard = () => {
         {/* Pending Applications Section */}
         <div className="dashboard-section">
           <div className="section-header">
-            <h2 className="section-title">Pending Applications</h2>
+            <h2 className="section-title">Recent Applications</h2>
             {applications.length > 0 && (
               <Link to="/admin/users?tab=pending" className="view-all-link">
                 View All ({applications.length})
