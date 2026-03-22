@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import ClientNavbar from "../components/client/ClientNavbar";
 import OwnerNavbar from "../components/owner/OwnerNavbar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -45,11 +44,21 @@ import {
   ThumbsUp,
   Calendar as CalendarIcon,
   Check,
-  Bell,
-  MessageSquare
+  ChevronRight,
+  ShoppingBag,
+  MessageSquare,
+  Store,
+  PieChart,
+  TrendingDown,
+  Percent,
+  CalendarDays,
+  StarHalf,
+  Medal,
+  Rocket,
+  Target as TargetIcon
 } from "lucide-react";
 
-const Profile = () => {
+const OwnerProfile = () => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -58,24 +67,28 @@ const Profile = () => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [memberships, setMemberships] = useState([]);
-  const [loadingMemberships, setLoadingMemberships] = useState(false);
   
-  // Real data states
-  const [stats, setStats] = useState({
-    totalSpent: 0,
+  // Owner specific data states
+  const [businesses, setBusinesses] = useState([]);
+  const [selectedBusiness, setSelectedBusiness] = useState(null);
+  const [businessStats, setBusinessStats] = useState({
+    totalMembers: 0,
     activeMemberships: 0,
-    totalVisits: 0,
-    memberSince: "",
     pendingApplications: 0,
-    totalBusinessesFollowed: 0,
-    totalReviews: 0
+    totalRevenue: 0,
+    monthlyRevenue: 0,
+    averageRating: 0,
+    totalReviews: 0,
+    membershipGrowth: 0,
+    revenueGrowth: 0
   });
   
-  const [recentActivities, setRecentActivities] = useState([]);
+  const [recentMembers, setRecentMembers] = useState([]);
+  const [recentApplications, setRecentApplications] = useState([]);
   const [achievements, setAchievements] = useState([]);
   const [loadingStats, setLoadingStats] = useState(false);
-  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [loadingApplications, setLoadingApplications] = useState(false);
   const [loadingAchievements, setLoadingAchievements] = useState(false);
 
   // Password visibility states
@@ -92,7 +105,7 @@ const Profile = () => {
     email: "",
     mobile: "",
     business_name: "",
-    role: "client",
+    role: "owner",
   });
 
   // Password change state
@@ -152,7 +165,7 @@ const Profile = () => {
           email: profile.email || user.email,
           mobile: profile.mobile || "",
           business_name: profile.business_name || "",
-          role: profile.role || "client",
+          role: profile.role || "owner",
         });
 
         // Get avatar URL if exists
@@ -166,13 +179,8 @@ const Profile = () => {
           }
         }
 
-        // Fetch all data
-        await Promise.all([
-          fetchMemberships(user.id),
-          fetchUserStats(user.id),
-          fetchRecentActivities(user.id),
-          fetchAchievements(user.id)
-        ]);
+        // Fetch owner-specific data
+        await fetchOwnerBusinesses(user.id);
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -181,253 +189,362 @@ const Profile = () => {
     }
   };
 
-  const fetchMemberships = async (userId) => {
+  const fetchOwnerBusinesses = async (userId) => {
     try {
-      setLoadingMemberships(true);
+      setLoadingStats(true);
+      
+      // Fetch businesses owned by this user
+      const { data: businessesData, error: businessesError } = await supabase
+        .from("businesses")
+        .select("*")
+        .eq("owner_id", userId);
 
-      const { data, error } = await supabase
-        .from("memberships")
-        .select(
-          `
-          *,
-          businesses:business_id (
-            id,
-            name,
-            owner_name,
-            location,
-            business_type,
-            emoji
-          ),
-          membership_plans:plan_id (
-            id,
-            name,
-            price,
-            duration,
-            features
-          )
-        `,
-        )
-        .eq("user_id", userId)
-        .eq("status", "approved")
-        .order("created_at", { ascending: false });
+      if (businessesError) throw businessesError;
 
-      if (error) throw error;
-
-      setMemberships(data || []);
+      setBusinesses(businessesData || []);
+      
+      if (businessesData && businessesData.length > 0) {
+        setSelectedBusiness(businessesData[0]);
+        await Promise.all([
+          fetchBusinessStats(businessesData[0].id),
+          fetchRecentMembers(businessesData[0].id),
+          fetchRecentApplications(businessesData[0].id),
+          fetchBusinessAchievements(businessesData[0].id, userId)
+        ]);
+      }
     } catch (error) {
-      console.error("Error fetching memberships:", error);
+      console.error("Error fetching businesses:", error);
     } finally {
-      setLoadingMemberships(false);
+      setLoadingStats(false);
     }
   };
 
-  const fetchUserStats = async (userId) => {
+  const fetchBusinessStats = async (businessId) => {
     try {
-      setLoadingStats(true);
-
-      // Get total spent from payments
-      const { data: payments, error: paymentsError } = await supabase
-        .from("payments")
-        .select("amount, payment_status")
-        .eq("user_id", userId)
-        .eq("payment_status", "paid");
-
-      if (paymentsError) throw paymentsError;
-
-      const totalSpent = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-
-      // Get active memberships count
-      const { count: activeCount, error: activeError } = await supabase
+      // Get total members (approved memberships)
+      const { count: totalMembers, error: membersError } = await supabase
         .from("memberships")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
+        .eq("business_id", businessId)
+        .eq("status", "approved");
+
+      if (membersError) throw membersError;
+
+      // Get active members (end_date >= today)
+      const { count: activeMembers, error: activeError } = await supabase
+        .from("memberships")
+        .select("*", { count: "exact", head: true })
+        .eq("business_id", businessId)
         .eq("status", "approved")
         .gte("end_date", new Date().toISOString());
 
       if (activeError) throw activeError;
 
       // Get pending applications
-      const { count: pendingCount, error: pendingError } = await supabase
+      const { count: pendingApps, error: pendingError } = await supabase
         .from("memberships")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
+        .eq("business_id", businessId)
         .eq("status", "pending");
 
       if (pendingError) throw pendingError;
 
-      // Get total reviews count
-      const { count: reviewsCount, error: reviewsError } = await supabase
+      // Get ALL payments with status 'paid' for total revenue
+      const { data: allPaidPayments, error: allPaymentsError } = await supabase
+        .from("payments")
+        .select("amount, paid_at")
+        .eq("business_id", businessId)
+        .eq("payment_status", "paid");
+
+      if (allPaymentsError) throw allPaymentsError;
+
+      const totalRevenue = allPaidPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+
+      // Calculate monthly revenue (current month) - using paid_at
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth();
+      const currentYear = currentDate.getFullYear();
+      
+      const monthlyRevenue = allPaidPayments?.filter(p => {
+        if (!p.paid_at) return false;
+        const paidDate = new Date(p.paid_at);
+        return paidDate.getMonth() === currentMonth && paidDate.getFullYear() === currentYear;
+      }).reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+
+      // Get reviews and rating
+      const { data: reviews, error: reviewsError } = await supabase
         .from("reviews")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId);
+        .select("rating")
+        .eq("business_id", businessId);
 
       if (reviewsError) throw reviewsError;
 
-      // Get unique businesses followed (memberships count distinct business_id)
-      const { data: businessesFollowed, error: businessesError } = await supabase
+      const averageRating = reviews?.length > 0 
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
+        : 0;
+
+      const totalReviews = reviews?.length || 0;
+
+      // Calculate revenue growth (compare with last month)
+      const lastMonth = new Date();
+      lastMonth.setMonth(lastMonth.getMonth() - 1);
+      const lastMonthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+      const lastMonthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0, 23, 59, 59);
+      
+      const lastMonthRevenue = allPaidPayments?.filter(p => {
+        if (!p.paid_at) return false;
+        const paidDate = new Date(p.paid_at);
+        return paidDate >= lastMonthStart && paidDate <= lastMonthEnd;
+      }).reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+
+      const revenueGrowth = lastMonthRevenue > 0 
+        ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
+        : monthlyRevenue > 0 ? 100 : 0;
+
+      // Calculate membership growth (compare with last month)
+      const lastMonthMembersStart = new Date();
+      lastMonthMembersStart.setMonth(lastMonthMembersStart.getMonth() - 1);
+      lastMonthMembersStart.setDate(1);
+      lastMonthMembersStart.setHours(0, 0, 0, 0);
+      
+      const lastMonthMembersEnd = new Date(lastMonthMembersStart);
+      lastMonthMembersEnd.setMonth(lastMonthMembersEnd.getMonth() + 1);
+      lastMonthMembersEnd.setDate(0);
+      lastMonthMembersEnd.setHours(23, 59, 59, 999);
+      
+      const { count: lastMonthMembers, error: lastMonthError } = await supabase
         .from("memberships")
-        .select("business_id")
-        .eq("user_id", userId)
-        .eq("status", "approved");
+        .select("*", { count: "exact", head: true })
+        .eq("business_id", businessId)
+        .eq("status", "approved")
+        .lt("created_at", lastMonthMembersEnd.toISOString());
 
-      if (businessesError) throw businessesError;
+      let membershipGrowth = 0;
+      if (!lastMonthError) {
+        membershipGrowth = lastMonthMembers > 0 
+          ? ((totalMembers - lastMonthMembers) / lastMonthMembers) * 100 
+          : totalMembers > 0 ? 100 : 0;
+      }
 
-      const uniqueBusinesses = new Set(businessesFollowed?.map(m => m.business_id));
-      const totalBusinessesFollowed = uniqueBusinesses.size;
-
-      setStats({
-        totalSpent,
-        activeMemberships: activeCount || 0,
-        totalVisits: activeCount || 0, // Assuming visits = active memberships for now
-        memberSince: user?.created_at || profile?.created_at,
-        pendingApplications: pendingCount || 0,
-        totalBusinessesFollowed,
-        totalReviews: reviewsCount || 0
+      setBusinessStats({
+        totalMembers: totalMembers || 0,
+        activeMemberships: activeMembers || 0,
+        pendingApplications: pendingApps || 0,
+        totalRevenue,
+        monthlyRevenue,
+        averageRating: parseFloat(averageRating.toFixed(1)),
+        totalReviews,
+        membershipGrowth: parseFloat(membershipGrowth.toFixed(1)),
+        revenueGrowth: parseFloat(revenueGrowth.toFixed(1))
       });
     } catch (error) {
-      console.error("Error fetching user stats:", error);
-    } finally {
-      setLoadingStats(false);
+      console.error("Error fetching business stats:", error);
     }
   };
 
-  const fetchRecentActivities = async (userId) => {
+  const fetchRecentMembers = async (businessId) => {
     try {
-      setLoadingActivities(true);
+      setLoadingMembers(true);
 
       const { data, error } = await supabase
-        .from("notifications")
-        .select("id, type, title, message, data, created_at, is_read, business_id")
-        .eq("user_id", userId)
+        .from("memberships")
+        .select(`
+          id,
+          user_id,
+          created_at,
+          price_paid,
+          payment_method,
+          profiles:user_id (
+            first_name,
+            last_name,
+            email,
+            avatar_url
+          ),
+          membership_plans:plan_id (
+            name
+          )
+        `)
+        .eq("business_id", businessId)
+        .eq("status", "approved")
         .order("created_at", { ascending: false })
         .limit(5);
 
       if (error) throw error;
 
-      const activities = data?.map(notification => ({
-        id: notification.id,
-        action: notification.title || notification.message,
-        time: formatTimeAgo(notification.created_at),
-        icon: getActivityIcon(notification.type),
-        isRead: notification.is_read,
-        type: notification.type
+      const members = data?.map(m => ({
+        id: m.id,
+        name: `${m.profiles?.first_name || ""} ${m.profiles?.last_name || ""}`.trim() || "Unknown",
+        email: m.profiles?.email,
+        plan: m.membership_plans?.name || "Standard Plan",
+        amount: m.price_paid,
+        joined: formatTimeAgo(m.created_at),
+        avatar: m.profiles?.avatar_url
       })) || [];
 
-      setRecentActivities(activities);
+      setRecentMembers(members);
     } catch (error) {
-      console.error("Error fetching activities:", error);
+      console.error("Error fetching recent members:", error);
     } finally {
-      setLoadingActivities(false);
+      setLoadingMembers(false);
     }
   };
 
-  const fetchAchievements = async (userId) => {
+  const fetchRecentApplications = async (businessId) => {
+    try {
+      setLoadingApplications(true);
+
+      const { data, error } = await supabase
+        .from("memberships")
+        .select(`
+          id,
+          user_id,
+          created_at,
+          price_paid,
+          payment_method,
+          status,
+          profiles:user_id (
+            first_name,
+            last_name,
+            email,
+            avatar_url
+          ),
+          membership_plans:plan_id (
+            name
+          )
+        `)
+        .eq("business_id", businessId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      const applications = data?.map(app => ({
+        id: app.id,
+        name: `${app.profiles?.first_name || ""} ${app.profiles?.last_name || ""}`.trim() || "Unknown",
+        email: app.profiles?.email,
+        plan: app.membership_plans?.name || "Standard Plan",
+        amount: app.price_paid,
+        timeAgo: formatTimeAgo(app.created_at),
+        avatar: app.profiles?.avatar_url
+      })) || [];
+
+      setRecentApplications(applications);
+    } catch (error) {
+      console.error("Error fetching recent applications:", error);
+    } finally {
+      setLoadingApplications(false);
+    }
+  };
+
+  const fetchBusinessAchievements = async (businessId, ownerId) => {
     try {
       setLoadingAchievements(true);
 
-      // Calculate achievements based on real data
       const achievementsList = [];
-      let profileComplete = 0;
+      let businessComplete = 0;
 
-      // Check profile completion
-      if (userData.first_name) profileComplete += 25;
-      if (userData.last_name) profileComplete += 25;
-      if (userData.mobile) profileComplete += 25;
-      if (avatarUrl) profileComplete += 25;
+      // Check business profile completion
+      const business = businesses.find(b => b.id === businessId);
+      if (business) {
+        if (business.name && business.name !== "") businessComplete += 20;
+        if (business.description && business.description !== "") businessComplete += 20;
+        if (business.location && business.location !== "") businessComplete += 20;
+        if (business.business_type && business.business_type !== "") businessComplete += 20;
+        if (business.contact_phone || business.contact_email) businessComplete += 20;
+      }
 
-      // Get memberships count
-      const { count: totalMemberships, error: membershipsError } = await supabase
+      // Get total members count
+      const { count: totalMembers } = await supabase
         .from("memberships")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
+        .eq("business_id", businessId)
         .eq("status", "approved");
 
-      if (membershipsError) throw membershipsError;
-
-      // Get total spent
-      const { data: payments, error: paymentsError } = await supabase
+      // Get total revenue from PAID payments only
+      const { data: paidPayments } = await supabase
         .from("payments")
         .select("amount")
-        .eq("user_id", userId)
+        .eq("business_id", businessId)
         .eq("payment_status", "paid");
 
-      if (paymentsError) throw paymentsError;
+      const totalRevenue = paidPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
-      const totalSpent = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-
-      // Get reviews count
-      const { count: reviewsCount, error: reviewsError } = await supabase
+      // Get reviews count and rating
+      const { data: reviews } = await supabase
         .from("reviews")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId);
+        .select("rating")
+        .eq("business_id", businessId);
 
-      if (reviewsError) throw reviewsError;
-
-      // Get account age
-      const accountAge = user?.created_at ? Math.floor((new Date() - new Date(user.created_at)) / (1000 * 60 * 60 * 24)) : 0;
+      const reviewsCount = reviews?.length || 0;
+      const averageRating = reviews?.length > 0 
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
+        : 0;
 
       // Build achievements
       achievementsList.push({
-        id: "first_membership",
-        title: "First Membership",
-        description: "Joined your first business",
-        icon: <Trophy className="w-5 h-5" />,
-        completed: (totalMemberships || 0) >= 1,
-        progress: (totalMemberships || 0) >= 1 ? 100 : 0
+        id: "first_member",
+        title: "First Member",
+        description: "Get your first member",
+        icon: <Users className="w-5 h-5" />,
+        completed: (totalMembers || 0) >= 1,
+        progress: (totalMembers || 0) >= 1 ? 100 : 0
       });
 
       achievementsList.push({
-        id: "active_member",
-        title: "Active Member",
-        description: "Maintain an active membership",
-        icon: <Zap className="w-5 h-5" />,
-        completed: (stats.activeMemberships || 0) >= 1,
-        progress: (stats.activeMemberships || 0) >= 1 ? 100 : 0
+        id: "growing_business",
+        title: "Growing Business",
+        description: "Reach 10 members",
+        icon: <TrendingUp className="w-5 h-5" />,
+        completed: (totalMembers || 0) >= 10,
+        progress: Math.min(100, ((totalMembers || 0) / 10) * 100)
       });
 
+      // Revenue Milestone - Check total revenue from PAID payments
       achievementsList.push({
-        id: "loyal_member",
-        title: "Loyal Member",
-        description: "Join 3 or more businesses",
-        icon: <Heart className="w-5 h-5" />,
-        completed: (totalMemberships || 0) >= 3,
-        progress: Math.min(100, ((totalMemberships || 0) / 3) * 100)
-      });
-
-      achievementsList.push({
-        id: "big_spender",
-        title: "Big Spender",
-        description: "Spend ₱1,000 or more",
+        id: "revenue_milestone",
+        title: "Revenue Milestone",
+        description: "Earn ₱10,000 total revenue",
         icon: <DollarSign className="w-5 h-5" />,
-        completed: totalSpent >= 1000,
-        progress: Math.min(100, (totalSpent / 1000) * 100)
+        completed: totalRevenue >= 10000,
+        progress: Math.min(100, (totalRevenue / 10000) * 100)
+      });
+
+      // Top Rated - Check average rating from reviews
+      achievementsList.push({
+        id: "top_rated",
+        title: "Top Rated",
+        description: "Achieve 4.5+ star rating",
+        icon: <Star className="w-5 h-5" />,
+        completed: averageRating >= 4.5,
+        progress: Math.min(100, (averageRating / 5) * 100)
       });
 
       achievementsList.push({
-        id: "reviewer",
-        title: "Reviewer",
-        description: "Leave your first review",
-        icon: <Star className="w-5 h-5" />,
+        id: "first_review",
+        title: "First Review",
+        description: "Receive your first review",
+        icon: <MessageSquare className="w-5 h-5" />,
         completed: (reviewsCount || 0) >= 1,
         progress: (reviewsCount || 0) >= 1 ? 100 : 0
       });
 
       achievementsList.push({
-        id: "profile_complete",
-        title: "Profile Complete",
-        description: "Complete your profile information",
-        icon: <UserCheck className="w-5 h-5" />,
-        completed: profileComplete >= 100,
-        progress: profileComplete
+        id: "business_complete",
+        title: "Business Complete",
+        description: "Complete your business profile",
+        icon: <Store className="w-5 h-5" />,
+        completed: businessComplete >= 100,
+        progress: businessComplete
       });
 
       achievementsList.push({
-        id: "anniversary",
-        title: "Anniversary",
-        description: "Celebrate 30 days with us",
-        icon: <CalendarIcon className="w-5 h-5" />,
-        completed: accountAge >= 30,
-        progress: Math.min(100, (accountAge / 30) * 100)
+        id: "verified_business",
+        title: "Verified Business",
+        description: "Get your business verified",
+        icon: <Shield className="w-5 h-5" />,
+        completed: business?.verification_status === "verified",
+        progress: business?.verification_status === "verified" ? 100 : 0
       });
 
       setAchievements(achievementsList);
@@ -467,9 +584,7 @@ const Profile = () => {
           upsert: true,
         });
 
-      if (uploadError) {
-        throw new Error(uploadError.message);
-      }
+      if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage
         .from("avatars")
@@ -483,16 +598,13 @@ const Profile = () => {
         })
         .eq("id", user.id);
 
-      if (updateError) {
-        throw new Error(updateError.message);
-      }
+      if (updateError) throw updateError;
 
       if (urlData?.publicUrl) {
         setAvatarUrl(urlData.publicUrl);
       }
 
       alert("Avatar uploaded successfully!");
-      await fetchAchievements(user.id); // Refresh achievements
     } catch (error) {
       console.error("Error in uploadAvatar:", error);
       alert(error.message || "Error uploading avatar!");
@@ -520,7 +632,7 @@ const Profile = () => {
 
       setIsEditing(false);
       alert("Profile updated successfully!");
-      await fetchAchievements(user.id); // Refresh achievements
+      await getUserProfile(user);
     } catch (error) {
       console.error("Error updating profile:", error);
       alert("Failed to update profile. Please try again.");
@@ -598,17 +710,6 @@ const Profile = () => {
     }
   };
 
-  const getActivityIcon = (type) => {
-    const iconMap = {
-      membership_approved: <CheckCircle className="w-4 h-4 text-green-500" />,
-      membership_pending: <Clock className="w-4 h-4 text-yellow-500" />,
-      payment_received: <CreditCard className="w-4 h-4 text-blue-500" />,
-      welcome: <Sparkles className="w-4 h-4 text-purple-500" />,
-      announcement: <Bell className="w-4 h-4 text-indigo-500" />
-    };
-    return iconMap[type] || <Bell className="w-4 h-4 text-gray-500" />;
-  };
-
   const formatTimeAgo = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -632,7 +733,7 @@ const Profile = () => {
       const username = user.email.split("@")[0];
       return username.charAt(0).toUpperCase() + username.slice(1);
     }
-    return "User";
+    return "Owner";
   };
 
   const getInitials = () => {
@@ -645,7 +746,7 @@ const Profile = () => {
     if (user?.email) {
       return user.email.charAt(0).toUpperCase();
     }
-    return "U";
+    return "O";
   };
 
   const getUserRole = () => {
@@ -666,41 +767,6 @@ const Profile = () => {
     return <UserCheck className="w-4 h-4" />;
   };
 
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case "approved":
-        return "bg-gradient-to-r from-green-500 to-emerald-500";
-      case "rejected":
-        return "bg-gradient-to-r from-red-500 to-pink-500";
-      case "pending":
-        return "bg-gradient-to-r from-yellow-500 to-orange-500";
-      default:
-        return "bg-gradient-to-r from-gray-500 to-gray-600";
-    }
-  };
-
-  const getPaymentMethodIcon = (method) => {
-    switch (method) {
-      case "gcash":
-        return <CreditCard className="w-4 h-4" />;
-      case "onsite":
-        return <Building className="w-4 h-4" />;
-      default:
-        return <CreditCard className="w-4 h-4" />;
-    }
-  };
-
-  const getPaymentMethodLabel = (method) => {
-    switch (method) {
-      case "gcash":
-        return "GCash";
-      case "onsite":
-        return "Pay at Business";
-      default:
-        return method || "Not specified";
-    }
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -708,6 +774,21 @@ const Profile = () => {
       month: "short",
       day: "numeric",
     });
+  };
+
+  const formatCurrency = (amount) => {
+    return `₱${amount?.toLocaleString() || 0}`;
+  };
+
+  const handleBusinessChange = async (businessId) => {
+    const business = businesses.find(b => b.id === businessId);
+    setSelectedBusiness(business);
+    await Promise.all([
+      fetchBusinessStats(businessId),
+      fetchRecentMembers(businessId),
+      fetchRecentApplications(businessId),
+      fetchBusinessAchievements(businessId, user.id)
+    ]);
   };
 
   if (loading) {
@@ -722,15 +803,8 @@ const Profile = () => {
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             className="w-20 h-20 border-4 border-sky-200 border-t-sky-600 rounded-full mx-auto mb-4"
-          ></motion.div>
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-gray-600 font-medium"
-          >
-            Loading your profile...
-          </motion.p>
+          />
+          <motion.p className="text-gray-600 font-medium">Loading your profile...</motion.p>
         </motion.div>
       </div>
     );
@@ -741,108 +815,108 @@ const Profile = () => {
   const roleGradient = getRoleColor();
   const roleIcon = getRoleIcon();
   const initials = getInitials();
-  const fullName =
-    `${userData.first_name} ${userData.last_name}`.trim() || firstName;
+  const fullName = `${userData.first_name} ${userData.last_name}`.trim() || firstName;
 
   const completedAchievements = achievements.filter(a => a.completed).length;
   const totalAchievements = achievements.length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50">
-      {/* Role-based Navbar */}
-      {userData.role === "owner" ? (
-        <OwnerNavbar profile={profile} avatarUrl={avatarUrl} />
-      ) : (
-        <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
-      )}
+      {/* Owner Navbar */}
+      <OwnerNavbar profile={profile} avatarUrl={avatarUrl} />
 
-      {/* Main Content - Full Screen with padding-top for navbar */}
-      <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 min-h-screen">
+      {/* Main Content - Added z-index and proper positioning */}
+      <div className="relative z-10 pt-24 pb-16 px-4 sm:px-6 lg:px-8 min-h-screen">
         <div className="max-w-7xl mx-auto">
-          {/* Animated Floating Background Elements - Sky Blue */}
-          <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          {/* Animated Floating Background Elements - Lower z-index */}
+          <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
             <motion.div
-              animate={{
-                y: [0, -30, 0],
-                x: [0, 20, 0],
-                scale: [1, 1.1, 1],
-              }}
-              transition={{
-                duration: 12,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
+              animate={{ y: [0, -30, 0], x: [0, 20, 0], scale: [1, 1.1, 1] }}
+              transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
               className="absolute top-10 left-5 w-96 h-96 bg-sky-400/20 rounded-full blur-3xl"
             />
             <motion.div
-              animate={{
-                y: [0, 30, 0],
-                x: [0, -20, 0],
-                scale: [1, 1.2, 1],
-              }}
-              transition={{
-                duration: 15,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 2,
-              }}
+              animate={{ y: [0, 30, 0], x: [0, -20, 0], scale: [1, 1.2, 1] }}
+              transition={{ duration: 15, repeat: Infinity, ease: "easeInOut", delay: 2 }}
               className="absolute bottom-10 right-5 w-[500px] h-[500px] bg-blue-400/20 rounded-full blur-3xl"
             />
           </div>
 
-          {/* Left Sidebar Widget */}
-          <div className="hidden xl:block fixed left-4 top-1/2 -translate-y-1/2 w-80">
+          {/* Left Sidebar - Business Stats - Fixed positioning with top offset to avoid navbar */}
+          <div className="hidden xl:block fixed left-4 top-32 w-80">
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2, type: "spring" }}
-              className="space-y-4"
+              className="space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar"
             >
-              {/* Quick Stats Card - REAL DATA */}
+              {/* Business Selector */}
+              {businesses.length > 1 && (
+                <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Business</label>
+                  <select
+                    value={selectedBusiness?.id || ""}
+                    onChange={(e) => handleBusinessChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                  >
+                    {businesses.map(business => (
+                      <option key={business.id} value={business.id}>
+                        {business.name} {business.verification_status === "verified" ? "✓" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Business Stats Card */}
               <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
                 <div className="flex items-center gap-2 mb-4">
-                  <Activity className="w-5 h-5 text-sky-600" />
-                  <h3 className="font-semibold text-gray-800">Quick Stats</h3>
+                  <Store className="w-5 h-5 text-sky-600" />
+                  <h3 className="font-semibold text-gray-800">Business Stats</h3>
                 </div>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Active Memberships</span>
-                    <span className="text-lg font-bold text-sky-600">{stats.activeMemberships}</span>
+                    <span className="text-sm text-gray-600">Total Members</span>
+                    <span className="text-lg font-bold text-sky-600">{businessStats.totalMembers}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Total Spent</span>
-                    <span className="text-lg font-bold text-green-600">₱{stats.totalSpent.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Businesses Followed</span>
-                    <span className="text-lg font-bold text-purple-600">{stats.totalBusinessesFollowed}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Reviews Written</span>
-                    <span className="text-lg font-bold text-orange-600">{stats.totalReviews}</span>
+                    <span className="text-sm text-gray-600">Active Members</span>
+                    <span className="text-lg font-bold text-green-600">{businessStats.activeMemberships}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Pending Applications</span>
-                    <span className="text-lg font-bold text-yellow-600">{stats.pendingApplications}</span>
+                    <span className="text-lg font-bold text-yellow-600">{businessStats.pendingApplications}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Member Since</span>
-                    <span className="text-sm font-medium text-gray-700">{formatDate(stats.memberSince)}</span>
+                    <span className="text-sm text-gray-600">Total Revenue</span>
+                    <span className="text-lg font-bold text-purple-600">{formatCurrency(businessStats.totalRevenue)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Monthly Revenue</span>
+                    <span className="text-lg font-bold text-blue-600">{formatCurrency(businessStats.monthlyRevenue)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Rating</span>
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                      <span className="text-lg font-bold text-gray-800">{businessStats.averageRating}</span>
+                      <span className="text-xs text-gray-500">({businessStats.totalReviews})</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Achievements Card - REAL DATA */}
+              {/* Business Achievements */}
               <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-sky-600" />
-                    <h3 className="font-semibold text-gray-800">Achievements</h3>
+                    <h3 className="font-semibold text-gray-800">Business Achievements</h3>
                   </div>
                   <span className="text-xs text-gray-500">{completedAchievements}/{totalAchievements}</span>
                 </div>
-                <div className="space-y-3">
-                  {achievements.slice(0, 5).map((achievement) => (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {achievements.map((achievement) => (
                     <div key={achievement.id} className="group">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
@@ -869,87 +943,118 @@ const Profile = () => {
                     </div>
                   ))}
                 </div>
-                {completedAchievements === totalAchievements && totalAchievements > 0 && (
-                  <div className="mt-4 p-2 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg text-center">
-                    <p className="text-xs text-yellow-700">🏆 Achievement Unlocked! You're a Pro!</p>
-                  </div>
-                )}
               </div>
             </motion.div>
           </div>
 
-          {/* Right Sidebar Widget - Recent Activity REAL DATA */}
-          <div className="hidden xl:block fixed right-4 top-1/2 -translate-y-1/2 w-80">
+          {/* Right Sidebar - Recent Activity - Fixed positioning with top offset to avoid navbar */}
+          <div className="hidden xl:block fixed right-4 top-32 w-80">
             <motion.div
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2, type: "spring" }}
-              className="space-y-4"
+              className="space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar"
             >
-              {/* Recent Activity Card */}
+              {/* Recent Members */}
               <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
                 <div className="flex items-center gap-2 mb-4">
-                  <Activity className="w-5 h-5 text-sky-600" />
-                  <h3 className="font-semibold text-gray-800">Recent Activity</h3>
+                  <Users className="w-5 h-5 text-sky-600" />
+                  <h3 className="font-semibold text-gray-800">Newest Members</h3>
                 </div>
-                {loadingActivities ? (
+                {loadingMembers ? (
                   <div className="text-center py-4">
-                    <div className="w-8 h-8 border-2 border-sky-200 border-t-sky-600 rounded-full animate-spin mx-auto"></div>
+                    <div className="w-8 h-8 border-2 border-sky-200 border-t-sky-600 rounded-full animate-spin mx-auto" />
                   </div>
-                ) : recentActivities.length > 0 ? (
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                    {recentActivities.map((activity) => (
-                      <motion.div
-                        key={activity.id}
-                        whileHover={{ x: -5 }}
-                        className="flex items-start gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="p-1.5 bg-gray-100 rounded-lg">
-                          {activity.icon}
+                ) : recentMembers.length > 0 ? (
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                    {recentMembers.map((member) => (
+                      <div key={member.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-white text-sm font-bold">
+                          {member.name.charAt(0)}
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-700">{activity.action}</p>
-                          <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{member.name}</p>
+                          <p className="text-xs text-gray-500">{member.plan}</p>
                         </div>
-                        {!activity.isRead && <div className="w-2 h-2 bg-sky-500 rounded-full"></div>}
-                      </motion.div>
+                        <div className="text-right">
+                          <p className="text-xs font-semibold text-green-600">{formatCurrency(member.amount)}</p>
+                          <p className="text-xs text-gray-400">{member.joined}</p>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <Bell className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No recent activity</p>
+                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No members yet</p>
                   </div>
-                )}
-                {recentActivities.length > 0 && (
-                  <button className="mt-4 w-full text-center text-xs text-sky-600 hover:text-sky-700 font-medium transition-colors">
-                    View all activity →
-                  </button>
                 )}
               </div>
 
-              {/* Quick Tips Card */}
+              {/* Pending Applications */}
+              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
+                <div className="flex items-center gap-2 mb-4">
+                  <Clock className="w-5 h-5 text-sky-600" />
+                  <h3 className="font-semibold text-gray-800">Pending Applications</h3>
+                  {businessStats.pendingApplications > 0 && (
+                    <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                      {businessStats.pendingApplications}
+                    </span>
+                  )}
+                </div>
+                {loadingApplications ? (
+                  <div className="text-center py-4">
+                    <div className="w-8 h-8 border-2 border-sky-200 border-t-sky-600 rounded-full animate-spin mx-auto" />
+                  </div>
+                ) : recentApplications.length > 0 ? (
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                    {recentApplications.map((app) => (
+                      <div key={app.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => navigate("/applications")}>
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center text-white text-sm font-bold">
+                          {app.name.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{app.name}</p>
+                          <p className="text-xs text-gray-500">{app.plan}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-semibold text-yellow-600">{formatCurrency(app.amount)}</p>
+                          <p className="text-xs text-gray-400">{app.timeAgo}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <CheckCircle className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No pending applications</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Tips for Owners */}
               <div className="bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl p-5 shadow-lg text-white">
                 <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-5 h-5" />
-                  <h3 className="font-semibold">Pro Tips</h3>
+                  <Rocket className="w-5 h-5" />
+                  <h3 className="font-semibold">Owner Tips</h3>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-start gap-2 text-sm">
                     <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>Complete your profile to unlock more features</span>
+                    <span>Review applications promptly to retain members</span>
                   </div>
                   <div className="flex items-start gap-2 text-sm">
                     <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>Join businesses to earn loyalty rewards</span>
+                    <span>Update your business profile to attract more customers</span>
                   </div>
                   <div className="flex items-start gap-2 text-sm">
                     <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>Write reviews to help other members</span>
+                    <span>Respond to reviews to build trust</span>
                   </div>
                   <div className="flex items-start gap-2 text-sm">
                     <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>Enable notifications to never miss updates</span>
+                    <span>Promote special offers to increase memberships</span>
                   </div>
                 </div>
               </div>
@@ -967,14 +1072,8 @@ const Profile = () => {
             >
               {/* Animated Gradient Background */}
               <motion.div
-                animate={{
-                  backgroundPosition: ["0% 0%", "100% 100%"],
-                }}
-                transition={{
-                  duration: 10,
-                  repeat: Infinity,
-                  ease: "linear",
-                }}
+                animate={{ backgroundPosition: ["0% 0%", "100% 100%"] }}
+                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                 className="absolute inset-0 bg-gradient-to-r from-sky-600/10 via-blue-600/10 to-indigo-600/10"
                 style={{ backgroundSize: "200% 200%" }}
               />
@@ -982,14 +1081,8 @@ const Profile = () => {
               {/* Cover Image */}
               <div className="relative h-48 overflow-hidden">
                 <motion.div
-                  animate={{
-                    scale: [1, 1.05, 1],
-                  }}
-                  transition={{
-                    duration: 20,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
                   className="absolute inset-0 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600"
                 />
                 <div className="absolute inset-0 bg-black/20" />
@@ -1005,16 +1098,9 @@ const Profile = () => {
                       x: [Math.random() * window.innerWidth, Math.random() * window.innerWidth],
                       y: [Math.random() * 200, Math.random() * 200],
                     }}
-                    transition={{
-                      duration: 3 + Math.random() * 2,
-                      repeat: Infinity,
-                      delay: Math.random() * 2,
-                    }}
+                    transition={{ duration: 3 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 2 }}
                     className="absolute w-2 h-2 bg-white/60 rounded-full"
-                    style={{
-                      left: `${Math.random() * 100}%`,
-                      top: `${Math.random() * 100}%`,
-                    }}
+                    style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
                   />
                 ))}
               </div>
@@ -1034,16 +1120,10 @@ const Profile = () => {
                       className="w-32 h-32 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-500 p-1 shadow-2xl"
                     >
                       {avatarUrl ? (
-                        <img
-                          src={avatarUrl}
-                          alt={fullName}
-                          className="w-full h-full rounded-xl object-cover"
-                        />
+                        <img src={avatarUrl} alt={fullName} className="w-full h-full rounded-xl object-cover" />
                       ) : (
                         <div className={`w-full h-full rounded-xl bg-gradient-to-br ${roleGradient} flex items-center justify-center`}>
-                          <span className="text-4xl font-bold text-white">
-                            {initials}
-                          </span>
+                          <span className="text-4xl font-bold text-white">{initials}</span>
                         </div>
                       )}
                     </motion.div>
@@ -1054,14 +1134,7 @@ const Profile = () => {
                       className="absolute bottom-0 right-0 p-2 bg-white rounded-full cursor-pointer shadow-lg border-2 border-gray-200 hover:shadow-xl transition-all"
                     >
                       <Camera className="w-4 h-4 text-gray-600" />
-                      <input
-                        id="avatar-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={uploadAvatar}
-                        disabled={uploading}
-                        className="hidden"
-                      />
+                      <input id="avatar-upload" type="file" accept="image/*" onChange={uploadAvatar} disabled={uploading} className="hidden" />
                     </motion.label>
                     {uploading && (
                       <motion.div
@@ -1069,11 +1142,7 @@ const Profile = () => {
                         animate={{ opacity: 1 }}
                         className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center"
                       >
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity }}
-                          className="w-8 h-8 border-4 border-white border-t-transparent rounded-full"
-                        />
+                        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity }} className="w-8 h-8 border-4 border-white border-t-transparent rounded-full" />
                       </motion.div>
                     )}
                   </div>
@@ -1082,11 +1151,7 @@ const Profile = () => {
                 {/* Profile Info */}
                 <div className="pt-24 pb-8">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                    <motion.div
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2 }}
-                    >
+                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
                       <div className="flex items-center gap-3 mb-3 flex-wrap">
                         <motion.h1
                           animate={{ backgroundPosition: ["0% 0%", "100% 100%"] }}
@@ -1104,12 +1169,7 @@ const Profile = () => {
                         </motion.span>
                       </div>
                       
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.3 }}
-                        className="space-y-2"
-                      >
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-2">
                         <div className="flex items-center gap-3 text-gray-600">
                           <Mail className="w-4 h-4" />
                           <span>{userData.email}</span>
@@ -1120,25 +1180,25 @@ const Profile = () => {
                             <span>{userData.mobile}</span>
                           </div>
                         )}
-                        {userData.business_name && userData.role === "owner" && (
+                        {selectedBusiness && (
                           <div className="flex items-center gap-3 text-gray-600">
-                            <Building className="w-4 h-4" />
-                            <span className="font-medium">{userData.business_name}</span>
+                            <Store className="w-4 h-4" />
+                            <span className="font-medium">{selectedBusiness.name}</span>
+                            {selectedBusiness.verification_status === "verified" && (
+                              <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" /> Verified
+                              </span>
+                            )}
                           </div>
                         )}
                         <div className="flex items-center gap-3 text-gray-500 text-sm">
                           <Calendar className="w-4 h-4" />
-                          <span>Joined {user?.created_at ? formatDate(user.created_at) : "N/A"}</span>
+                          <span>Owner since {user?.created_at ? formatDate(user.created_at) : "N/A"}</span>
                         </div>
                       </motion.div>
                     </motion.div>
 
-                    <motion.div
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.25 }}
-                      className="flex gap-3"
-                    >
+                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }} className="flex gap-3">
                       {!isEditing ? (
                         <>
                           <motion.button
@@ -1202,19 +1262,11 @@ const Profile = () => {
                         transition={{ duration: 0.3 }}
                         className="mt-8 pt-8 border-t border-gray-200"
                       >
-                        <motion.h3
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-lg font-semibold text-gray-800 mb-4"
-                        >
+                        <motion.h3 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-lg font-semibold text-gray-800 mb-4">
                           Edit Profile Information
                         </motion.h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.05 }}
-                          >
+                          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}>
                             <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
                             <input
                               type="text"
@@ -1225,11 +1277,7 @@ const Profile = () => {
                               placeholder="Enter your first name"
                             />
                           </motion.div>
-                          <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.1 }}
-                          >
+                          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
                             <input
                               type="text"
@@ -1240,11 +1288,7 @@ const Profile = () => {
                               placeholder="Enter your last name"
                             />
                           </motion.div>
-                          <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.15 }}
-                          >
+                          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
                             <input
                               type="tel"
@@ -1255,29 +1299,18 @@ const Profile = () => {
                               placeholder="09171234567"
                             />
                           </motion.div>
-                          {userData.role === "owner" && (
-                            <motion.div
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.2 }}
-                            >
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Business Name</label>
-                              <input
-                                type="text"
-                                name="business_name"
-                                value={userData.business_name}
-                                onChange={handleInputChange}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
-                                placeholder="Your Business Name"
-                              />
-                            </motion.div>
-                          )}
-                          <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.25 }}
-                            className="md:col-span-2"
-                          >
+                          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Business Name</label>
+                            <input
+                              type="text"
+                              name="business_name"
+                              value={userData.business_name}
+                              onChange={handleInputChange}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                              placeholder="Your Business Name"
+                            />
+                          </motion.div>
+                          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }} className="md:col-span-2">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                             <input
                               type="email"
@@ -1295,213 +1328,26 @@ const Profile = () => {
                 </div>
               </div>
             </motion.div>
-
-            {/* Memberships Section - Only for Clients */}
-            {userData.role === "client" && (
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, type: "spring", stiffness: 100 }}
-                className="mt-8"
-              >
-                <div className="flex items-center gap-3 mb-6">
-                  <motion.div
-                    animate={{ rotate: [0, 10, -10, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                  >
-                    <Award className="w-8 h-8 text-sky-600" />
-                  </motion.div>
-                  <h2 className="text-2xl font-bold text-gray-800">My Memberships</h2>
-                </div>
-
-                {loadingMemberships ? (
-                  <div className="text-center py-12">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      className="w-12 h-12 border-4 border-sky-200 border-t-sky-600 rounded-full mx-auto mb-4"
-                    />
-                    <p className="text-gray-500">Loading your memberships...</p>
-                  </div>
-                ) : memberships.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {memberships.map((membership, index) => (
-                      <motion.div
-                        key={membership.id}
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 + index * 0.1 }}
-                        whileHover={{ y: -8, scale: 1.02 }}
-                        className="group relative bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-300"
-                      >
-                        {/* Animated Border */}
-                        <motion.div
-                          animate={{
-                            backgroundPosition: ["0% 0%", "100% 100%"],
-                          }}
-                          transition={{
-                            duration: 5,
-                            repeat: Infinity,
-                            ease: "linear",
-                          }}
-                          className="absolute inset-0 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                          style={{ backgroundSize: "200% 200%" }}
-                        />
-                        <div className="relative bg-white m-[2px] rounded-2xl overflow-hidden">
-                          <div className="p-6">
-                            {/* Business Header */}
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex items-center gap-3">
-                                <motion.div
-                                  whileHover={{ scale: 1.1, rotate: 5 }}
-                                  className="w-14 h-14 rounded-xl bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-3xl shadow-lg"
-                                >
-                                  {membership.businesses?.emoji || "🏢"}
-                                </motion.div>
-                                <div>
-                                  <h3 className="font-bold text-gray-800 text-lg">
-                                    {membership.businesses?.name}
-                                  </h3>
-                                  <div className="flex items-center gap-1 text-sm text-gray-500">
-                                    <Crown className="w-3 h-3" />
-                                    <span>{membership.businesses?.owner_name}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <motion.span
-                                whileHover={{ scale: 1.05 }}
-                                className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-md ${getStatusBadgeClass(membership.status)}`}
-                              >
-                                {membership.status.toUpperCase()}
-                              </motion.span>
-                            </div>
-
-                            {/* Plan Details */}
-                            <div className="mb-4">
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-bold text-sky-600">
-                                  ₱{membership.membership_plans?.price?.toLocaleString()}
-                                </span>
-                                <span className="text-gray-500 text-sm">/{membership.membership_plans?.duration}</span>
-                              </div>
-                              <p className="font-semibold text-gray-700 mt-1">{membership.membership_plans?.name}</p>
-                            </div>
-
-                            {/* Payment Method */}
-                            <div className="flex items-center gap-2 text-sm text-gray-600 mb-3 p-2 bg-gray-50 rounded-lg">
-                              {getPaymentMethodIcon(membership.payment_method)}
-                              <span>{getPaymentMethodLabel(membership.payment_method)}</span>
-                            </div>
-
-                            {/* Dates */}
-                            <div className="space-y-2 text-sm border-t border-gray-100 pt-3">
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Started:</span>
-                                <span className="text-gray-700 font-medium">{formatDate(membership.start_date)}</span>
-                              </div>
-                              {membership.end_date && (
-                                <div className="flex justify-between">
-                                  <span className="text-gray-500">Valid until:</span>
-                                  <motion.span
-                                    animate={{ scale: [1, 1.05, 1] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                    className="text-green-600 font-bold"
-                                  >
-                                    {formatDate(membership.end_date)}
-                                  </motion.span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Features */}
-                            {membership.membership_plans?.features && membership.membership_plans.features.length > 0 && (
-                              <div className="mt-4 pt-3 border-t border-gray-100">
-                                <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                                  <Star className="w-3 h-3" />
-                                  Features:
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {membership.membership_plans.features.slice(0, 3).map((feature, idx) => (
-                                    <motion.span
-                                      key={idx}
-                                      whileHover={{ scale: 1.05 }}
-                                      className="px-2 py-1 bg-gradient-to-r from-sky-50 to-blue-50 text-gray-700 text-xs rounded-lg"
-                                    >
-                                      {feature}
-                                    </motion.span>
-                                  ))}
-                                  {membership.membership_plans.features.length > 3 && (
-                                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg">
-                                      +{membership.membership_plans.features.length - 3} more
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Action Button */}
-                            <motion.button
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => navigate("/browse")}
-                              className="w-full mt-4 px-4 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all"
-                            >
-                              View Business
-                            </motion.button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-white rounded-2xl shadow-xl p-12 text-center"
-                  >
-                    <motion.div
-                      animate={{ y: [0, -10, 0] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="text-7xl mb-4"
-                    >
-                      📋
-                    </motion.div>
-                    <h3 className="text-xl font-semibold text-gray-800 mb-2">No Memberships Found</h3>
-                    <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                      You haven't joined any businesses yet or your memberships are pending approval.
-                    </p>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => navigate("/browse")}
-                      className="px-6 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
-                    >
-                      Browse Businesses
-                    </motion.button>
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
           </div>
         </div>
       </div>
 
       {/* Mobile Bottom Bar */}
-      <div className="xl:hidden fixed bottom-6 left-4 right-4">
+      <div className="xl:hidden fixed bottom-6 left-4 right-4 z-20">
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white/95 backdrop-blur-xl rounded-2xl p-4 shadow-lg border border-white/20 flex gap-4 overflow-x-auto"
         >
           <div className="flex-1 min-w-[100px] text-center">
-            <Activity className="w-5 h-5 text-sky-600 mx-auto mb-1" />
-            <p className="text-xs text-gray-500">Active</p>
-            <p className="text-lg font-bold text-sky-600">{stats.activeMemberships}</p>
+            <Users className="w-5 h-5 text-sky-600 mx-auto mb-1" />
+            <p className="text-xs text-gray-500">Members</p>
+            <p className="text-lg font-bold text-sky-600">{businessStats.totalMembers}</p>
           </div>
           <div className="flex-1 min-w-[100px] text-center">
             <DollarSign className="w-5 h-5 text-green-600 mx-auto mb-1" />
-            <p className="text-xs text-gray-500">Spent</p>
-            <p className="text-lg font-bold text-green-600">₱{stats.totalSpent.toLocaleString()}</p>
+            <p className="text-xs text-gray-500">Revenue</p>
+            <p className="text-lg font-bold text-green-600">{formatCurrency(businessStats.monthlyRevenue)}</p>
           </div>
           <div className="flex-1 min-w-[100px] text-center">
             <Trophy className="w-5 h-5 text-yellow-500 mx-auto mb-1" />
@@ -1561,9 +1407,7 @@ const Profile = () => {
                 <form onSubmit={handlePasswordSubmit}>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Current Password
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
                       <div className="relative">
                         <input
                           type={showCurrentPassword ? "text" : "password"}
@@ -1584,20 +1428,12 @@ const Profile = () => {
                         </button>
                       </div>
                       {passwordErrors.currentPassword && (
-                        <motion.p
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="text-red-500 text-xs mt-1"
-                        >
-                          {passwordErrors.currentPassword}
-                        </motion.p>
+                        <p className="text-red-500 text-xs mt-1">{passwordErrors.currentPassword}</p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        New Password
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
                       <div className="relative">
                         <input
                           type={showNewPassword ? "text" : "password"}
@@ -1618,20 +1454,12 @@ const Profile = () => {
                         </button>
                       </div>
                       {passwordErrors.newPassword && (
-                        <motion.p
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="text-red-500 text-xs mt-1"
-                        >
-                          {passwordErrors.newPassword}
-                        </motion.p>
+                        <p className="text-red-500 text-xs mt-1">{passwordErrors.newPassword}</p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Confirm New Password
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
                       <div className="relative">
                         <input
                           type={showConfirmPassword ? "text" : "password"}
@@ -1652,13 +1480,7 @@ const Profile = () => {
                         </button>
                       </div>
                       {passwordErrors.confirmPassword && (
-                        <motion.p
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="text-red-500 text-xs mt-1"
-                        >
-                          {passwordErrors.confirmPassword}
-                        </motion.p>
+                        <p className="text-red-500 text-xs mt-1">{passwordErrors.confirmPassword}</p>
                       )}
                     </div>
                   </div>
@@ -1692,4 +1514,4 @@ const Profile = () => {
   );
 };
 
-export default Profile;
+export default OwnerProfile;

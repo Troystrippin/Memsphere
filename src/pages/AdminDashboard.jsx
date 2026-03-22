@@ -1,774 +1,710 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import AdminSidebarNav from '../components/admin/AdminSidebarNav';
-import RejectionModal from '../components/admin/RejectionModal';
-import { supabase } from '../lib/supabase';
-import '../styles/AdminDashboard.css';
+// src/pages/AdminDashboard.jsx
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import AdminSidebarNav from "../components/admin/AdminSidebarNav";
+import { motion } from "framer-motion";
+import {
+  Users,
+  Store,
+  Clock,
+  Shield,
+  Activity,
+  Building,
+  Settings,
+  RefreshCw,
+  ChevronRight,
+  Check,
+  X,
+  Bell
+} from "lucide-react";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [avatarUrl, setAvatarUrl] = useState(null);
-  
-  // Modal state
-  const [showRejectionModal, setShowRejectionModal] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState(null);
-  
-  // Data states
-  const [applications, setApplications] = useState([]);
-  const [recentOwners, setRecentOwners] = useState([]);
   const [stats, setStats] = useState({
-    pendingApplications: 0,
-    totalOwners: 0,
     totalUsers: 0,
-    totalBusinesses: 0
+    totalBusinesses: 0,
+    pendingVerifications: 0,
+    activeBusinesses: 0,
+    newUsersThisMonth: 0,
+    newBusinessesThisMonth: 0,
+    userGrowth: 0
   });
-
-  // Add session check ref to prevent multiple calls
-  const sessionChecked = React.useRef(false);
+  
+  const [recentUsers, setRecentUsers] = useState([]);
+  const [recentBusinesses, setRecentBusinesses] = useState([]);
+  const [pendingVerifications, setPendingVerifications] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
+  
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+  const [loadingVerifications, setLoadingVerifications] = useState(false);
 
   useEffect(() => {
-    // Prevent double execution in StrictMode
-    if (sessionChecked.current) return;
-    sessionChecked.current = true;
-    
-    checkAdmin();
+    fetchAdminData();
   }, []);
 
-  useEffect(() => {
-    if (profile) {
-      fetchDashboardData();
-    }
-  }, [profile]);
-
-  const checkAdmin = async () => {
+  const fetchAdminData = async () => {
     try {
       setLoading(true);
-      
-      // Get session first to ensure we have a valid session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) throw sessionError;
-      
-      if (!session) {
-        console.log('No session found, redirecting to login');
-        navigate('/login');
-        return;
-      }
-
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        // If we get an auth error, try to refresh the session
-        if (userError.message?.includes('Auth session missing')) {
-          console.log('Session missing, attempting to refresh...');
-          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-          
-          if (refreshError || !refreshData.session) {
-            navigate('/login');
-            return;
-          }
-          
-          // Retry with refreshed session
-          const { data: retryUser, error: retryError } = await supabase.auth.getUser();
-          if (retryError) throw retryError;
-          user = retryUser;
-        } else {
-          throw userError;
-        }
-      }
-      
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) {
-        console.error('Profile error:', profileError);
-        // If profile doesn't exist, create a default one
-        if (profileError.code === 'PGRST116') {
-          // Create default profile
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert([{
-              id: user.id,
-              email: user.email,
-              role: 'admin',
-              first_name: 'Admin',
-              last_name: 'User',
-              verification_status: 'approved'
-            }])
-            .select()
-            .single();
-            
-          if (createError) throw createError;
-          setProfile(newProfile);
-        } else {
-          throw profileError;
-        }
-      } else {
-        setProfile(profileData);
-      }
-
-      if (profileData?.avatar_url) {
-        downloadAvatar(profileData.avatar_url);
-      }
-
-    } catch (err) {
-      console.error('Error checking admin:', err);
-      
-      // Handle specific error cases
-      if (err.message?.includes('Auth session missing') || 
-          err.message?.includes('JWT') ||
-          err.message?.includes('refresh_token')) {
-        console.log('Auth error, redirecting to login');
-        navigate('/login');
-      } else {
-        setError(err.message);
-      }
+      await Promise.all([
+        fetchStats(),
+        fetchRecentUsers(),
+        fetchRecentBusinesses(),
+        fetchPendingVerifications(),
+        fetchRecentActivities()
+      ]);
+    } catch (error) {
+      console.error("Error fetching admin data:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchDashboardData = async () => {
-    try {
-      await fetchStats();
-      await fetchApplications();
-      await fetchRecentOwners();
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      // Don't set error state here to avoid blocking the UI
-    }
-  };
-
   const fetchStats = async () => {
     try {
-      // Check if we have a valid session before making requests
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.log('No session for stats fetch');
-        return;
-      }
+      setLoadingStats(true);
 
-      const { count: pendingApplications } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'pending_owner');
-
-      const { count: totalOwners } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'owner');
-
+      // Get total users
       const { count: totalUsers } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'client');
+        .from("profiles")
+        .select("*", { count: "exact", head: true });
 
+      // Get new users this month
+      const firstDayOfMonth = new Date();
+      firstDayOfMonth.setDate(1);
+      firstDayOfMonth.setHours(0, 0, 0, 0);
+      
+      const { count: newUsersThisMonth } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", firstDayOfMonth.toISOString());
+
+      // Get total businesses
       const { count: totalBusinesses } = await supabase
-        .from('businesses')
-        .select('*', { count: 'exact', head: true });
+        .from("businesses")
+        .select("*", { count: "exact", head: true });
+
+      // Get active businesses
+      const { count: activeBusinesses } = await supabase
+        .from("businesses")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "active");
+
+      // Get new businesses this month
+      const { count: newBusinessesThisMonth } = await supabase
+        .from("businesses")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", firstDayOfMonth.toISOString());
+
+      // Get pending verifications
+      const { count: pendingVerifications } = await supabase
+        .from("businesses")
+        .select("*", { count: "exact", head: true })
+        .eq("verification_status", "pending");
+
+      // Calculate user growth
+      const { count: lastMonthUsersCount } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .lt("created_at", firstDayOfMonth.toISOString());
+      
+      const userGrowth = lastMonthUsersCount > 0 
+        ? ((newUsersThisMonth - lastMonthUsersCount) / lastMonthUsersCount) * 100 
+        : newUsersThisMonth > 0 ? 100 : 0;
 
       setStats({
-        pendingApplications: pendingApplications || 0,
-        totalOwners: totalOwners || 0,
         totalUsers: totalUsers || 0,
-        totalBusinesses: totalBusinesses || 0
+        totalBusinesses: totalBusinesses || 0,
+        pendingVerifications: pendingVerifications || 0,
+        activeBusinesses: activeBusinesses || 0,
+        newUsersThisMonth: newUsersThisMonth || 0,
+        newBusinessesThisMonth: newBusinessesThisMonth || 0,
+        userGrowth: parseFloat(userGrowth.toFixed(1))
       });
-
     } catch (error) {
-      console.error('Error fetching stats:', error);
-      // Don't throw, just log
+      console.error("Error fetching stats:", error);
+    } finally {
+      setLoadingStats(false);
     }
   };
 
-  const fetchApplications = async () => {
+  const fetchRecentUsers = async () => {
     try {
-      // Check session before making request
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
+      setLoadingRecent(true);
+      
       const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          email,
-          first_name,
-          last_name,
-          mobile,
-          avatar_url,
-          created_at,
-          businesses (
-            id,
-            name,
-            business_type,
-            location,
-            description,
-            emoji,
-            verification_status,
-            submitted_at
-          )
-        `)
-        .eq('role', 'pending_owner')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const processedData = await Promise.all((data || []).map(async (item) => {
-        let avatarUrl = null;
-        if (item.avatar_url) {
-          avatarUrl = await getAvatarUrl(item.avatar_url, item.id);
-        }
-        return { ...item, avatarUrl };
-      }));
-
-      setApplications(processedData);
-    } catch (error) {
-      console.error('Error fetching applications:', error);
-      // Don't throw, just log
-    }
-  };
-
-  const fetchRecentOwners = async () => {
-    try {
-      // Check session before making request
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          email,
-          first_name,
-          last_name,
-          mobile,
-          avatar_url,
-          created_at,
-          businesses (id, name, business_type, emoji)
-        `)
-        .eq('role', 'owner')
-        .order('created_at', { ascending: false })
+        .from("profiles")
+        .select("id, first_name, last_name, email, role, created_at, avatar_url")
+        .order("created_at", { ascending: false })
         .limit(5);
 
       if (error) throw error;
 
-      const processedData = await Promise.all((data || []).map(async (item) => {
-        let avatarUrl = null;
-        if (item.avatar_url) {
-          avatarUrl = await getAvatarUrl(item.avatar_url, item.id);
-        }
-        return { ...item, avatarUrl };
-      }));
+      const users = data?.map(user => ({
+        id: user.id,
+        name: `${user.first_name || ""} ${user.last_name || ""}`.trim() || "Unknown",
+        email: user.email,
+        role: user.role || "client",
+        joined: formatTimeAgo(user.created_at),
+        avatar: user.avatar_url
+      })) || [];
 
-      setRecentOwners(processedData);
+      setRecentUsers(users);
     } catch (error) {
-      console.error('Error fetching recent owners:', error);
-      // Don't throw, just log
+      console.error("Error fetching recent users:", error);
+    } finally {
+      setLoadingRecent(false);
     }
   };
 
-  const getAvatarUrl = async (avatarPath, userId) => {
-    if (!avatarPath) return null;
-
+  const fetchRecentBusinesses = async () => {
     try {
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('avatars')
-        .getPublicUrl(avatarPath);
-      
-      if (publicUrlData?.publicUrl) {
-        try {
-          const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
-          if (response.ok) {
-            return publicUrlData.publicUrl;
-          }
-        } catch (e) {
-          console.log('Public URL not accessible, trying download...');
-        }
-      }
-
-      const { data, error } = await supabase.storage
-        .from('avatars')
-        .download(avatarPath);
+      const { data, error } = await supabase
+        .from("businesses")
+        .select("id, name, owner_name, business_type, created_at, verification_status, emoji")
+        .order("created_at", { ascending: false })
+        .limit(5);
 
       if (error) throw error;
 
-      return URL.createObjectURL(data);
+      const businesses = data?.map(business => ({
+        id: business.id,
+        name: business.name,
+        owner: business.owner_name,
+        type: business.business_type,
+        joined: formatTimeAgo(business.created_at),
+        status: business.verification_status,
+        emoji: business.emoji || "🏢"
+      })) || [];
+
+      setRecentBusinesses(businesses);
     } catch (error) {
-      console.error('Error getting avatar URL:', error);
-      return null;
+      console.error("Error fetching recent businesses:", error);
     }
   };
 
-  const downloadAvatar = async (path) => {
+  const fetchPendingVerifications = async () => {
     try {
-      const { data, error } = await supabase.storage
-        .from('avatars')
-        .download(path);
+      setLoadingVerifications(true);
+      
+      const { data, error } = await supabase
+        .from("businesses")
+        .select("id, name, owner_name, business_type, created_at, verification_status, emoji")
+        .eq("verification_status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(5);
 
       if (error) throw error;
 
-      const url = URL.createObjectURL(data);
-      setAvatarUrl(url);
+      const pending = data?.map(business => ({
+        id: business.id,
+        name: business.name,
+        owner: business.owner_name,
+        type: business.business_type,
+        requested: formatTimeAgo(business.created_at),
+        emoji: business.emoji || "🏢"
+      })) || [];
+
+      setPendingVerifications(pending);
     } catch (error) {
-      console.error('Error downloading avatar:', error);
+      console.error("Error fetching pending verifications:", error);
+    } finally {
+      setLoadingVerifications(false);
     }
   };
 
-  const handleApproveClick = (application) => {
-    setSelectedApplication(application);
-    handleApproveOwner(application.id, application.businesses?.[0]?.id);
-  };
-
-  const handleRejectClick = (application) => {
-    setSelectedApplication(application);
-    setShowRejectionModal(true);
-  };
-
-  const handleApproveOwner = async (userId, businessId) => {
+  const fetchRecentActivities = async () => {
     try {
-      // Check session before proceeding
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Your session has expired. Please login again.');
-        navigate('/login');
-        return;
-      }
+      // Get recent notifications for admin
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("id, type, title, message, created_at, is_read")
+        .order("created_at", { ascending: false })
+        .limit(5);
 
-      // Get current admin profile
-      const { data: adminProfile, error: adminError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', profile?.id)
-        .single();
+      if (error) throw error;
 
-      if (adminError) throw adminError;
+      const activities = data?.map(notification => ({
+        id: notification.id,
+        action: notification.title || notification.message,
+        time: formatTimeAgo(notification.created_at),
+        type: notification.type,
+        isRead: notification.is_read
+      })) || [];
 
-      // Update profile to owner
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          role: 'owner', 
-          verification_status: 'approved',
-          approved_at: new Date(),
-          approved_by: adminProfile?.id,
-          application_reviewed_at: new Date()
-        })
-        .eq('id', userId);
-
-      if (profileError) throw profileError;
-
-      // Update business to approved
-      const { error: businessError } = await supabase
-        .from('businesses')
-        .update({ 
-          verification_status: 'approved',
-          status: 'active',
-          verified_at: new Date(),
-          verified_by: adminProfile?.id
-        })
-        .eq('id', businessId);
-
-      if (businessError) throw businessError;
-
-      // Log verification
-      await supabase
-        .from('verification_logs')
-        .insert({
-          business_id: businessId,
-          owner_id: userId,
-          action_by: adminProfile?.id,
-          action_type: 'approve',
-          created_at: new Date()
-        });
-
-      // Notify owner
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: userId,
-          type: 'application_approved',
-          title: 'Application Approved! 🎉',
-          message: 'Your business owner application has been approved! You can now log in and start managing your business.',
-          data: { businessId },
-          created_at: new Date()
-        });
-
-      fetchDashboardData();
-      alert('Owner application approved successfully!');
+      setRecentActivities(activities);
     } catch (error) {
-      console.error('Error approving owner:', error);
+      console.error("Error fetching activities:", error);
+    }
+  };
+
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const getRoleBadgeColor = (role) => {
+    switch (role) {
+      case "owner":
+        return "bg-purple-100 text-purple-700";
+      case "admin":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-blue-100 text-blue-700";
+    }
+  };
+
+  const getStatusBadgeColor = (status) => {
+    switch (status) {
+      case "verified":
+        return "bg-green-100 text-green-700";
+      case "pending":
+        return "bg-yellow-100 text-yellow-700";
+      case "rejected":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  const handleVerifyBusiness = async (businessId) => {
+    try {
+      const { error } = await supabase
+        .from("businesses")
+        .update({
+          verification_status: "verified",
+          verified_at: new Date().toISOString(),
+          verified_by: (await supabase.auth.getUser()).data.user?.id
+        })
+        .eq("id", businessId);
+
+      if (error) throw error;
+
+      // Refresh data
+      await Promise.all([
+        fetchStats(),
+        fetchPendingVerifications(),
+        fetchRecentBusinesses()
+      ]);
       
-      // Handle session errors
-      if (error.message?.includes('Auth session missing') || 
-          error.message?.includes('JWT')) {
-        alert('Your session has expired. Please login again.');
-        navigate('/login');
-      } else {
-        alert('Failed to approve owner. Please try again.');
-      }
+      alert("Business verified successfully!");
+    } catch (error) {
+      console.error("Error verifying business:", error);
+      alert("Failed to verify business");
     }
   };
 
-  const handleRejectOwner = async (reason) => {
-    if (!selectedApplication) return;
-
-    const userId = selectedApplication.id;
-    const businessId = selectedApplication.businesses?.[0]?.id;
+  const handleRejectBusiness = async (businessId) => {
+    const reason = prompt("Please enter reason for rejection:");
+    if (!reason) return;
 
     try {
-      // Check session before proceeding
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Your session has expired. Please login again.');
-        navigate('/login');
-        return;
-      }
-
-      // Get current admin profile
-      const { data: adminProfile, error: adminError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', profile?.id)
-        .single();
-
-      if (adminError) throw adminError;
-
-      // Update profile to rejected_owner
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          role: 'rejected_owner', 
-          verification_status: 'rejected',
-          rejected_at: new Date(),
-          application_reviewed_at: new Date()
-        })
-        .eq('id', userId);
-
-      if (profileError) throw profileError;
-
-      // Update business to rejected
-      const { error: businessError } = await supabase
-        .from('businesses')
-        .update({ 
-          verification_status: 'rejected',
-          status: 'rejected',
+      const { error } = await supabase
+        .from("businesses")
+        .update({
+          verification_status: "rejected",
           rejection_reason: reason
         })
-        .eq('id', businessId);
+        .eq("id", businessId);
 
-      if (businessError) throw businessError;
-
-      // Log rejection
-      await supabase
-        .from('verification_logs')
-        .insert({
-          business_id: businessId,
-          owner_id: userId,
-          action_by: adminProfile?.id,
-          action_type: 'reject',
-          reason: reason,
-          created_at: new Date()
-        });
-
-      // Notify owner
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: userId,
-          type: 'application_rejected',
-          title: 'Application Update',
-          message: reason || 'Your application was not approved. Please contact support for more information.',
-          data: { reason },
-          created_at: new Date()
-        });
-
-      fetchDashboardData();
-      alert('Owner application rejected.');
-    } catch (error) {
-      console.error('Error rejecting owner:', error);
-      
-      // Handle session errors
-      if (error.message?.includes('Auth session missing') || 
-          error.message?.includes('JWT')) {
-        alert('Your session has expired. Please login again.');
-        navigate('/login');
-      } else {
-        alert('Failed to reject application. Please try again.');
-      }
-    } finally {
-      setShowRejectionModal(false);
-      setSelectedApplication(null);
-    }
-  };
-
-  const getInitials = (firstName, lastName) => {
-    if (!firstName && !lastName) return '??';
-    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch (e) {
-      return 'Invalid Date';
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      navigate('/login');
-    } catch (err) {
-      console.error('Error signing out:', err);
-    }
-  };
 
-  // Add retry function
-  const handleRetry = () => {
-    sessionChecked.current = false;
-    setError(null);
-    setLoading(true);
-    checkAdmin();
+      // Refresh data
+      await Promise.all([
+        fetchStats(),
+        fetchPendingVerifications(),
+        fetchRecentBusinesses()
+      ]);
+      
+      alert("Business rejected!");
+    } catch (error) {
+      console.error("Error rejecting business:", error);
+      alert("Failed to reject business");
+    }
   };
 
   if (loading) {
     return (
-      <div className="admin-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading admin dashboard...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="admin-error">
-        <h2>Error</h2>
-        <p>{error}</p>
-        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-          <button onClick={handleRetry} className="btn-error" style={{ background: '#2563eb' }}>
-            Retry
-          </button>
-          <button onClick={handleSignOut} className="btn-error">
-            Sign Out
-          </button>
+      <AdminSidebarNav>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading dashboard...</p>
+          </div>
         </div>
-      </div>
+      </AdminSidebarNav>
     );
   }
-
-  const firstName = profile?.first_name || 'Admin';
 
   return (
     <AdminSidebarNav>
-      <div className="admin-dashboard-content">
-        {/* Stats Cards */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon-wrapper pending">
-              <span className="stat-icon">⏳</span>
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.pendingApplications}</span>
-              <span className="stat-label">Pending Applications</span>
-            </div>
-          </div>
+      <div className="min-h-screen space-y-6">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="pt-4"
+        >
+          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-gray-600 mt-1">Manage users, businesses, and platform analytics</p>
+        </motion.div>
 
-          <div className="stat-card">
-            <div className="stat-icon-wrapper owners">
-              <span className="stat-icon">👥</span>
+        {/* Stats Grid - 4 Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Total Users */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <Users className="w-6 h-6 text-blue-600" />
+              </div>
+              <span className="text-sm font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                +{stats.userGrowth}%
+              </span>
             </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.totalOwners}</span>
-              <span className="stat-label">Business Owners</span>
-            </div>
-          </div>
+            <p className="text-3xl font-bold text-gray-900">{stats.totalUsers}</p>
+            <p className="text-sm text-gray-600 mt-1">Total Users</p>
+            <p className="text-xs text-gray-500 mt-2">+{stats.newUsersThisMonth} this month</p>
+          </motion.div>
 
-          <div className="stat-card">
-            <div className="stat-icon-wrapper users">
-              <span className="stat-icon">👤</span>
+          {/* Total Businesses */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <Store className="w-6 h-6 text-purple-600" />
+              </div>
             </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.totalUsers}</span>
-              <span className="stat-label">Total Users</span>
-            </div>
-          </div>
+            <p className="text-3xl font-bold text-gray-900">{stats.totalBusinesses}</p>
+            <p className="text-sm text-gray-600 mt-1">Total Businesses</p>
+            <p className="text-xs text-gray-500 mt-2">+{stats.newBusinessesThisMonth} this month</p>
+          </motion.div>
 
-          <div className="stat-card">
-            <div className="stat-icon-wrapper businesses">
-              <span className="stat-icon">🏢</span>
+          {/* Active Businesses */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <Building className="w-6 h-6 text-green-600" />
+              </div>
             </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.totalBusinesses}</span>
-              <span className="stat-label">Businesses</span>
+            <p className="text-3xl font-bold text-gray-900">{stats.activeBusinesses}</p>
+            <p className="text-sm text-gray-600 mt-1">Active Businesses</p>
+            <p className="text-xs text-gray-500 mt-2">{Math.round((stats.activeBusinesses / stats.totalBusinesses) * 100)}% of total</p>
+          </motion.div>
+
+          {/* Pending Verifications */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow cursor-pointer"
+            onClick={() => navigate("/admin/businesses")}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+                <Clock className="w-6 h-6 text-yellow-600" />
+              </div>
+              {stats.pendingVerifications > 0 && (
+                <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                  {stats.pendingVerifications}
+                </span>
+              )}
             </div>
-          </div>
+            <p className="text-3xl font-bold text-gray-900">{stats.pendingVerifications}</p>
+            <p className="text-sm text-gray-600 mt-1">Pending Verifications</p>
+            <p className="text-xs text-blue-600 mt-2">Click to review →</p>
+          </motion.div>
         </div>
 
-        {/* Pending Applications Section */}
-        <div className="dashboard-section">
-          <div className="section-header">
-            <h2 className="section-title">Pending Applications</h2>
-            {applications.length > 0 && (
-              <Link to="/admin/users?tab=pending" className="view-all-link">
-                View All ({applications.length})
-              </Link>
-            )}
-          </div>
-          
-          {applications.length > 0 ? (
-            <div className="applications-list">
-              {applications.slice(0, 3).map((app) => (
-                <div key={app.id} className="application-card">
-                  <div className="application-header">
-                    <div className="applicant-info">
-                      <div className="applicant-avatar">
-                        {app.avatarUrl ? (
-                          <img src={app.avatarUrl} alt={app.first_name} />
-                        ) : (
-                          <div className="avatar-placeholder">
-                            {getInitials(app.first_name, app.last_name)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="applicant-details">
-                        <h3>{app.first_name} {app.last_name}</h3>
-                        <p>{app.email}</p>
-                        <p className="applicant-phone">{app.mobile || 'No phone'}</p>
-                      </div>
-                    </div>
-                    <div className="application-date">
-                      Applied: {formatDate(app.created_at)}
-                    </div>
-                  </div>
-
-                  {app.businesses && app.businesses.length > 0 && (
-                    <div className="business-details">
-                      <h4>Business Information</h4>
-                      {app.businesses.map((business) => (
-                        <div key={business.id} className="business-item">
-                          <span className="business-emoji">{business.emoji || '🏢'}</span>
-                          <div className="business-info">
-                            <p className="business-name">{business.name}</p>
-                            <p className="business-type">{business.business_type}</p>
-                            <p className="business-location">{business.location}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="application-actions">
-                    <button
-                      className="btn-approve"
-                      onClick={() => handleApproveClick(app)}
-                    >
-                      ✓ Approve
-                    </button>
-                    <button
-                      className="btn-reject"
-                      onClick={() => handleRejectClick(app)}
-                    >
-                      ✗ Reject
-                    </button>
-                  </div>
+        {/* Recent Activity and Pending Verifications Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent Users */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-white rounded-2xl shadow-lg overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-semibold text-gray-900">Recent Users</h3>
                 </div>
-              ))}
+                <button
+                  onClick={() => navigate("/admin/users")}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                >
+                  View All <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="empty-state">
-              <div className="empty-icon">📋</div>
-              <h3>No Pending Applications</h3>
-              <p>There are no business owner applications to review.</p>
+            <div className="divide-y divide-gray-100">
+              {loadingRecent ? (
+                <div className="p-8 text-center">
+                  <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto" />
+                </div>
+              ) : recentUsers.length > 0 ? (
+                recentUsers.map((user) => (
+                  <div key={user.id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{user.name}</p>
+                        <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-xs px-2 py-1 rounded-full ${getRoleBadgeColor(user.role)}`}>
+                          {user.role}
+                        </span>
+                        <p className="text-xs text-gray-400 mt-1">{user.joined}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  No recent users
+                </div>
+              )}
             </div>
-          )}
+          </motion.div>
+
+          {/* Recent Businesses */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.6 }}
+            className="bg-white rounded-2xl shadow-lg overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Store className="w-5 h-5 text-purple-600" />
+                  <h3 className="font-semibold text-gray-900">Recent Businesses</h3>
+                </div>
+                <button
+                  onClick={() => navigate("/admin/businesses")}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                >
+                  View All <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {recentBusinesses.length > 0 ? (
+                recentBusinesses.map((business) => (
+                  <div key={business.id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center text-2xl">
+                        {business.emoji}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{business.name}</p>
+                        <p className="text-sm text-gray-500 truncate">by {business.owner}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-xs px-2 py-1 rounded-full ${getStatusBadgeColor(business.status)}`}>
+                          {business.status}
+                        </span>
+                        <p className="text-xs text-gray-400 mt-1">{business.joined}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  No recent businesses
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Recent Activities */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.7 }}
+            className="bg-white rounded-2xl shadow-lg overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-green-600" />
+                <h3 className="font-semibold text-gray-900">Recent Activities</h3>
+              </div>
+            </div>
+            <div className="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
+              {recentActivities.length > 0 ? (
+                recentActivities.map((activity) => (
+                  <div key={activity.id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                        <Bell className="w-4 h-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-800">{activity.action}</p>
+                        <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
+                      </div>
+                      {!activity.isRead && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  No recent activities
+                </div>
+              )}
+            </div>
+          </motion.div>
         </div>
 
-        {/* Recent Business Owners Section */}
-        <div className="dashboard-section">
-          <div className="section-header">
-            <h2 className="section-title">Recent Business Owners</h2>
-            {stats.totalOwners > 0 && (
-              <Link to="/admin/users?tab=owners" className="view-all-link">
-                View All ({stats.totalOwners})
-              </Link>
-            )}
-          </div>
-          
-          {recentOwners.length > 0 ? (
-            <div className="recent-owners-grid">
-              {recentOwners.map((owner) => (
-                <div key={owner.id} className="recent-owner-card">
-                  <div className="recent-owner-header">
-                    <div className="recent-owner-avatar">
-                      {owner.avatarUrl ? (
-                        <img src={owner.avatarUrl} alt={owner.first_name} />
-                      ) : (
-                        <div className="avatar-placeholder-small">
-                          {getInitials(owner.first_name, owner.last_name)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="recent-owner-info">
-                      <h4>{owner.first_name} {owner.last_name}</h4>
-                      <p>{owner.email}</p>
-                    </div>
-                  </div>
-                  <div className="recent-owner-business">
-                    {owner.businesses && owner.businesses.length > 0 ? (
-                      <span className="business-badge">
-                        {owner.businesses[0].emoji} {owner.businesses[0].name}
-                      </span>
-                    ) : (
-                      <span className="no-business">No business yet</span>
-                    )}
-                  </div>
-                  <div className="recent-owner-footer">
-                    <span className="joined-date">
-                      Joined {formatDate(owner.created_at)}
-                    </span>
-                  </div>
+        {/* Pending Verifications Section */}
+        {pendingVerifications.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="bg-white rounded-2xl shadow-lg overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-yellow-50 to-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-yellow-600" />
+                  <h3 className="font-semibold text-gray-900">Pending Business Verifications</h3>
+                  <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full">
+                    {pendingVerifications.length}
+                  </span>
                 </div>
-              ))}
+                <button
+                  onClick={() => navigate("/admin/businesses")}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  View All
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="empty-state">
-              <div className="empty-icon">👥</div>
-              <h3>No Business Owners</h3>
-              <p>There are no registered business owners yet.</p>
+            <div className="divide-y divide-gray-100">
+              {loadingVerifications ? (
+                <div className="p-8 text-center">
+                  <div className="w-8 h-8 border-2 border-yellow-200 border-t-yellow-600 rounded-full animate-spin mx-auto" />
+                </div>
+              ) : (
+                pendingVerifications.map((business) => (
+                  <div key={business.id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-100 to-orange-100 flex items-center justify-center text-2xl">
+                          {business.emoji}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">{business.name}</p>
+                          <p className="text-sm text-gray-500">{business.owner} • {business.type}</p>
+                          <p className="text-xs text-gray-400 mt-1">Requested {business.requested}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleVerifyBusiness(business.id)}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm font-medium"
+                        >
+                          <Check className="w-4 h-4" />
+                          Verify
+                        </button>
+                        <button
+                          onClick={() => handleRejectBusiness(business.id)}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm font-medium"
+                        >
+                          <X className="w-4 h-4" />
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-          )}
-        </div>
+          </motion.div>
+        )}
+
+        {/* Quick Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="grid grid-cols-1 md:grid-cols-4 gap-4 pb-8"
+        >
+          <button
+            onClick={() => navigate("/admin/users")}
+            className="group p-4 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all text-left border border-gray-100"
+          >
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-blue-600 transition-colors">
+              <Users className="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" />
+            </div>
+            <h4 className="font-semibold text-gray-900">Manage Users</h4>
+            <p className="text-sm text-gray-500 mt-1">View, edit, and manage user accounts</p>
+          </button>
+
+          <button
+            onClick={() => navigate("/admin/businesses")}
+            className="group p-4 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all text-left border border-gray-100"
+          >
+            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-purple-600 transition-colors">
+              <Store className="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" />
+            </div>
+            <h4 className="font-semibold text-gray-900">Manage Businesses</h4>
+            <p className="text-sm text-gray-500 mt-1">Review and verify business applications</p>
+          </button>
+
+          <button
+            onClick={() => navigate("/admin/settings")}
+            className="group p-4 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all text-left border border-gray-100"
+          >
+            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-gray-600 transition-colors">
+              <Settings className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors" />
+            </div>
+            <h4 className="font-semibold text-gray-900">Platform Settings</h4>
+            <p className="text-sm text-gray-500 mt-1">Configure system settings and preferences</p>
+          </button>
+
+          <button
+            onClick={() => window.location.reload()}
+            className="group p-4 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all text-left border border-gray-100"
+          >
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-green-600 transition-colors">
+              <RefreshCw className="w-5 h-5 text-green-600 group-hover:text-white transition-colors" />
+            </div>
+            <h4 className="font-semibold text-gray-900">Refresh Data</h4>
+            <p className="text-sm text-gray-500 mt-1">Update dashboard with latest information</p>
+          </button>
+        </motion.div>
       </div>
-
-      {/* Rejection Modal */}
-      <RejectionModal
-        isOpen={showRejectionModal}
-        onClose={() => {
-          setShowRejectionModal(false);
-          setSelectedApplication(null);
-        }}
-        onConfirm={handleRejectOwner}
-        ownerName={selectedApplication ? `${selectedApplication.first_name} ${selectedApplication.last_name}` : ''}
-        businessName={selectedApplication?.businesses?.[0]?.name || ''}
-      />
     </AdminSidebarNav>
   );
 };

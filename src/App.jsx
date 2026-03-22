@@ -5,6 +5,7 @@ import {
   isSupabaseConfigured,
   testSupabaseConnection,
 } from "./lib/supabase";
+import { DarkModeProvider } from "./contexts/DarkModeContext";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -18,8 +19,9 @@ import Browse from "./pages/Browse";
 import BusinessReviews from "./pages/BusinessReviews";
 import LandingPage from "./pages/LandingPage";
 import About from "./pages/About";
-import Contact from "./pages/Contact"; // ✅ ADD THIS IMPORT
+import Contact from "./pages/Contact";
 import Profile from "./pages/Profile";
+import OwnerProfile from "./pages/OwnerProfile"; // Add this import
 import Notifications from "./pages/Notifications";
 import OwnerMemberManagement from "./pages/OwnerMemberManagement";
 import AdminUserManagement from "./pages/AdminUserManagement";
@@ -32,7 +34,7 @@ import "./App.css";
 
 function App() {
   const [session, setSession] = useState(null);
-  const [userRole, setUserRole] = useState(null);
+  const [userRole, setUserRole] = useState(undefined);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
   const [initialRedirectDone, setInitialRedirectDone] = useState(false);
@@ -61,7 +63,6 @@ function App() {
       try {
         console.log("🔍 Initializing auth...");
 
-        // Test Supabase connection first
         const isConnected = await testSupabaseConnection();
         if (!isConnected) {
           console.error("❌ Cannot connect to Supabase");
@@ -71,7 +72,6 @@ function App() {
           return;
         }
 
-        // Get actual session from Supabase
         const {
           data: { session },
           error,
@@ -86,13 +86,9 @@ function App() {
           return;
         }
 
-        console.log(
-          "📦 Initial session:",
-          session?.user?.email || "No session",
-        );
+        console.log("📦 Initial session:", session?.user?.email || "No session");
 
         if (session?.user) {
-          // Validate that the session is still valid
           const { data: userData, error: userError } =
             await supabase.auth.getUser();
 
@@ -112,6 +108,7 @@ function App() {
           console.log("👤 No valid session");
           localStorage.removeItem("sb-session");
           setSession(null);
+          setUserRole(undefined);
           setLoading(false);
           setAuthChecked(true);
         }
@@ -129,12 +126,7 @@ function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(
-        "🔄 Auth state changed - event:",
-        event,
-        "email:",
-        session?.user?.email,
-      );
+      console.log("🔄 Auth state changed - event:", event, "email:", session?.user?.email);
 
       setSession(session);
 
@@ -144,11 +136,13 @@ function App() {
         setInitialRedirectDone(false);
         setAuthError(null);
         setLoading(true);
+        setUserRole(undefined);
         try {
           await fetchUserRole(session.user.id);
         } catch (error) {
           console.error("Error in sign in flow:", error);
           setLoading(false);
+          setAuthChecked(true);
         }
       } else if (event === "TOKEN_REFRESHED") {
         console.log("🔄 Token refreshed");
@@ -163,7 +157,7 @@ function App() {
       } else if (event === "SIGNED_OUT") {
         console.log("👤 User signed out");
         localStorage.removeItem("sb-session");
-        setUserRole(null);
+        setUserRole(undefined);
         setSession(null);
         setAuthError(null);
         setLoading(false);
@@ -172,7 +166,6 @@ function App() {
         navigationInProgress.current = false;
         fetchRetryCount.current = 0;
 
-        // Navigate to home page on sign out
         navigate("/", { replace: true });
       } else if (event === "USER_UPDATED") {
         console.log("👤 User updated");
@@ -195,7 +188,7 @@ function App() {
       console.log("🔍 Fetching role for user ID:", userId);
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Fetch timeout")), 5000),
+        setTimeout(() => reject(new Error("Fetch timeout")), 5000)
       );
 
       const fetchPromise = supabase
@@ -204,20 +197,18 @@ function App() {
         .eq("id", userId)
         .maybeSingle();
 
-      const { data, error } = await Promise.race([
-        fetchPromise,
-        timeoutPromise,
-      ]);
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error) {
         console.error("❌ Error fetching user role:", error);
-        // If we get a permission error, maybe the session is invalid
         if (error.code === "PGRST301" || error.message?.includes("JWT")) {
           console.log("❌ JWT error - session may be invalid");
           localStorage.removeItem("sb-session");
           setSession(null);
+          setUserRole(undefined);
+        } else {
+          setUserRole("client");
         }
-        setUserRole("client");
         setAuthError("Error loading user profile");
         setLoading(false);
         setAuthChecked(true);
@@ -225,7 +216,6 @@ function App() {
       }
 
       if (data) {
-        console.log("📊 Full profile data:", data);
         console.log("✅ User role from database:", data?.role);
         setUserRole(data?.role || "client");
         setAuthError(null);
@@ -240,45 +230,48 @@ function App() {
 
       if (fetchRetryCount.current < 2) {
         fetchRetryCount.current++;
-        console.log(
-          `🔄 Retrying fetchUserRole (attempt ${fetchRetryCount.current + 1}/3)...`,
-        );
+        console.log(`🔄 Retrying fetchUserRole (attempt ${fetchRetryCount.current + 1}/3)...`);
         setTimeout(() => {
           fetchUserRole(userId);
-        }, 1000 * fetchRetryCount.current);
+        }, 1000);
         return;
       }
     } finally {
-      console.log("✅ Setting loading to false");
+      console.log("✅ Role fetch complete");
       setLoading(false);
       setAuthChecked(true);
     }
   };
 
-  // Handle initial redirect - ONLY when logged in with valid session
+  // Timeout to prevent infinite loading
   useEffect(() => {
-    // Don't redirect if still loading or auth not checked
+    const timeout = setTimeout(() => {
+      if (loading && !authChecked) {
+        console.log("⚠️ Loading timeout - forcing completion");
+        setAuthChecked(true);
+        setLoading(false);
+        setUserRole("client");
+      }
+    }, 8000);
+
+    return () => clearTimeout(timeout);
+  }, [loading, authChecked]);
+
+  // Handle initial redirect
+  useEffect(() => {
     if (loading || !authChecked) {
-      console.log(
-        "⏳ Still loading or auth not checked, waiting before redirect check...",
-      );
       return;
     }
 
-    // Don't redirect if no session (not logged in)
     if (!session) {
-      console.log("⏳ No session, staying on current page");
       return;
     }
 
-    // Don't redirect if no role yet
-    if (!userRole) {
-      console.log("⏳ No role yet, waiting...");
+    if (userRole === undefined) {
       return;
     }
 
     if (navigationInProgress.current || initialRedirectDone) {
-      console.log("🚫 Navigation already in progress or done, skipping");
       return;
     }
 
@@ -291,10 +284,9 @@ function App() {
       "/register",
       "/forgot-password",
       "/about",
-      "/contact", // ✅ ADDED CONTACT TO PUBLIC PATHS
+      "/contact",
     ];
 
-    // Only redirect if on a public path AND logged in with valid session
     if (publicPaths.includes(currentPath)) {
       navigationInProgress.current = true;
       let destination;
@@ -315,7 +307,7 @@ function App() {
     } else {
       setInitialRedirectDone(true);
     }
-  }, [loading, session, userRole, navigate, initialRedirectDone, authChecked]);
+  }, [loading, authChecked, session, userRole, navigate, initialRedirectDone]);
 
   // Debug logging
   useEffect(() => {
@@ -330,21 +322,11 @@ function App() {
     });
   }, [loading, authChecked, session, userRole, initialRedirectDone, authError]);
 
-  // Don't render anything until auth is checked
-  if (!authChecked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="loading-spinner mx-auto"></div>
-          <p className="mt-4">Loading application...</p>
-        </div>
-      </div>
-    );
-  }
+  const isLoading = !authChecked || (session && userRole === undefined) || loading;
 
   if (configError) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500 text-white">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500 text-white select-none">
         <h1 className="text-3xl font-bold mb-4">Configuration Error</h1>
         <p className="mb-4">
           Supabase is not configured properly. Please check your environment
@@ -360,6 +342,17 @@ function App() {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center select-none">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     console.log(
       "🛡️ ProtectedRoute - Session:",
@@ -368,8 +361,6 @@ function App() {
       userRole,
       "AuthChecked:",
       authChecked,
-      "Path:",
-      window.location.pathname,
     );
 
     if (!session) {
@@ -377,15 +368,8 @@ function App() {
       return <Navigate to="/login" replace />;
     }
 
-    if (userRole === null) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="loading-spinner mx-auto"></div>
-            <p className="mt-4">Loading your profile...</p>
-          </div>
-        </div>
-      );
+    if (userRole === undefined) {
+      return null;
     }
 
     if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
@@ -405,172 +389,189 @@ function App() {
     return children;
   };
 
+  // Dynamic Profile Component - redirects based on role
+  const DynamicProfile = () => {
+    if (userRole === "owner") {
+      return <Navigate to="/owner-profile" replace />;
+    }
+    return <Profile />;
+  };
+
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/about" element={<About />} />
-      <Route path="/contact" element={<Contact />} /> {/* ✅ ADDED CONTACT ROUTE */}
+    <DarkModeProvider>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
 
-      {/* Client Routes */}
-      <Route
-        path="/ClientDashboard"
-        element={
-          <ProtectedRoute allowedRoles={["client"]}>
-            <ClientDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/browse"
-        element={
-          <ProtectedRoute allowedRoles={["client"]}>
-            <Browse />
-          </ProtectedRoute>
-        }
-      />
-      {/* Business Reviews Route */}
-      <Route
-        path="/business-reviews/:businessId"
-        element={
-          <ProtectedRoute allowedRoles={["client"]}>
-            <BusinessReviews />
-          </ProtectedRoute>
-        }
-      />
+        {/* Client Routes */}
+        <Route
+          path="/ClientDashboard"
+          element={
+            <ProtectedRoute allowedRoles={["client"]}>
+              <ClientDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/browse"
+          element={
+            <ProtectedRoute allowedRoles={["client"]}>
+              <Browse />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/business-reviews/:businessId"
+          element={
+            <ProtectedRoute allowedRoles={["client"]}>
+              <BusinessReviews />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Owner Routes */}
-      <Route
-        path="/owner-dashboard"
-        element={
-          <ProtectedRoute allowedRoles={["owner"]}>
-            <OwnerDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/my-business"
-        element={
-          <ProtectedRoute allowedRoles={["owner"]}>
-            <MyBusinessPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/applications"
-        element={
-          <ProtectedRoute allowedRoles={["owner"]}>
-            <Applications />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/members"
-        element={
-          <ProtectedRoute allowedRoles={["owner"]}>
-            <OwnerMemberManagement />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/analytics"
-        element={
-          <ProtectedRoute allowedRoles={["owner"]}>
-            <Analytics />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/owner-notifications"
-        element={
-          <ProtectedRoute allowedRoles={["owner"]}>
-            <OwnerNotifications />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/owner-settings"
-        element={
-          <ProtectedRoute allowedRoles={["owner"]}>
-            <OwnerSettings />
-          </ProtectedRoute>
-        }
-      />
-      
-      {/* Admin Routes */}
-      <Route
-        path="/admin-dashboard"
-        element={
-          <ProtectedRoute allowedRoles={["admin"]}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/users"
-        element={
-          <ProtectedRoute allowedRoles={["admin"]}>
-            <AdminUserManagement />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/businesses"
-        element={
-          <ProtectedRoute allowedRoles={["admin"]}>
-            <AdminBusinessManagement />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/settings"
-        element={
-          <ProtectedRoute allowedRoles={["admin"]}>
-            <AdminSettings />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/profile"
-        element={
-          <ProtectedRoute allowedRoles={["admin"]}>
-            <AdminProfile />
-          </ProtectedRoute>
-        }
-      />
+        {/* Owner Routes */}
+        <Route
+          path="/owner-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["owner"]}>
+              <OwnerDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/owner-profile"
+          element={
+            <ProtectedRoute allowedRoles={["owner"]}>
+              <OwnerProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-business"
+          element={
+            <ProtectedRoute allowedRoles={["owner"]}>
+              <MyBusinessPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/applications"
+          element={
+            <ProtectedRoute allowedRoles={["owner"]}>
+              <Applications />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/members"
+          element={
+            <ProtectedRoute allowedRoles={["owner"]}>
+              <OwnerMemberManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute allowedRoles={["owner"]}>
+              <Analytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/owner-notifications"
+          element={
+            <ProtectedRoute allowedRoles={["owner"]}>
+              <OwnerNotifications />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/owner-settings"
+          element={
+            <ProtectedRoute allowedRoles={["owner"]}>
+              <OwnerSettings />
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* Admin Routes */}
+        <Route
+          path="/admin-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminUserManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/businesses"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminBusinessManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/profile"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminProfile />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Shared Protected Routes */}
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute allowedRoles={["owner", "client"]}>
-            <Profile />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/notifications"
-        element={
-          <ProtectedRoute allowedRoles={["owner", "client", "admin"]}>
-            <Notifications />
-          </ProtectedRoute>
-        }
-      />
+        {/* Shared Protected Routes */}
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "client"]}>
+              <DynamicProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "client", "admin"]}>
+              <Notifications />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Redirects */}
-      <Route
-        path="/dashboard"
-        element={<Navigate to="/ClientDashboard" replace />}
-      />
-      <Route
-        path="/client-dashboard"
-        element={<Navigate to="/ClientDashboard" replace />}
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Redirects */}
+        <Route
+          path="/dashboard"
+          element={<Navigate to="/ClientDashboard" replace />}
+        />
+        <Route
+          path="/client-dashboard"
+          element={<Navigate to="/ClientDashboard" replace />}
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </DarkModeProvider>
   );
 }
 

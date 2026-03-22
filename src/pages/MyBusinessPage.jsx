@@ -1,32 +1,77 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import OwnerNavbar from "../components/owner/OwnerNavbar";
-import "../styles/MyBusinessPage.css";
+import { toast, Toaster } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Save, X, Edit2, Eye, Star, Clock, MapPin, Phone, Mail, 
+  Globe, CreditCard, Image, FileText, Users, Award, 
+  AlertCircle, CheckCircle, Loader, ChevronRight, ChevronLeft,
+  Plus, Trash2, ToggleLeft, ToggleRight, Upload, QrCode,
+  Calendar, Building, Info, Shield, AlertTriangle
+} from 'lucide-react';
+
+// Lazy load heavy components
+const MembershipPlansManager = lazy(() => import('../components/owner/MembershipPlansManager'));
+const ReviewsManager = lazy(() => import('../components/owner/ReviewsManager'));
+const BusinessPreview = lazy(() => import('../components/owner/BusinessPreview'));
+
+// Custom hooks
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+};
+
+const useLocalStorage = (key, initialValue) => {
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+  const setValue = (value) => {
+    try {
+      setStoredValue(value);
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+    }
+  };
+  return [storedValue, setValue];
+};
 
 const MyBusinessPage = () => {
   const navigate = useNavigate();
   const [business, setBusiness] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({});
   const [activeTab, setActiveTab] = useState("basic");
   const [profile, setProfile] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [draftSaved, setDraftSaved] = useLocalStorage('business_draft', null);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [showVerifiedMessage, setShowVerifiedMessage] = useState(false);
 
   // Validation states
   const [touchedFields, setTouchedFields] = useState({});
-  const [focusedField, setFocusedField] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [validationProgress, setValidationProgress] = useState(0);
 
-  // GCash QR Code state
-  const [gcashQrCode, setGcashQrCode] = useState(null);
-  const [gcashQrUrl, setGcashQrUrl] = useState("");
+  // Upload states
+  const [uploadProgress, setUploadProgress] = useState({});
   const [uploadingQr, setUploadingQr] = useState(false);
   const [gcashNumber, setGcashNumber] = useState("");
+  const [gcashQrCode, setGcashQrCode] = useState(null);
+  const [gcashQrUrl, setGcashQrUrl] = useState("");
 
   // Business Permit state
   const [permitFile, setPermitFile] = useState(null);
@@ -35,485 +80,53 @@ const MyBusinessPage = () => {
   const [permitNumber, setPermitNumber] = useState("");
   const [permitExpiry, setPermitExpiry] = useState("");
 
-  // Membership plans state
-  const [membershipPlans, setMembershipPlans] = useState([]);
-  const [editingPlan, setEditingPlan] = useState(null);
-  const [showPlanForm, setShowPlanForm] = useState(false);
-  const [planFormData, setPlanFormData] = useState({
-    name: "",
-    price: 0,
-    duration: "month",
-    features: [""],
-    is_active: true,
-  });
+  // UI states
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
+  const [analytics, setAnalytics] = useState(null);
 
-  // Reviews & Ratings State
-  const [reviews, setReviews] = useState([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [selectedReview, setSelectedReview] = useState(null);
-  const [showDeleteReviewModal, setShowDeleteReviewModal] = useState(false);
-  const [deletingReview, setDeletingReview] = useState(false);
-  const [ratingStats, setRatingStats] = useState({
-    average: 0,
-    total: 0,
-    distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-  });
-
-  // Business hours state with 12-hour format
+  // Business hours state with advanced features
   const [businessHours, setBusinessHours] = useState({
-    monday: {
-      open: "09:00",
-      close: "18:00",
-      closed: false,
-      openAMPM: "AM",
-      closeAMPM: "PM",
-    },
-    tuesday: {
-      open: "09:00",
-      close: "18:00",
-      closed: false,
-      openAMPM: "AM",
-      closeAMPM: "PM",
-    },
-    wednesday: {
-      open: "09:00",
-      close: "18:00",
-      closed: false,
-      openAMPM: "AM",
-      closeAMPM: "PM",
-    },
-    thursday: {
-      open: "09:00",
-      close: "18:00",
-      closed: false,
-      openAMPM: "AM",
-      closeAMPM: "PM",
-    },
-    friday: {
-      open: "09:00",
-      close: "18:00",
-      closed: false,
-      openAMPM: "AM",
-      closeAMPM: "PM",
-    },
-    saturday: {
-      open: "10:00",
-      close: "17:00",
-      closed: false,
-      openAMPM: "AM",
-      closeAMPM: "PM",
-    },
-    sunday: {
-      open: "10:00",
-      close: "15:00",
-      closed: true,
-      openAMPM: "AM",
-      closeAMPM: "PM",
-    },
+    monday: { open: "09:00", close: "18:00", closed: false, openAMPM: "AM", closeAMPM: "PM", breaks: [] },
+    tuesday: { open: "09:00", close: "18:00", closed: false, openAMPM: "AM", closeAMPM: "PM", breaks: [] },
+    wednesday: { open: "09:00", close: "18:00", closed: false, openAMPM: "AM", closeAMPM: "PM", breaks: [] },
+    thursday: { open: "09:00", close: "18:00", closed: false, openAMPM: "AM", closeAMPM: "PM", breaks: [] },
+    friday: { open: "09:00", close: "18:00", closed: false, openAMPM: "AM", closeAMPM: "PM", breaks: [] },
+    saturday: { open: "10:00", close: "17:00", closed: false, openAMPM: "AM", closeAMPM: "PM", breaks: [] },
+    sunday: { open: "10:00", close: "15:00", closed: true, openAMPM: "AM", closeAMPM: "PM", breaks: [] },
   });
 
-  // Business categories
+  // Enhanced categories with icons and metadata
   const businessCategories = [
-    { id: "gym", label: "Gym / Fitness Center", icon: "🏋️" },
-    { id: "cafe", label: "Cafe / Coffee Shop", icon: "☕" },
-    { id: "bakery", label: "Bakery / Pastry Shop", icon: "🥐" },
+    { id: "gym", label: "Gym / Fitness Center", icon: "🏋️", color: "from-green-500 to-emerald-500", description: "Health & Wellness" },
+    { id: "cafe", label: "Cafe / Coffee Shop", icon: "☕", color: "from-amber-500 to-orange-500", description: "Food & Beverage" },
+    { id: "bakery", label: "Bakery / Pastry Shop", icon: "🥐", color: "from-yellow-500 to-amber-500", description: "Food & Beverage" },
+    { id: "restaurant", label: "Restaurant", icon: "🍽️", color: "from-red-500 to-orange-500", description: "Food & Beverage" },
+    { id: "salon", label: "Salon / Spa", icon: "💇", color: "from-pink-500 to-rose-500", description: "Beauty & Wellness" },
+    { id: "retail", label: "Retail Store", icon: "🛍️", color: "from-blue-500 to-cyan-500", description: "Shopping" },
   ];
 
-  // Location options
   const locationOptions = [
-    { value: "Downtown", label: "Downtown" },
-    { value: "Arellano", label: "Arellano" },
-    { value: "Pantal", label: "Pantal" },
-    { value: "Perez", label: "Perez" },
-    { value: "PNR", label: "PNR" },
-    { value: "Bonuan", label: "Bonuan" },
-    { value: "AB Fernandez", label: "AB Fernandez" },
+    { value: "Downtown", label: "Downtown", coordinates: { lat: 16.0489, lng: 120.3364 }, popular: true },
+    { value: "Arellano", label: "Arellano", coordinates: { lat: 16.0470, lng: 120.3370 }, popular: false },
+    { value: "Pantal", label: "Pantal", coordinates: { lat: 16.0500, lng: 120.3300 }, popular: false },
+    { value: "Perez", label: "Perez", coordinates: { lat: 16.0450, lng: 120.3350 }, popular: true },
+    { value: "PNR", label: "PNR", coordinates: { lat: 16.0420, lng: 120.3380 }, popular: false },
+    { value: "Bonuan", label: "Bonuan", coordinates: { lat: 16.0600, lng: 120.3400 }, popular: true },
+    { value: "AB Fernandez", label: "AB Fernandez", coordinates: { lat: 16.0440, lng: 120.3330 }, popular: false },
   ];
 
   const daysOfWeek = [
-    { id: "monday", label: "Monday" },
-    { id: "tuesday", label: "Tuesday" },
-    { id: "wednesday", label: "Wednesday" },
-    { id: "thursday", label: "Thursday" },
-    { id: "friday", label: "Friday" },
-    { id: "saturday", label: "Saturday" },
-    { id: "sunday", label: "Sunday" },
+    { id: "monday", label: "Monday", short: "Mon" },
+    { id: "tuesday", label: "Tuesday", short: "Tue" },
+    { id: "wednesday", label: "Wednesday", short: "Wed" },
+    { id: "thursday", label: "Thursday", short: "Thu" },
+    { id: "friday", label: "Friday", short: "Fri" },
+    { id: "saturday", label: "Saturday", short: "Sat" },
+    { id: "sunday", label: "Sunday", short: "Sun" },
   ];
 
-  useEffect(() => {
-    fetchUserProfile();
-    fetchBusiness();
-  }, []);
-
-  useEffect(() => {
-    if (business?.id) {
-      fetchMembershipPlans();
-      fetchReviews();
-      // Parse business hours if they exist
-      if (business.business_hours) {
-        setBusinessHours(business.business_hours);
-      }
-      // Load GCash QR code if exists
-      if (business.gcash_qr_code) {
-        setGcashQrCode(business.gcash_qr_code);
-        downloadGcashQrCode(business.gcash_qr_code);
-      }
-      if (business.gcash_number) {
-        setGcashNumber(business.gcash_number);
-      }
-      // Set permit data if exists
-      if (business.permit_number) {
-        setPermitNumber(business.permit_number);
-      }
-      if (business.permit_expiry) {
-        setPermitExpiry(business.permit_expiry);
-      }
-    }
-  }, [business]);
-
-  // Clean up preview URL
-  useEffect(() => {
-    return () => {
-      if (permitPreview) {
-        URL.revokeObjectURL(permitPreview);
-      }
-    };
-  }, [permitPreview]);
-
-  // Validate fields when formData changes
-  useEffect(() => {
-    if (editMode) {
-      validateField("name");
-      validateField("business_type");
-      validateField("short_description");
-      validateField("location");
-      validateField("address");
-      validateField("price");
-      validateField("contact_phone");
-      validateField("contact_email");
-      validateField("website");
-      validateField("gcash_number");
-    }
-  }, [formData, editMode]);
-
-  const validateField = (fieldName) => {
-    let errorMessage = "";
-
-    switch (fieldName) {
-      case "name":
-        if (!formData.name?.trim()) {
-          errorMessage = "Business name is required";
-        }
-        break;
-      case "business_type":
-        if (!formData.business_type) {
-          errorMessage = "Please select a business category";
-        }
-        break;
-      case "short_description":
-        if (formData.short_description?.length > 200) {
-          errorMessage = "Short description must be less than 200 characters";
-        }
-        break;
-      case "location":
-        if (!formData.location) {
-          errorMessage = "Please select a location";
-        }
-        break;
-      case "address":
-        if (!formData.address?.trim()) {
-          errorMessage = "Address is required";
-        }
-        break;
-      case "price":
-        if (formData.price < 0) {
-          errorMessage = "Price cannot be negative";
-        }
-        break;
-      case "contact_phone":
-        if (
-          formData.contact_phone &&
-          !/^(\+63|0)[0-9]{10}$/.test(formData.contact_phone.replace(/\s/g, ""))
-        ) {
-          errorMessage = "Invalid phone number format";
-        }
-        break;
-      case "contact_email":
-        if (
-          formData.contact_email &&
-          !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(
-            formData.contact_email,
-          )
-        ) {
-          errorMessage = "Invalid email format";
-        }
-        break;
-      case "website":
-        if (
-          formData.website &&
-          !/^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(
-            formData.website,
-          )
-        ) {
-          errorMessage = "Invalid website URL";
-        }
-        break;
-      case "gcash_number":
-        if (
-          formData.gcash_number &&
-          !/^09\d{9}$/.test(formData.gcash_number.replace(/\s/g, ""))
-        ) {
-          errorMessage = "GCash number must be 11 digits starting with 09";
-        }
-        break;
-      default:
-        break;
-    }
-
-    setFieldErrors((prev) => ({
-      ...prev,
-      [fieldName]: errorMessage,
-    }));
-
-    return !errorMessage;
-  };
-
-  const fetchUserProfile = async () => {
-    try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) throw userError;
-
-      if (!user) {
-        navigate("/login");
-        return;
-      }
-
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      setProfile(profileData);
-
-      if (profileData?.avatar_url) {
-        downloadAvatar(profileData.avatar_url);
-      }
-    } catch (err) {
-      console.error("Error fetching profile:", err);
-    }
-  };
-
-  const downloadAvatar = async (path) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from("avatars")
-        .download(path);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      setAvatarUrl(url);
-    } catch (error) {
-      console.error("Error downloading avatar:", error);
-    }
-  };
-
-  const downloadGcashQrCode = async (path) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from("gcash-qr-codes")
-        .download(path);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      setGcashQrUrl(url);
-    } catch (error) {
-      console.error("Error downloading GCash QR code:", error);
-    }
-  };
-
-  const fetchBusiness = async () => {
-    try {
-      setLoading(true);
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) throw userError;
-
-      if (!user) {
-        navigate("/login");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("businesses")
-        .select("*")
-        .eq("owner_id", user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        setBusiness(data);
-        setFormData(data);
-      } else {
-        setBusiness(null);
-        setFormData({
-          name: profile?.business_name || "",
-          owner_name:
-            profile?.first_name && profile?.last_name
-              ? `${profile.first_name} ${profile.last_name}`.trim()
-              : "",
-          business_type: profile?.business_category || "",
-          description: "",
-          short_description: "",
-          location: "Downtown",
-          address: "",
-          city: "Dagupan",
-          province: "Pangasinan",
-          price: 0,
-          price_unit: "month",
-          emoji: getEmojiForCategory(profile?.business_category) || "🏢",
-          contact_phone: profile?.mobile || "",
-          contact_email: profile?.email || "",
-          website: "",
-          status: "active",
-          members_count: 0,
-          rating: 0,
-          gcash_number: "",
-          gcash_qr_code: null,
-        });
-        setEditMode(true);
-      }
-    } catch (err) {
-      console.error("Error fetching business:", err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMembershipPlans = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("membership_plans")
-        .select("*")
-        .eq("business_id", business.id)
-        .order("price", { ascending: true });
-
-      if (error) throw error;
-
-      setMembershipPlans(data || []);
-    } catch (err) {
-      console.error("Error fetching membership plans:", err);
-    }
-  };
-
-  const fetchReviews = async () => {
-    if (!business?.id) return;
-
-    try {
-      setReviewsLoading(true);
-      const { data, error } = await supabase
-        .from("reviews")
-        .select(
-          `
-          *,
-          profiles:user_id (
-            first_name,
-            last_name,
-            avatar_url
-          )
-        `,
-        )
-        .eq("business_id", business.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      setReviews(data || []);
-
-      if (data && data.length > 0) {
-        const total = data.length;
-        const sum = data.reduce((acc, review) => acc + review.rating, 0);
-        const average = sum / total;
-
-        const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-        data.forEach((review) => {
-          distribution[review.rating]++;
-        });
-
-        setRatingStats({
-          average,
-          total,
-          distribution,
-        });
-      } else {
-        setRatingStats({
-          average: 0,
-          total: 0,
-          distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching reviews:", error);
-    } finally {
-      setReviewsLoading(false);
-    }
-  };
-
-  const handleDeleteReview = async () => {
-    if (!selectedReview) return;
-
-    try {
-      setDeletingReview(true);
-
-      const { error } = await supabase
-        .from("reviews")
-        .delete()
-        .eq("id", selectedReview.id);
-
-      if (error) throw error;
-
-      await fetchReviews();
-
-      setShowDeleteReviewModal(false);
-      setSelectedReview(null);
-      setSuccessMessage("Review deleted successfully!");
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error) {
-      console.error("Error deleting review:", error);
-      setError("Failed to delete review. Please try again.");
-    } finally {
-      setDeletingReview(false);
-    }
-  };
-
-  const getEmojiForCategory = (category) => {
-    switch (category) {
-      case "gym":
-        return "🏋️";
-      case "cafe":
-        return "☕";
-      case "bakery":
-        return "🥐";
-      default:
-        return "🏢";
-    }
-  };
-
-  // Convert 24h to 12h format
+  // Helper functions
   const convertTo12Hour = (time24) => {
     if (!time24) return { time: "09:00", ampm: "AM" };
     const [hours, minutes] = time24.split(":");
@@ -523,7 +136,6 @@ const MyBusinessPage = () => {
     return { time: `${h12.toString().padStart(2, "0")}:${minutes}`, ampm };
   };
 
-  // Convert 12h to 24h format
   const convertTo24Hour = (time12, ampm) => {
     if (!time12) return "09:00";
     const [hours, minutes] = time12.split(":");
@@ -533,33 +145,8 @@ const MyBusinessPage = () => {
     return `${h.toString().padStart(2, "0")}:${minutes}`;
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-
-    if (name === "contact_phone" || name === "gcash_number") {
-      const numericValue = value.replace(/\D/g, "");
-      setFormData((prev) => ({
-        ...prev,
-        [name]: numericValue,
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
-  };
-
-  const handleNumberChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: parseFloat(value) || 0,
-    }));
-  };
-
   const handleBusinessHourChange = (day, field, value) => {
-    setBusinessHours((prev) => ({
+    setBusinessHours(prev => ({
       ...prev,
       [day]: {
         ...prev[day],
@@ -571,133 +158,201 @@ const MyBusinessPage = () => {
   const handleTimeChange = (day, type, value) => {
     const current = businessHours[day];
     if (type === "openTime") {
-      handleBusinessHourChange(
-        day,
-        "open",
-        convertTo24Hour(value, current.openAMPM),
-      );
+      handleBusinessHourChange(day, "open", convertTo24Hour(value, current.openAMPM));
     } else if (type === "closeTime") {
-      handleBusinessHourChange(
-        day,
-        "close",
-        convertTo24Hour(value, current.closeAMPM),
-      );
+      handleBusinessHourChange(day, "close", convertTo24Hour(value, current.closeAMPM));
     } else {
       handleBusinessHourChange(day, type, value);
     }
   };
 
-  const handleBlur = (fieldName) => {
-    setFocusedField(null);
-    setTouchedFields((prev) => ({ ...prev, [fieldName]: true }));
-    validateField(fieldName);
+  // Debounced form data for auto-save
+  const debouncedFormData = useDebounce(formData, 3000);
+
+  // Auto-save effect
+  useEffect(() => {
+    if (autoSaveEnabled && editMode && debouncedFormData && Object.keys(debouncedFormData).length > 0) {
+      const saveDraft = async () => {
+        try {
+          setDraftSaved({
+            ...debouncedFormData,
+            lastSaved: new Date().toISOString(),
+            businessHours,
+          });
+          toast.success('Draft auto-saved', { icon: '💾', duration: 2000 });
+        } catch (error) {
+          console.error('Auto-save failed:', error);
+        }
+      };
+      saveDraft();
+    }
+  }, [debouncedFormData, businessHours, editMode, autoSaveEnabled]);
+
+  // Fetch business data
+  const fetchBusiness = async () => {
+    try {
+      setLoading(true);
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) { navigate("/login"); return; }
+      
+      const { data, error } = await supabase.from("businesses").select("*").eq("owner_id", user.id).maybeSingle();
+      if (error) throw error;
+      
+      if (data) {
+        setBusiness(data);
+        setFormData(data);
+        if (data.gcash_number) setGcashNumber(data.gcash_number);
+        if (data.gcash_qr_code) {
+          setGcashQrCode(data.gcash_qr_code);
+          const { data: urlData } = supabase.storage
+            .from("gcash-qr-codes")
+            .getPublicUrl(data.gcash_qr_code);
+          setGcashQrUrl(urlData.publicUrl);
+        }
+        if (data.permit_number) setPermitNumber(data.permit_number || "");
+        if (data.permit_expiry) setPermitExpiry(data.permit_expiry || "");
+        
+        // Show verified message for 3 seconds if newly verified
+        if (data.permit_verified === true && !showVerifiedMessage) {
+          setShowVerifiedMessage(true);
+          setTimeout(() => {
+            setShowVerifiedMessage(false);
+          }, 3000);
+        }
+      } else {
+        setBusiness(null);
+        setFormData({
+          name: profile?.business_name || "",
+          owner_name: profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}`.trim() : "",
+          business_type: profile?.business_category || "",
+          description: "",
+          short_description: "",
+          location: "Downtown",
+          address: "",
+          city: "Dagupan",
+          province: "Pangasinan",
+          price: 0,
+          price_unit: "month",
+          emoji: businessCategories.find(c => c.id === profile?.business_category)?.icon || "🏢",
+          contact_phone: profile?.mobile || "",
+          contact_email: profile?.email || "",
+          website: "",
+          status: "active",
+        });
+        setEditMode(true);
+      }
+    } catch (err) {
+      console.error("Error fetching business:", err);
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Fetch user profile
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) { navigate("/login"); return; }
+      
+      const { data: profileData, error: profileError } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      if (profileError) throw profileError;
+      setProfile(profileData);
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserProfile();
+    fetchBusiness();
+  }, []);
+
+  // Simplified image upload
   const handleGcashQrUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setError("Please upload an image file");
+      toast.error('Please upload an image file');
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      setError("File size must be less than 2MB");
+      toast.error('File size must be less than 2MB');
       return;
     }
 
+    setUploadingQr(true);
+
     try {
-      setUploadingQr(true);
-      setError(null);
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
-
+      if (!user) {
+        toast.error('User not authenticated');
+        return;
+      }
+      
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/gcash-qr-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("gcash-qr-codes")
-        .upload(fileName, file);
-
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
       if (uploadError) throw uploadError;
-
+      
       const { data: urlData } = supabase.storage
         .from("gcash-qr-codes")
         .getPublicUrl(fileName);
-
+      
       setGcashQrCode(fileName);
       setGcashQrUrl(urlData.publicUrl);
-      setFormData((prev) => ({ ...prev, gcash_qr_code: fileName }));
-
-      setSuccessMessage("GCash QR code uploaded successfully!");
-      setTimeout(() => setSuccessMessage(""), 3000);
+      setFormData(prev => ({ 
+        ...prev, 
+        gcash_qr_code: fileName
+      }));
+      
+      toast.success('GCash QR code uploaded successfully!');
     } catch (err) {
       console.error("Error uploading GCash QR code:", err);
-      setError("Failed to upload QR code. Please try again.");
+      toast.error(err.message || 'Failed to upload QR code');
     } finally {
       setUploadingQr(false);
     }
   };
 
-  const removeGcashQr = async () => {
-    if (!gcashQrCode) return;
-    if (!window.confirm("Are you sure you want to remove the GCash QR code?"))
-      return;
-
-    try {
-      const { error } = await supabase.storage
-        .from("gcash-qr-codes")
-        .remove([gcashQrCode]);
-
-      if (error) throw error;
-
-      setGcashQrCode(null);
-      setGcashQrUrl("");
-      setFormData((prev) => ({ ...prev, gcash_qr_code: null }));
-      setSuccessMessage("GCash QR code removed successfully!");
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (err) {
-      console.error("Error removing GCash QR code:", err);
-      setError("Failed to remove QR code. Please try again.");
-    }
-  };
-
-  const uploadPermit = async () => {
+  // Business Permit upload
+  const handlePermitUpload = async () => {
     if (!permitFile) {
-      setError("Please select a permit file to upload");
+      toast.error('Please select a permit file');
       return;
     }
 
     if (!permitNumber.trim()) {
-      setError("Please enter permit number");
+      toast.error('Please enter permit number');
       return;
     }
 
     if (!permitExpiry) {
-      setError("Please select permit expiry date");
+      toast.error('Please select permit expiry date');
       return;
     }
 
     const expiryDate = new Date(permitExpiry);
-    const today = new Date();
-    if (expiryDate < today) {
-      setError("Permit expiry date must be in the future");
+    if (expiryDate < new Date()) {
+      toast.error('Permit expiry date must be in the future');
       return;
     }
 
     try {
       setUploadingPermit(true);
-      setError(null);
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
 
       const fileExt = permitFile.name.split(".").pop();
@@ -725,17 +380,15 @@ const MyBusinessPage = () => {
       if (updateError) throw updateError;
 
       await fetchBusiness();
-      setSuccessMessage(
-        "Permit uploaded successfully! Waiting for admin verification.",
-      );
-      setTimeout(() => setSuccessMessage(""), 3000);
+      toast.success('Permit uploaded successfully! Awaiting verification.');
+      
       setPermitFile(null);
       setPermitPreview(null);
       setPermitNumber("");
       setPermitExpiry("");
     } catch (err) {
       console.error("Error uploading permit:", err);
-      setError("Failed to upload permit. Please try again.");
+      toast.error('Failed to upload permit');
     } finally {
       setUploadingPermit(false);
     }
@@ -745,41 +398,29 @@ const MyBusinessPage = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "application/pdf",
-    ];
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "application/pdf"];
     if (!allowedTypes.includes(file.type)) {
-      setError("Please upload a JPG, PNG, or PDF file");
+      toast.error('Please upload a JPG, PNG, or PDF file');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setError("File size must be less than 5MB");
+      toast.error('File size must be less than 5MB');
       return;
     }
 
     setPermitFile(file);
-
-    if (permitPreview) {
-      URL.revokeObjectURL(permitPreview);
-    }
-
+    if (permitPreview) URL.revokeObjectURL(permitPreview);
     if (file.type.startsWith("image/")) {
       setPermitPreview(URL.createObjectURL(file));
     } else {
       setPermitPreview(null);
     }
-
-    setError(null);
   };
 
   const removePermit = async () => {
     if (!business?.permit_document) return;
-    if (!window.confirm("Are you sure you want to remove the permit document?"))
-      return;
+    if (!window.confirm("Remove permit document?")) return;
 
     try {
       const { error } = await supabase.storage
@@ -800,69 +441,103 @@ const MyBusinessPage = () => {
         .eq("id", business.id);
 
       await fetchBusiness();
-      setSuccessMessage("Permit removed successfully!");
-      setTimeout(() => setSuccessMessage(""), 3000);
+      toast.success("Permit removed successfully!");
     } catch (err) {
       console.error("Error removing permit:", err);
-      setError("Failed to remove permit. Please try again.");
+      toast.error("Failed to remove permit");
     }
   };
 
-  const validateForm = () => {
-    const fieldsToValidate = [
-      "name",
-      "business_type",
-      "location",
-      "address",
-      "price",
-    ];
-    let isValid = true;
+  // Validation
+  const validateField = useCallback((fieldName, value) => {
+    let errorMessage = "";
+    
+    switch (fieldName) {
+      case "name":
+        if (!value?.trim()) errorMessage = "Business name is required";
+        else if (value.length < 3) errorMessage = "Name must be at least 3 characters";
+        else if (value.length > 100) errorMessage = "Name must be less than 100 characters";
+        break;
+      case "business_type":
+        if (!value) errorMessage = "Please select a business category";
+        break;
+      case "short_description":
+        if (value?.length > 200) errorMessage = "Short description must be less than 200 characters";
+        break;
+      case "description":
+        if (value?.length > 5000) errorMessage = "Description must be less than 5000 characters";
+        break;
+      case "location":
+        if (!value) errorMessage = "Please select a location";
+        break;
+      case "address":
+        if (!value?.trim()) errorMessage = "Address is required";
+        break;
+      case "price":
+        if (value < 0) errorMessage = "Price cannot be negative";
+        break;
+      case "contact_phone":
+        if (value && !/^(\+63|0)[0-9]{10}$/.test(value.replace(/\s/g, ""))) {
+          errorMessage = "Invalid phone number format (e.g., 09171234567)";
+        }
+        break;
+      case "contact_email":
+        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          errorMessage = "Invalid email format";
+        }
+        break;
+      case "gcash_number":
+        if (value && !/^09\d{9}$/.test(value.replace(/\s/g, ""))) {
+          errorMessage = "GCash number must be 11 digits starting with 09";
+        }
+        break;
+      default:
+        break;
+    }
+    
+    setFieldErrors(prev => ({ ...prev, [fieldName]: errorMessage }));
+    
+    const fields = ["name", "business_type", "location", "address", "price"];
+    const validatedFields = fields.filter(f => !fieldErrors[f] && formData[f]);
+    const progress = (validatedFields.length / fields.length) * 100;
+    setValidationProgress(progress);
+    
+    return !errorMessage;
+  }, [formData, fieldErrors]);
 
-    fieldsToValidate.forEach((field) => {
-      if (!validateField(field)) {
-        isValid = false;
+  // Save business
+  const saveBusiness = async () => {
+    const fieldsToValidate = ["name", "business_type", "location", "address", "price"];
+    const errors = [];
+    
+    fieldsToValidate.forEach(field => {
+      if (!validateField(field, formData[field])) {
+        errors.push(field);
       }
     });
-
-    const touched = {};
-    fieldsToValidate.forEach((field) => {
-      touched[field] = true;
-    });
-    setTouchedFields(touched);
-
-    return isValid;
-  };
-
-  const saveBusiness = async () => {
-    if (!validateForm()) {
-      setError("Please fix the errors before saving");
+    
+    if (errors.length > 0) {
+      toast.error(`Please fix ${errors.length} error(s) before saving`);
       return;
     }
-
+    
+    const saveToast = toast.loading('Saving business information...');
+    
     try {
       setSaving(true);
-      setError(null);
-      setSuccessMessage("");
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) throw userError;
-
+      const { data: { user } } = await supabase.auth.getUser();
+      
       if (!user) {
         navigate("/login");
         return;
       }
-
+      
       const businessData = {
         ...formData,
         owner_id: user.id,
-        owner_name:
-          profile?.first_name && profile?.last_name
-            ? `${profile.first_name} ${profile.last_name}`.trim()
-            : formData.owner_name,
+        owner_name: profile?.first_name && profile?.last_name 
+          ? `${profile.first_name} ${profile.last_name}`.trim() 
+          : formData.owner_name,
         city: "Dagupan",
         province: "Pangasinan",
         members_count: business?.members_count || 0,
@@ -872,9 +547,9 @@ const MyBusinessPage = () => {
         gcash_qr_code: gcashQrCode,
         updated_at: new Date().toISOString(),
       };
-
+      
       let result;
-
+      
       if (business?.id) {
         result = await supabase
           .from("businesses")
@@ -887,314 +562,287 @@ const MyBusinessPage = () => {
           .insert([businessData])
           .select();
       }
-
+      
       const { data, error } = result;
-
+      
       if (error) throw error;
-
+      
       setBusiness(data[0]);
       setFormData(data[0]);
       setEditMode(false);
-      setSuccessMessage(
-        business?.id
-          ? "Business updated successfully!"
-          : "Business created successfully!",
-      );
-
-      setTimeout(() => setSuccessMessage(""), 3000);
+      setDraftSaved(null);
+      
+      toast.success(business?.id ? 'Business updated successfully!' : 'Business created successfully!', {
+        id: saveToast,
+        duration: 3000,
+      });
     } catch (err) {
       console.error("Error saving business:", err);
-      setError(err.message);
+      toast.error(err.message || 'Failed to save business', { id: saveToast });
     } finally {
       setSaving(false);
     }
   };
 
-  // Membership Plan Handlers
-  const handlePlanInputChange = (e) => {
-    const { name, value } = e.target;
-    setPlanFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleFeatureChange = (index, value) => {
-    const updatedFeatures = [...planFormData.features];
-    updatedFeatures[index] = value;
-    setPlanFormData((prev) => ({ ...prev, features: updatedFeatures }));
-  };
-
-  const addFeature = () => {
-    setPlanFormData((prev) => ({ ...prev, features: [...prev.features, ""] }));
-  };
-
-  const removeFeature = (index) => {
-    const updatedFeatures = planFormData.features.filter((_, i) => i !== index);
-    setPlanFormData((prev) => ({ ...prev, features: updatedFeatures }));
-  };
-
-  const resetPlanForm = () => {
-    setPlanFormData({
-      name: "",
-      price: 0,
-      duration: "month",
-      features: [""],
-      is_active: true,
-    });
-    setEditingPlan(null);
-    setShowPlanForm(false);
-  };
-
-  const saveMembershipPlan = async () => {
-    try {
-      setSaving(true);
-
-      const filteredFeatures = planFormData.features.filter(
-        (f) => f.trim() !== "",
-      );
-
-      const planData = {
-        business_id: business.id,
-        name: planFormData.name,
-        price: planFormData.price,
-        duration: planFormData.duration,
-        features: filteredFeatures,
-        is_active: planFormData.is_active,
-      };
-
-      let result;
-
-      if (editingPlan) {
-        result = await supabase
-          .from("membership_plans")
-          .update(planData)
-          .eq("id", editingPlan.id)
-          .select();
-      } else {
-        result = await supabase
-          .from("membership_plans")
-          .insert([planData])
-          .select();
-      }
-
-      const { data, error } = result;
-
-      if (error) throw error;
-
-      await fetchMembershipPlans();
-      resetPlanForm();
-      setSuccessMessage(
-        editingPlan
-          ? "Plan updated successfully!"
-          : "Plan created successfully!",
-      );
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (err) {
-      console.error("Error saving membership plan:", err);
-      setError(err.message);
-    } finally {
-      setSaving(false);
+  const handleCancelEdit = () => {
+    if (JSON.stringify(formData) !== JSON.stringify(business)) {
+      setShowUnsavedChangesModal(true);
+    } else {
+      cancelEdit();
     }
   };
-
-  const editPlan = (plan) => {
-    setEditingPlan(plan);
-    setPlanFormData({
-      name: plan.name,
-      price: plan.price,
-      duration: plan.duration,
-      features: plan.features.length > 0 ? plan.features : [""],
-      is_active: plan.is_active,
-    });
-    setShowPlanForm(true);
-  };
-
-  const deletePlan = async (planId) => {
-    if (
-      !window.confirm("Are you sure you want to delete this membership plan?")
-    )
-      return;
-
-    try {
-      const { error } = await supabase
-        .from("membership_plans")
-        .delete()
-        .eq("id", planId);
-
-      if (error) throw error;
-
-      await fetchMembershipPlans();
-      setSuccessMessage("Plan deleted successfully!");
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (err) {
-      console.error("Error deleting plan:", err);
-      setError(err.message);
-    }
-  };
-
-  const togglePlanStatus = async (plan) => {
-    try {
-      const { error } = await supabase
-        .from("membership_plans")
-        .update({ is_active: !plan.is_active })
-        .eq("id", plan.id);
-
-      if (error) throw error;
-
-      await fetchMembershipPlans();
-    } catch (err) {
-      console.error("Error toggling plan status:", err);
-      setError(err.message);
-    }
-  };
-
+  
   const cancelEdit = () => {
     setFormData(business || {});
     setEditMode(false);
-    setError(null);
+    setFieldErrors({});
     setTouchedFields({});
+    setValidationProgress(0);
   };
-
-  const getFirstName = () => {
-    if (profile?.first_name) return profile.first_name;
-    return "Owner";
-  };
-
-  const getInputClassName = (fieldName) => {
-    let className = "form-group";
-    if (focusedField === fieldName) className += " focused";
-    if (touchedFields[fieldName] && fieldErrors[fieldName]) {
-      className += " error";
-    } else if (
-      touchedFields[fieldName] &&
-      formData[fieldName] &&
-      !fieldErrors[fieldName]
-    ) {
-      className += " valid";
-    }
-    return className;
-  };
-
-  const renderStars = (rating) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-
-    for (let i = 1; i <= 5; i++) {
-      if (i <= fullStars) {
-        stars.push(
-          <span key={i} className="star full">
-            ★
-          </span>,
-        );
-      } else if (i === fullStars + 1 && hasHalfStar) {
-        stars.push(
-          <span key={i} className="star half">
-            ★
-          </span>,
-        );
-      } else {
-        stars.push(
-          <span key={i} className="star empty">
-            ☆
-          </span>,
-        );
+  
+  const addBreakTime = (day) => {
+    const newBreak = { start: "12:00", end: "13:00", startAMPM: "PM", endAMPM: "PM" };
+    setBusinessHours(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        breaks: [...(prev[day].breaks || []), newBreak]
       }
-    }
-    return stars;
+    }));
   };
+  
+  const removeBreakTime = (day, breakIndex) => {
+    setBusinessHours(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        breaks: prev[day].breaks.filter((_, i) => i !== breakIndex)
+      }
+    }));
+  };
+  
+  const getCompletionPercentage = useMemo(() => {
+    const requiredFields = ['name', 'business_type', 'location', 'address', 'price'];
+    const completed = requiredFields.filter(field => formData[field]).length;
+    return (completed / requiredFields.length) * 100;
+  }, [formData]);
+  
+  const activeCategory = useMemo(() => {
+    return businessCategories.find(cat => cat.id === formData.business_type);
+  }, [formData.business_type]);
+
+  // Check if business is verified
+  const isVerified = business?.permit_verified === true;
+  const isPending = business?.verification_status === "pending" || (!business?.permit_verified && business?.permit_document);
+  const isRejected = business?.verification_status === "rejected";
 
   if (loading) {
     return (
-      <div className="business-page-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading business information...</p>
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center z-50 select-none">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+          <p className="mt-6 text-gray-600 font-medium">Loading your business...</p>
+        </motion.div>
       </div>
     );
   }
 
-  const firstName = getFirstName();
-
   return (
-    <div className="dashboard-container">
+    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 overflow-hidden select-none">
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+        }}
+      />
+      
       <OwnerNavbar profile={profile} avatarUrl={avatarUrl} />
-
-      <div className="content-wrapper">
-        <div className="mobile-welcome">
-          <p>Welcome, {profile?.first_name || "Owner"}!</p>
-        </div>
-
-        <main className="dashboard-main-full">
-          <div className="dashboard-header">
-            <div className="header-left">
-              <h2 className="page-title">
-                My Business
-                <span className="title-glow"></span>
-              </h2>
-              <div className="header-decoration"></div>
-            </div>
-            <div className="header-right">
-              <div className="user-greeting">
-                <span className="greeting-wave">👋</span>
-                <span className="greeting-text">Managing,</span>
-                <span className="greeting-name">{firstName}</span>
+      
+      <div className="h-full pt-20 overflow-y-auto">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-12">
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                      My Business
+                    </h1>
+                    <div className="absolute -bottom-2 left-0 w-20 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-width-pulse"></div>
+                  </div>
+                  {activeCategory && (
+                    <span className={`px-3 py-1 bg-gradient-to-r ${activeCategory.color} text-white text-xs font-semibold rounded-full shadow-md`}>
+                      {activeCategory.icon} {activeCategory.label}
+                    </span>
+                  )}
+                </div>
+                <p className="text-gray-500 mt-2 flex items-center gap-2">
+                  <Info className="w-4 h-4" />
+                  Manage your business profile, settings, and services
+                </p>
               </div>
             </div>
-          </div>
-
-          <div className="my-business-page-content">
-            {error && <div className="business-error-message">{error}</div>}
-
-            {successMessage && (
-              <div className="business-success-message">{successMessage}</div>
+            
+            {editMode && (
+              <div className="mt-4">
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Profile Completion</span>
+                  <span>{Math.round(getCompletionPercentage)}%</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${getCompletionPercentage}%` }}
+                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
+                  />
+                </div>
+              </div>
             )}
-
-            {/* Verification Status Banner - Only show if not verified */}
-            {business &&
-              business.verification_status === "pending" &&
-              !business.permit_verified && (
-                <div className="verification-banner pending">
-                  <div className="banner-icon">⏳</div>
-                  <div className="banner-content">
-                    <h3>Business Verification Pending</h3>
-                    <p>
-                      Please upload your business permit for verification. Once
-                      verified, your business will be fully visible to
-                      customers.
-                    </p>
+          </motion.div>
+          
+          {/* VERIFIED MESSAGE - Fades out after 3 seconds */}
+          <AnimatePresence>
+            {showVerifiedMessage && isVerified && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="mb-6"
+              >
+                <div className="bg-green-50 border-l-4 border-green-500 rounded-r-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-green-800">Business Verified ✓</h3>
+                      <p className="text-sm text-green-700 mt-1">
+                        Your business is verified and visible to customers. You can now accept memberships and payments.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          {/* VERIFICATION BANNERS - Persistent for unverified businesses */}
+          {business && !isVerified && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              {isPending && (
+                <div className="bg-yellow-50 border-l-4 border-yellow-500 rounded-r-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <Clock className="w-5 h-5 text-yellow-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-yellow-800">Business Verification Pending</h3>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Your business permit is under review. Your business is currently hidden from customers until verified. 
+                        This usually takes 1-2 business days.
+                      </p>
+                      <div className="mt-3">
+                        <button
+                          onClick={() => setActiveTab("permit")}
+                          className="text-sm text-yellow-800 font-medium hover:text-yellow-900 underline"
+                        >
+                          View Permit Status →
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
-
-            {business &&
-              business.verification_status === "rejected" &&
-              !business.permit_verified && (
-                <div className="verification-banner rejected">
-                  <div className="banner-icon">❌</div>
-                  <div className="banner-content">
-                    <h3>Verification Rejected</h3>
-                    <p>
-                      Reason:{" "}
-                      {business.rejection_reason ||
-                        "Your permit was not approved. Please upload a valid permit."}
-                    </p>
+              
+              {isRejected && (
+                <div className="bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <AlertTriangle className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-red-800">Verification Failed - Action Required!</h3>
+                      <p className="text-sm text-red-700 mt-1">
+                        Your business permit was not approved. {business.rejection_reason ? `Reason: ${business.rejection_reason}` : "Please upload a valid business permit."}
+                      </p>
+                      <p className="text-sm text-red-700 mt-1 font-medium">
+                        ⚠️ Your business is NOT visible to customers until verification is approved.
+                      </p>
+                      <div className="mt-3">
+                        <button
+                          onClick={() => setActiveTab("permit")}
+                          className="text-sm text-red-800 font-medium hover:text-red-900 underline"
+                        >
+                          Upload New Permit →
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
-
-            {!business && !editMode ? (
-              <div className="no-business-state">
-                <div className="no-business-icon">🏢</div>
-                <h2>No Business Found</h2>
-                <p>You haven't registered a business yet.</p>
+              
+              {!business?.permit_document && !business?.permit_verified && (
+                <div className="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <Shield className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-orange-800">Business Not Verified</h3>
+                      <p className="text-sm text-orange-700 mt-1">
+                        Your business is currently NOT visible to customers. Please upload your business permit for verification.
+                      </p>
+                      <div className="mt-3">
+                        <button
+                          onClick={() => setActiveTab("permit")}
+                          className="text-sm text-orange-800 font-medium hover:text-orange-900 underline"
+                        >
+                          Upload Business Permit →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+          
+          {/* No Business State */}
+          <AnimatePresence>
+            {!business && !editMode && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-2xl shadow-xl p-12 text-center"
+              >
+                <div className="text-7xl mb-4">🏢</div>
+                <h2 className="text-2xl font-semibold text-gray-800 mb-2">No Business Found</h2>
+                <p className="text-gray-500 mb-6">You haven't registered a business yet.</p>
                 <button
-                  className="btn-create-business"
                   onClick={() => {
                     setEditMode(true);
                     setFormData({
                       name: profile?.business_name || "",
-                      owner_name:
-                        profile?.first_name && profile?.last_name
-                          ? `${profile.first_name} ${profile.last_name}`.trim()
-                          : "",
+                      owner_name: profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}`.trim() : "",
                       business_type: profile?.business_category || "",
                       description: "",
                       short_description: "",
@@ -1204,1822 +852,990 @@ const MyBusinessPage = () => {
                       province: "Pangasinan",
                       price: 0,
                       price_unit: "month",
-                      emoji:
-                        getEmojiForCategory(profile?.business_category) || "🏢",
+                      emoji: businessCategories.find(c => c.id === profile?.business_category)?.icon || "🏢",
                       contact_phone: profile?.mobile || "",
                       contact_email: profile?.email || "",
                       website: "",
                       status: "active",
-                      members_count: 0,
-                      rating: 0,
-                      gcash_number: "",
-                      gcash_qr_code: null,
                     });
                   }}
+                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
                 >
                   Create Your Business
                 </button>
-              </div>
-            ) : (
-              <div className="business-content">
-                {/* Edit Business Button - Reverted to original position above tabs */}
-                {!editMode && business && (
-                  <div className="business-page-header">
-                    <button
-                      className="btn-edit-business"
-                      onClick={() => setEditMode(true)}
-                    >
-                      <span className="btn-icon">✏️</span>
-                      Edit Business
-                    </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          {/* Main Content */}
+          {business || editMode ? (
+            <div className="flex gap-6">
+              {/* Sidebar */}
+              <motion.div
+                animate={{ width: sidebarCollapsed ? 'auto' : '280px' }}
+                className={`bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden ${sidebarCollapsed ? 'w-auto' : 'w-80'} flex-shrink-0 sticky top-6 h-[calc(100vh-120px)]`}
+              >
+                <button
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="w-full p-4 flex items-center justify-between border-b border-gray-200 hover:bg-gray-50"
+                >
+                  {!sidebarCollapsed && <span className="font-semibold text-gray-700">Menu</span>}
+                  {sidebarCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                </button>
+                
+                <div className="py-4 overflow-y-auto h-[calc(100%-60px)]">
+                  {[
+                    { id: "basic", label: "Basic Info", icon: Building, color: "text-blue-500" },
+                    { id: "contact", label: "Contact & Hours", icon: Clock, color: "text-green-500" },
+                    { id: "payment", label: "Payment", icon: CreditCard, color: "text-purple-500" },
+                    { id: "permit", label: "Permit", icon: FileText, color: "text-orange-500" },
+                    { id: "plans", label: "Membership Plans", icon: Award, color: "text-pink-500" },
+                    { id: "reviews", label: "Reviews", icon: Star, color: "text-yellow-500" },
+                    { id: "preview", label: "Preview", icon: Eye, color: "text-indigo-500" },
+                  ].map(tab => {
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 transition-all ${
+                          activeTab === tab.id
+                            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-r-4 border-blue-500 text-blue-700'
+                            : 'hover:bg-gray-50 text-gray-600'
+                        }`}
+                      >
+                        <Icon className={`w-5 h-5 ${activeTab === tab.id ? tab.color : 'text-gray-400'}`} />
+                        {!sidebarCollapsed && <span className="text-sm font-medium">{tab.label}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {editMode && !sidebarCollapsed && (
+                  <div className="border-t border-gray-200 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">Auto-save</span>
+                      <button onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}>
+                        {autoSaveEnabled ? (
+                          <ToggleRight className="w-6 h-6 text-blue-500" />
+                        ) : (
+                          <ToggleLeft className="w-6 h-6 text-gray-400" />
+                        )}
+                      </button>
+                    </div>
+                    {draftSaved && (
+                      <p className="text-xs text-gray-400 mt-2">
+                        Last saved: {new Date(draftSaved.lastSaved).toLocaleTimeString()}
+                      </p>
+                    )}
                   </div>
                 )}
-
-                <div className="business-tabs">
-                  <button
-                    className={`business-tab ${activeTab === "basic" ? "active" : ""}`}
-                    onClick={() => setActiveTab("basic")}
-                  >
-                    Basic Info & Details
-                  </button>
-                  <button
-                    className={`business-tab ${activeTab === "contact" ? "active" : ""}`}
-                    onClick={() => setActiveTab("contact")}
-                  >
-                    Contact & Hours
-                  </button>
-                  <button
-                    className={`business-tab ${activeTab === "payment" ? "active" : ""}`}
-                    onClick={() => setActiveTab("payment")}
-                  >
-                    Payment
-                  </button>
-                  <button
-                    className={`business-tab ${activeTab === "permit" ? "active" : ""}`}
-                    onClick={() => setActiveTab("permit")}
-                  >
-                    📄 Business Permit
-                  </button>
-                  <button
-                    className={`business-tab ${activeTab === "plans" ? "active" : ""}`}
-                    onClick={() => setActiveTab("plans")}
-                  >
-                    Membership Plans
-                  </button>
-                  <button
-                    className={`business-tab ${activeTab === "reviews" ? "active" : ""}`}
-                    onClick={() => {
-                      setActiveTab("reviews");
-                      fetchReviews();
-                    }}
-                  >
-                    ⭐ Reviews & Ratings ({ratingStats.total})
-                  </button>
-                  <button
-                    className={`business-tab ${activeTab === "preview" ? "active" : ""}`}
-                    onClick={() => setActiveTab("preview")}
-                  >
-                    Preview
-                  </button>
+              </motion.div>
+              
+              {/* Main Content */}
+              <div className="flex-1 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden flex flex-col">
+                <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between bg-gray-50/50 sticky top-0 z-10">
+                  <div className="flex items-center gap-3">
+                    {activeCategory && !editMode && (
+                      <div className={`w-10 h-10 bg-gradient-to-r ${activeCategory.color} rounded-xl flex items-center justify-center text-2xl`}>
+                        {activeCategory.icon}
+                      </div>
+                    )}
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-800">
+                        {activeTab === "basic" && "Basic Information"}
+                        {activeTab === "contact" && "Contact & Business Hours"}
+                        {activeTab === "payment" && "Payment Settings"}
+                        {activeTab === "permit" && "Business Permit"}
+                        {activeTab === "plans" && "Membership Plans"}
+                        {activeTab === "reviews" && "Customer Reviews"}
+                        {activeTab === "preview" && "Business Preview"}
+                      </h2>
+                      {!editMode && business && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          Last updated: {new Date(business.updated_at).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {!editMode && business && (
+                    <button
+                      onClick={() => setEditMode(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      <span>Edit Business</span>
+                    </button>
+                  )}
                 </div>
-
-                <div className="business-tab-content">
-                  {/* Basic Info & Details Tab - Combined with Divider */}
-                  {activeTab === "basic" && (
-                    <div className="business-form-section">
-                      <div className="two-column-layout with-divider">
-                        {/* Left Column - Basic Info */}
-                        <div className="left-column">
-                          <h2 className="section-subtitle">
-                            Basic Information
-                          </h2>
-
-                          <div
-                            className={
-                              editMode
-                                ? getInputClassName("name")
-                                : "form-group"
-                            }
-                          >
-                            <label>Business Name *</label>
-                            {editMode ? (
-                              <>
-                                <input
-                                  type="text"
-                                  name="name"
-                                  value={
-                                    formData.name ||
-                                    profile?.business_name ||
-                                    ""
-                                  }
-                                  onChange={handleInputChange}
-                                  onFocus={() => setFocusedField("name")}
-                                  onBlur={() => handleBlur("name")}
-                                  placeholder="Enter business name"
-                                  required
-                                />
-                                {touchedFields.name && fieldErrors.name && (
-                                  <span className="error-hint">
-                                    {fieldErrors.name}
+                
+                <div className="flex-1 overflow-y-auto p-6">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeTab}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {/* Basic Info Tab */}
+                      {activeTab === "basic" && (
+                        <div className="space-y-8">
+                          {/* Preview Card with Verification Status Badge */}
+                          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100 relative">
+                            {business && !isVerified && (
+                              <div className="absolute top-4 right-4">
+                                <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3" />
+                                  Not Verified
+                                </span>
+                              </div>
+                            )}
+                            {business && isVerified && (
+                              <div className="absolute top-4 right-4">
+                                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3" />
+                                  Verified
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-4">
+                              <div className="text-5xl">
+                                {formData.emoji || activeCategory?.icon || "🏢"}
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="text-xl font-bold text-gray-800">
+                                  {formData.name || "Your Business Name"}
+                                </h3>
+                                <p className="text-gray-600 text-sm mt-1 line-clamp-2">
+                                  {formData.short_description || "Add a short description"}
+                                </p>
+                                <div className="flex gap-4 mt-2">
+                                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    {formData.location || "Location"}
                                   </span>
-                                )}
-                              </>
-                            ) : (
-                              <p className="view-field">
-                                {business?.name ||
-                                  profile?.business_name ||
-                                  "—"}
-                              </p>
+                                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                                    <Users className="w-3 h-3" />
+                                    {business?.members_count || 0} members
+                                  </span>
+                                </div>
+                              </div>
+                              {editMode && validationProgress === 100 && (
+                                <div className="text-green-500">
+                                  <CheckCircle className="w-8 h-8" />
+                                </div>
+                              )}
+                            </div>
+                            {!isVerified && !editMode && (
+                              <div className="mt-4 pt-3 border-t border-blue-200">
+                                <p className="text-xs text-red-600 flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Your business is not visible to customers. Please upload your business permit for verification.
+                                </p>
+                              </div>
                             )}
                           </div>
-
-                          <div className="form-group">
-                            <label>Owner Name *</label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="owner_name"
-                                value={
-                                  formData.owner_name ||
-                                  (profile?.first_name && profile?.last_name
-                                    ? `${profile.first_name} ${profile.last_name}`.trim()
-                                    : "")
-                                }
-                                onChange={handleInputChange}
-                                placeholder="Enter owner name"
-                                required
-                                disabled={true}
-                              />
-                            ) : (
-                              <p className="view-field">
-                                {business?.owner_name ||
-                                  (profile?.first_name && profile?.last_name
-                                    ? `${profile.first_name} ${profile.last_name}`.trim()
-                                    : "—")}
-                              </p>
-                            )}
-                            {editMode && (
-                              <small className="field-hint">
-                                Auto-filled from your profile
-                              </small>
-                            )}
-                          </div>
-
-                          <div
-                            className={
-                              editMode
-                                ? getInputClassName("business_type")
-                                : "form-group"
-                            }
-                          >
-                            <label>Business Category *</label>
-                            {editMode ? (
-                              <>
-                                <select
-                                  name="business_type"
-                                  value={
-                                    formData.business_type ||
-                                    profile?.business_category ||
-                                    ""
-                                  }
-                                  onChange={handleInputChange}
-                                  onFocus={() =>
-                                    setFocusedField("business_type")
-                                  }
-                                  onBlur={() => handleBlur("business_type")}
-                                  required
-                                  className="select-input"
-                                >
-                                  <option value="">Select a category</option>
-                                  {businessCategories.map((cat) => (
-                                    <option key={cat.id} value={cat.id}>
-                                      {cat.icon} {cat.label}
-                                    </option>
-                                  ))}
-                                </select>
-                                {touchedFields.business_type &&
-                                  fieldErrors.business_type && (
-                                    <span className="error-hint">
-                                      {fieldErrors.business_type}
-                                    </span>
-                                  )}
-                              </>
-                            ) : (
-                              <p className="view-field">
-                                {business?.business_type ||
-                                  profile?.business_category ||
-                                  "—"}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="form-group">
-                            <label>Status & Icon</label>
-                            <div className="status-icon-row">
-                              {editMode ? (
-                                <>
-                                  <select
-                                    name="status"
-                                    value={formData.status || "active"}
-                                    onChange={handleInputChange}
-                                    className="status-select"
-                                  >
-                                    <option value="active">Active</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="inactive">Inactive</option>
-                                  </select>
-                                  <div className="icon-input-wrapper">
+                          
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* Left Column */}
+                            <div className="space-y-5">
+                              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                <Building className="w-5 h-5 text-blue-500" />
+                                Basic Information
+                              </h3>
+                              
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Business Name *</label>
+                                {editMode ? (
+                                  <>
                                     <input
                                       type="text"
-                                      name="emoji"
-                                      value={
-                                        formData.emoji ||
-                                        getEmojiForCategory(
-                                          formData.business_type,
-                                        ) ||
-                                        "🏢"
-                                      }
-                                      onChange={handleInputChange}
-                                      placeholder="🏢"
-                                      className="icon-input"
+                                      name="name"
+                                      value={formData.name || ""}
+                                      onChange={(e) => {
+                                        setFormData(prev => ({ ...prev, name: e.target.value }));
+                                        validateField("name", e.target.value);
+                                      }}
+                                      onBlur={() => setTouchedFields(prev => ({ ...prev, name: true }))}
+                                      className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${touchedFields.name && fieldErrors.name ? 'border-red-500' : 'border-gray-300'}`}
+                                      placeholder="Enter business name"
                                     />
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="status-icon-display">
-                                  <span
-                                    className={`status-badge ${business?.status}`}
-                                  >
-                                    {business?.status || "active"}
-                                  </span>
-                                  <span className="display-emoji">
-                                    {business?.emoji ||
-                                      getEmojiForCategory(
-                                        business?.business_type,
-                                      ) ||
-                                      "🏢"}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div
-                            className={
-                              editMode
-                                ? getInputClassName("short_description")
-                                : "form-group"
-                            }
-                          >
-                            <label>Short Description</label>
-                            {editMode ? (
-                              <>
-                                <input
-                                  type="text"
-                                  name="short_description"
-                                  value={formData.short_description || ""}
-                                  onChange={handleInputChange}
-                                  onFocus={() =>
-                                    setFocusedField("short_description")
-                                  }
-                                  onBlur={() => handleBlur("short_description")}
-                                  placeholder="Brief description (max 200 chars)"
-                                  maxLength="200"
-                                />
-                                {touchedFields.short_description &&
-                                  fieldErrors.short_description && (
-                                    <span className="error-hint">
-                                      {fieldErrors.short_description}
-                                    </span>
-                                  )}
-                                <small className="char-count">
-                                  {formData.short_description?.length || 0}/200
-                                </small>
-                              </>
-                            ) : (
-                              <p className="view-field">
-                                {business?.short_description || "—"}
-                              </p>
-                            )}
-                          </div>
-
-                          <div
-                            className={
-                              editMode
-                                ? getInputClassName("description")
-                                : "form-group"
-                            }
-                          >
-                            <label>Full Description</label>
-                            {editMode ? (
-                              <>
-                                <textarea
-                                  name="description"
-                                  value={formData.description || ""}
-                                  onChange={handleInputChange}
-                                  onFocus={() => setFocusedField("description")}
-                                  onBlur={() => handleBlur("description")}
-                                  placeholder="Detailed description of your business"
-                                  rows="5"
-                                />
-                                {touchedFields.description &&
-                                  fieldErrors.description && (
-                                    <span className="error-hint">
-                                      {fieldErrors.description}
-                                    </span>
-                                  )}
-                              </>
-                            ) : (
-                              <p className="view-field description-text">
-                                {business?.description || "—"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Vertical Divider */}
-                        <div className="column-divider"></div>
-
-                        {/* Right Column - Details */}
-                        <div className="right-column">
-                          <h2 className="section-subtitle">
-                            Location & Pricing
-                          </h2>
-
-                          <div
-                            className={
-                              editMode
-                                ? getInputClassName("location")
-                                : "form-group"
-                            }
-                          >
-                            <label>Location *</label>
-                            {editMode ? (
-                              <>
-                                <select
-                                  name="location"
-                                  value={formData.location || "Downtown"}
-                                  onChange={handleInputChange}
-                                  onFocus={() => setFocusedField("location")}
-                                  onBlur={() => handleBlur("location")}
-                                  required
-                                  className="select-input"
-                                >
-                                  <option value="">Select a location</option>
-                                  {locationOptions.map((loc) => (
-                                    <option key={loc.value} value={loc.value}>
-                                      {loc.label}
-                                    </option>
-                                  ))}
-                                </select>
-                                {touchedFields.location &&
-                                  fieldErrors.location && (
-                                    <span className="error-hint">
-                                      {fieldErrors.location}
-                                    </span>
-                                  )}
-                              </>
-                            ) : (
-                              <p className="view-field">
-                                {business?.location || "—"}
-                              </p>
-                            )}
-                          </div>
-
-                          <div
-                            className={
-                              editMode
-                                ? getInputClassName("address")
-                                : "form-group"
-                            }
-                          >
-                            <label>Address *</label>
-                            {editMode ? (
-                              <>
-                                <input
-                                  type="text"
-                                  name="address"
-                                  value={formData.address || ""}
-                                  onChange={handleInputChange}
-                                  onFocus={() => setFocusedField("address")}
-                                  onBlur={() => handleBlur("address")}
-                                  placeholder="Street address"
-                                  required
-                                />
-                                {touchedFields.address &&
-                                  fieldErrors.address && (
-                                    <span className="error-hint">
-                                      {fieldErrors.address}
-                                    </span>
-                                  )}
-                              </>
-                            ) : (
-                              <p className="view-field">
-                                {business?.address || "—"}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="form-row">
-                            <div className="form-group">
-                              <label>City</label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  value="Dagupan"
-                                  disabled
-                                  className="readonly-field"
-                                />
-                              ) : (
-                                <p className="view-field">
-                                  {business?.city || "Dagupan"}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="form-group">
-                              <label>Province</label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  value="Pangasinan"
-                                  disabled
-                                  className="readonly-field"
-                                />
-                              ) : (
-                                <p className="view-field">
-                                  {business?.province || "Pangasinan"}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div
-                            className={
-                              editMode
-                                ? getInputClassName("price")
-                                : "form-group"
-                            }
-                          >
-                            <label>Price *</label>
-                            {editMode ? (
-                              <>
-                                <input
-                                  type="number"
-                                  name="price"
-                                  value={formData.price || 0}
-                                  onChange={handleNumberChange}
-                                  onFocus={() => setFocusedField("price")}
-                                  onBlur={() => handleBlur("price")}
-                                  placeholder="0.00"
-                                  min="0"
-                                  step="0.01"
-                                />
-                                {touchedFields.price && fieldErrors.price && (
-                                  <span className="error-hint">
-                                    {fieldErrors.price}
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <p className="view-field">
-                                ₱{business?.price?.toFixed(2) || "0.00"}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="form-group">
-                            <label>Price Unit</label>
-                            {editMode ? (
-                              <select
-                                name="price_unit"
-                                value={formData.price_unit || "month"}
-                                onChange={handleInputChange}
-                              >
-                                <option value="month">per month</option>
-                                <option value="year">per year</option>
-                                <option value="week">per week</option>
-                                <option value="day">per day</option>
-                                <option value="session">per session</option>
-                              </select>
-                            ) : (
-                              <p className="view-field">
-                                per {business?.price_unit || "month"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Contact Tab with 12-hour format Business Hours */}
-                  {activeTab === "contact" && (
-                    <div className="business-form-section">
-                      <h2 className="section-subtitle">Contact Information</h2>
-
-                      <div className="form-row">
-                        <div
-                          className={
-                            editMode
-                              ? getInputClassName("contact_phone")
-                              : "form-group"
-                          }
-                        >
-                          <label>Contact Phone</label>
-                          {editMode ? (
-                            <>
-                              <input
-                                type="tel"
-                                name="contact_phone"
-                                value={
-                                  formData.contact_phone ||
-                                  profile?.mobile ||
-                                  ""
-                                }
-                                onChange={handleInputChange}
-                                onFocus={() => setFocusedField("contact_phone")}
-                                onBlur={() => handleBlur("contact_phone")}
-                                placeholder="09171234567"
-                                maxLength={11}
-                              />
-                              {touchedFields.contact_phone &&
-                                fieldErrors.contact_phone && (
-                                  <span className="error-hint">
-                                    {fieldErrors.contact_phone}
-                                  </span>
-                                )}
-                              {formData.contact_phone &&
-                                formData.contact_phone.length > 0 &&
-                                !fieldErrors.contact_phone && (
-                                  <span className="hint-text">
-                                    Format: 09xxxxxxxxx (11 digits)
-                                  </span>
-                                )}
-                            </>
-                          ) : (
-                            <p className="view-field">
-                              {business?.contact_phone ||
-                                profile?.mobile ||
-                                "—"}
-                            </p>
-                          )}
-                        </div>
-
-                        <div
-                          className={
-                            editMode
-                              ? getInputClassName("contact_email")
-                              : "form-group"
-                          }
-                        >
-                          <label>Contact Email</label>
-                          {editMode ? (
-                            <>
-                              <input
-                                type="email"
-                                name="contact_email"
-                                value={
-                                  formData.contact_email || profile?.email || ""
-                                }
-                                onChange={handleInputChange}
-                                onFocus={() => setFocusedField("contact_email")}
-                                onBlur={() => handleBlur("contact_email")}
-                                placeholder="business@example.com"
-                              />
-                              {touchedFields.contact_email &&
-                                fieldErrors.contact_email && (
-                                  <span className="error-hint">
-                                    {fieldErrors.contact_email}
-                                  </span>
-                                )}
-                            </>
-                          ) : (
-                            <p className="view-field">
-                              {business?.contact_email || profile?.email || "—"}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="form-row">
-                        <div
-                          className={
-                            editMode
-                              ? getInputClassName("website")
-                              : "form-group"
-                          }
-                        >
-                          <label>Website</label>
-                          {editMode ? (
-                            <>
-                              <input
-                                type="url"
-                                name="website"
-                                value={formData.website || ""}
-                                onChange={handleInputChange}
-                                onFocus={() => setFocusedField("website")}
-                                onBlur={() => handleBlur("website")}
-                                placeholder="https://example.com"
-                              />
-                              {touchedFields.website && fieldErrors.website && (
-                                <span className="error-hint">
-                                  {fieldErrors.website}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <p className="view-field">
-                              {business?.website || "—"}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="form-group">
-                          <label>Amenities</label>
-                          {editMode ? (
-                            <textarea
-                              value={
-                                formData.amenities
-                                  ? JSON.stringify(formData.amenities, null, 2)
-                                  : "[]"
-                              }
-                              onChange={(e) => {
-                                try {
-                                  const parsed = JSON.parse(e.target.value);
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    amenities: parsed,
-                                  }));
-                                } catch (e) {
-                                  console.error("Invalid JSON:", e);
-                                }
-                              }}
-                              placeholder='["wifi", "parking", "lockers"]'
-                              rows="4"
-                            />
-                          ) : (
-                            <div className="amenities-list">
-                              {business?.amenities?.map((item, index) => (
-                                <span key={index} className="amenity-tag">
-                                  {item}
-                                </span>
-                              )) || "—"}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="form-group full-width">
-                        <label>Business Hours</label>
-                        {editMode ? (
-                          <div className="business-hours-container">
-                            {daysOfWeek.map((day) => {
-                              const dayHours = businessHours[day.id];
-                              const openTime = dayHours?.open
-                                ? convertTo12Hour(dayHours.open)
-                                : { time: "09:00", ampm: "AM" };
-                              const closeTime = dayHours?.close
-                                ? convertTo12Hour(dayHours.close)
-                                : { time: "18:00", ampm: "PM" };
-
-                              return (
-                                <div key={day.id} className="business-hour-row">
-                                  <div className="day-label">{day.label}</div>
-                                  <div className="hour-controls">
-                                    <label className="closed-checkbox">
-                                      <input
-                                        type="checkbox"
-                                        checked={dayHours?.closed || false}
-                                        onChange={(e) =>
-                                          handleBusinessHourChange(
-                                            day.id,
-                                            "closed",
-                                            e.target.checked,
-                                          )
-                                        }
-                                      />
-                                      Closed
-                                    </label>
-                                    {!dayHours?.closed && (
-                                      <>
-                                        <div className="time-input">
-                                          <span>Open:</span>
-                                          <input
-                                            type="text"
-                                            value={openTime.time}
-                                            onChange={(e) =>
-                                              handleTimeChange(
-                                                day.id,
-                                                "openTime",
-                                                e.target.value,
-                                              )
-                                            }
-                                            placeholder="09:00"
-                                            pattern="[0-9]{2}:[0-9]{2}"
-                                            className="time-input-field"
-                                          />
-                                          <select
-                                            value={
-                                              dayHours?.openAMPM ||
-                                              openTime.ampm
-                                            }
-                                            onChange={(e) =>
-                                              handleBusinessHourChange(
-                                                day.id,
-                                                "openAMPM",
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="ampm-select"
-                                          >
-                                            <option value="AM">AM</option>
-                                            <option value="PM">PM</option>
-                                          </select>
-                                        </div>
-                                        <div className="time-input">
-                                          <span>Close:</span>
-                                          <input
-                                            type="text"
-                                            value={closeTime.time}
-                                            onChange={(e) =>
-                                              handleTimeChange(
-                                                day.id,
-                                                "closeTime",
-                                                e.target.value,
-                                              )
-                                            }
-                                            placeholder="18:00"
-                                            pattern="[0-9]{2}:[0-9]{2}"
-                                            className="time-input-field"
-                                          />
-                                          <select
-                                            value={
-                                              dayHours?.closeAMPM ||
-                                              closeTime.ampm
-                                            }
-                                            onChange={(e) =>
-                                              handleBusinessHourChange(
-                                                day.id,
-                                                "closeAMPM",
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="ampm-select"
-                                          >
-                                            <option value="AM">AM</option>
-                                            <option value="PM">PM</option>
-                                          </select>
-                                        </div>
-                                      </>
+                                    {touchedFields.name && fieldErrors.name && (
+                                      <p className="text-xs text-red-500 mt-1">{fieldErrors.name}</p>
                                     )}
+                                  </>
+                                ) : (
+                                  <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">{business?.name || "—"}</p>
+                                )}
+                              </div>
+                              
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Business Category *</label>
+                                {/* Business Category - READ ONLY (cannot be edited after registration) */}
+                                {editMode ? (
+                                  <div className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-600 cursor-not-allowed">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xl">{activeCategory?.icon || "🏢"}</span>
+                                      <span>{activeCategory?.label || formData.business_type || "Not selected"}</span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1">Business category cannot be changed after registration</p>
                                   </div>
-                                </div>
-                              );
-                            })}
-                            <p className="hours-hint">
-                              Set your business hours for each day of the week
-                              (12-hour format)
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="business-hours-display">
-                            {business?.business_hours ? (
-                              Object.entries(business.business_hours).map(
-                                ([day, hours]) => {
-                                  const openTime = hours.open
-                                    ? convertTo12Hour(hours.open)
-                                    : null;
-                                  const closeTime = hours.close
-                                    ? convertTo12Hour(hours.close)
-                                    : null;
-                                  return (
-                                    <div key={day} className="hour-display-row">
-                                      <span className="day">{day}:</span>
-                                      <span className="hours">
-                                        {hours.closed
-                                          ? "Closed"
-                                          : `${openTime?.time || "09:00"} ${openTime?.ampm || "AM"} - ${closeTime?.time || "06:00"} ${closeTime?.ampm || "PM"}`}
+                                ) : (
+                                  <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">
+                                    <span className="flex items-center gap-2">
+                                      <span className="text-xl">{businessCategories.find(c => c.id === business?.business_type)?.icon || "🏢"}</span>
+                                      <span>{businessCategories.find(c => c.id === business?.business_type)?.label || "—"}</span>
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                              
+                              {/* Short Description */}
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Short Description</label>
+                                {editMode ? (
+                                  <>
+                                    <textarea
+                                      name="short_description"
+                                      value={formData.short_description || ""}
+                                      onChange={(e) => {
+                                        setFormData(prev => ({ ...prev, short_description: e.target.value }));
+                                        validateField("short_description", e.target.value);
+                                      }}
+                                      rows="2"
+                                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="Brief description (max 200 chars)"
+                                      maxLength="200"
+                                    />
+                                    <div className="flex justify-between mt-1">
+                                      <p className="text-xs text-gray-400">A short tagline for your business (appears in search results)</p>
+                                      <span className="text-xs text-gray-400">
+                                        {formData.short_description?.length || 0}/200
                                       </span>
                                     </div>
-                                  );
-                                },
-                              )
-                            ) : (
-                              <p className="view-field">
-                                No business hours set
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Payment Tab */}
-                  {activeTab === "payment" && (
-                    <div className="business-form-section">
-                      <h2 className="section-subtitle">Payment Settings</h2>
-
-                      <div className="payment-section">
-                        <div className="payment-info">
-                          <div className="payment-icon">💳</div>
-                          <div className="payment-description">
-                            <h3>GCash Payment</h3>
-                            <p>
-                              Upload your GCash QR code so customers can scan
-                              and pay easily. Maximum file size: 2MB (PNG, JPG,
-                              JPEG)
-                            </p>
+                                    {touchedFields.short_description && fieldErrors.short_description && (
+                                      <p className="text-xs text-red-500 mt-1">{fieldErrors.short_description}</p>
+                                    )}
+                                  </>
+                                ) : (
+                                  <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 whitespace-pre-wrap">
+                                    {business?.short_description || "—"}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              {/* Full Description */}
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Full Description</label>
+                                {editMode ? (
+                                  <>
+                                    <textarea
+                                      name="description"
+                                      value={formData.description || ""}
+                                      onChange={(e) => {
+                                        setFormData(prev => ({ ...prev, description: e.target.value }));
+                                        validateField("description", e.target.value);
+                                      }}
+                                      rows="6"
+                                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="Detailed description of your business, services, history, and what makes you special..."
+                                    />
+                                    <div className="flex justify-between mt-1">
+                                      <p className="text-xs text-gray-400">Detailed description (max 5000 characters)</p>
+                                      <span className="text-xs text-gray-400">
+                                        {formData.description?.length || 0}/5000
+                                      </span>
+                                    </div>
+                                    {touchedFields.description && fieldErrors.description && (
+                                      <p className="text-xs text-red-500 mt-1">{fieldErrors.description}</p>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                    {business?.description || "—"}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Right Column */}
+                            <div className="space-y-5">
+                              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                <MapPin className="w-5 h-5 text-blue-500" />
+                                Location & Pricing
+                              </h3>
+                              
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Location *</label>
+                                {editMode ? (
+                                  <select
+                                    value={formData.location || "Downtown"}
+                                    onChange={(e) => {
+                                      setFormData(prev => ({ ...prev, location: e.target.value }));
+                                      validateField("location", e.target.value);
+                                    }}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    <option value="">Select a location</option>
+                                    {locationOptions.map(loc => (
+                                      <option key={loc.value} value={loc.value}>
+                                        {loc.popular ? "⭐ " : ""}{loc.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">{business?.location || "—"}</p>
+                                )}
+                              </div>
+                              
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Address *</label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="address"
+                                    value={formData.address || ""}
+                                    onChange={(e) => {
+                                      setFormData(prev => ({ ...prev, address: e.target.value }));
+                                      validateField("address", e.target.value);
+                                    }}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Street address"
+                                  />
+                                ) : (
+                                  <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">{business?.address || "—"}</p>
+                                )}
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Price *</label>
+                                  {editMode ? (
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₱</span>
+                                      <input
+                                        type="number"
+                                        name="price"
+                                        value={formData.price || 0}
+                                        onChange={(e) => {
+                                          setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }));
+                                          validateField("price", parseFloat(e.target.value));
+                                        }}
+                                        className="w-full pl-8 pr-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">₱{business?.price?.toFixed(2) || "0.00"}</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Price Unit</label>
+                                  {editMode ? (
+                                    <select
+                                      value={formData.price_unit || "month"}
+                                      onChange={(e) => setFormData(prev => ({ ...prev, price_unit: e.target.value }))}
+                                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                      <option value="month">per month</option>
+                                      <option value="year">per year</option>
+                                      <option value="week">per week</option>
+                                      <option value="day">per day</option>
+                                      <option value="session">per session</option>
+                                    </select>
+                                  ) : (
+                                    <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">per {business?.price_unit || "month"}</p>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Status</label>
+                                {editMode ? (
+                                  <div className="flex gap-3">
+                                    {['active', 'pending', 'inactive'].map(status => (
+                                      <label key={status} className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                          type="radio"
+                                          name="status"
+                                          value={status}
+                                          checked={formData.status === status}
+                                          onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                                          className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-sm capitalize">{status}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                      business?.status === 'active' ? 'bg-green-100 text-green-700' :
+                                      business?.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-red-100 text-red-700'
+                                    }`}>
+                                      {business?.status || 'active'}
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
-
-                        <div className="form-row">
-                          <div
-                            className={
-                              editMode
-                                ? getInputClassName("gcash_number")
-                                : "form-group full-width"
-                            }
-                          >
-                            <label>GCash Mobile Number</label>
+                      )}
+                      
+                      {/* Contact Tab */}
+                      {activeTab === "contact" && (
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Contact Phone</label>
+                              {editMode ? (
+                                <input
+                                  type="tel"
+                                  name="contact_phone"
+                                  value={formData.contact_phone || ""}
+                                  onChange={(e) => {
+                                    const numericValue = e.target.value.replace(/\D/g, "");
+                                    setFormData(prev => ({ ...prev, contact_phone: numericValue }));
+                                    validateField("contact_phone", numericValue);
+                                  }}
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="09171234567"
+                                  maxLength={11}
+                                />
+                              ) : (
+                                <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">{business?.contact_phone || "—"}</p>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Contact Email</label>
+                              {editMode ? (
+                                <input
+                                  type="email"
+                                  name="contact_email"
+                                  value={formData.contact_email || ""}
+                                  onChange={(e) => {
+                                    setFormData(prev => ({ ...prev, contact_email: e.target.value }));
+                                    validateField("contact_email", e.target.value);
+                                  }}
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="business@example.com"
+                                />
+                              ) : (
+                                <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">{business?.contact_email || "—"}</p>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Website</label>
+                              {editMode ? (
+                                <input
+                                  type="url"
+                                  name="website"
+                                  value={formData.website || ""}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="https://example.com"
+                                />
+                              ) : (
+                                <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">
+                                  {business?.website ? (
+                                    <a href={business.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                      {business.website}
+                                    </a>
+                                  ) : "—"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Business Hours */}
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-4">Business Hours</label>
+                            
+                            {editMode ? (
+                              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                                {daysOfWeek.map(day => {
+                                  const dayHours = businessHours[day.id];
+                                  const openTime = dayHours?.open ? convertTo12Hour(dayHours.open) : { time: "09:00", ampm: "AM" };
+                                  const closeTime = dayHours?.close ? convertTo12Hour(dayHours.close) : { time: "18:00", ampm: "PM" };
+                                  
+                                  return (
+                                    <div key={day.id} className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <span className="font-semibold text-gray-700 w-24">{day.label}</span>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                          <input
+                                            type="checkbox"
+                                            checked={dayHours?.closed || false}
+                                            onChange={(e) => handleBusinessHourChange(day.id, "closed", e.target.checked)}
+                                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                          />
+                                          <span className="text-sm text-gray-600">Closed</span>
+                                        </label>
+                                      </div>
+                                      
+                                      {!dayHours?.closed && (
+                                        <div className="space-y-3 pl-24">
+                                          <div className="flex items-center gap-3">
+                                            <span className="text-sm text-gray-500 w-12">Open:</span>
+                                            <input
+                                              type="text"
+                                              value={openTime.time}
+                                              onChange={(e) => handleTimeChange(day.id, "openTime", e.target.value)}
+                                              className="w-20 px-2 py-1 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <select
+                                              value={dayHours?.openAMPM || openTime.ampm}
+                                              onChange={(e) => handleBusinessHourChange(day.id, "openAMPM", e.target.value)}
+                                              className="px-2 py-1 border rounded-lg text-sm"
+                                            >
+                                              <option>AM</option>
+                                              <option>PM</option>
+                                            </select>
+                                            <span className="text-gray-400">to</span>
+                                            <input
+                                              type="text"
+                                              value={closeTime.time}
+                                              onChange={(e) => handleTimeChange(day.id, "closeTime", e.target.value)}
+                                              className="w-20 px-2 py-1 border rounded-lg text-sm"
+                                            />
+                                            <select
+                                              value={dayHours?.closeAMPM || closeTime.ampm}
+                                              onChange={(e) => handleBusinessHourChange(day.id, "closeAMPM", e.target.value)}
+                                              className="px-2 py-1 border rounded-lg text-sm"
+                                            >
+                                              <option>AM</option>
+                                              <option>PM</option>
+                                            </select>
+                                          </div>
+                                          
+                                          {/* Break Times */}
+                                          {(dayHours?.breaks || []).map((breakTime, idx) => (
+                                            <div key={idx} className="flex items-center gap-3 pl-12">
+                                              <span className="text-sm text-gray-500">Break {idx + 1}:</span>
+                                              <input
+                                                type="text"
+                                                value={breakTime.start}
+                                                onChange={(e) => {
+                                                  const newBreaks = [...(dayHours.breaks || [])];
+                                                  newBreaks[idx].start = e.target.value;
+                                                  handleBusinessHourChange(day.id, "breaks", newBreaks);
+                                                }}
+                                                className="w-20 px-2 py-1 border rounded-lg text-sm"
+                                              />
+                                              <select
+                                                value={breakTime.startAMPM || "PM"}
+                                                onChange={(e) => {
+                                                  const newBreaks = [...(dayHours.breaks || [])];
+                                                  newBreaks[idx].startAMPM = e.target.value;
+                                                  handleBusinessHourChange(day.id, "breaks", newBreaks);
+                                                }}
+                                                className="px-2 py-1 border rounded-lg text-sm"
+                                              >
+                                                <option>AM</option>
+                                                <option>PM</option>
+                                              </select>
+                                              <span>to</span>
+                                              <input
+                                                type="text"
+                                                value={breakTime.end}
+                                                onChange={(e) => {
+                                                  const newBreaks = [...(dayHours.breaks || [])];
+                                                  newBreaks[idx].end = e.target.value;
+                                                  handleBusinessHourChange(day.id, "breaks", newBreaks);
+                                                }}
+                                                className="w-20 px-2 py-1 border rounded-lg text-sm"
+                                              />
+                                              <select
+                                                value={breakTime.endAMPM || "PM"}
+                                                onChange={(e) => {
+                                                  const newBreaks = [...(dayHours.breaks || [])];
+                                                  newBreaks[idx].endAMPM = e.target.value;
+                                                  handleBusinessHourChange(day.id, "breaks", newBreaks);
+                                                }}
+                                                className="px-2 py-1 border rounded-lg text-sm"
+                                              >
+                                                <option>AM</option>
+                                                <option>PM</option>
+                                              </select>
+                                              <button
+                                                onClick={() => removeBreakTime(day.id, idx)}
+                                                className="text-red-500 hover:text-red-600"
+                                              >
+                                                <Trash2 className="w-4 h-4" />
+                                              </button>
+                                            </div>
+                                          ))}
+                                          
+                                          <button
+                                            onClick={() => addBreakTime(day.id)}
+                                            className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 pl-12"
+                                          >
+                                            <Plus className="w-4 h-4" />
+                                            Add Break Time
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                {business?.business_hours ? (
+                                  Object.entries(business.business_hours).map(([day, hours]) => {
+                                    const openTime = hours.open ? convertTo12Hour(hours.open) : null;
+                                    const closeTime = hours.close ? convertTo12Hour(hours.close) : null;
+                                    return (
+                                      <div key={day} className="flex items-center py-2 border-b border-gray-100">
+                                        <span className="w-24 font-medium text-gray-600 capitalize">{day}:</span>
+                                        <span className="text-gray-800">
+                                          {hours.closed ? (
+                                            <span className="text-gray-400">Closed</span>
+                                          ) : (
+                                            `${openTime?.time || "09:00"} ${openTime?.ampm || "AM"} - ${closeTime?.time || "06:00"} ${closeTime?.ampm || "PM"}`
+                                          )}
+                                        </span>
+                                        {hours.breaks?.length > 0 && (
+                                          <span className="ml-2 text-xs text-gray-400">
+                                            ({hours.breaks.length} break{hours.breaks.length > 1 ? 's' : ''})
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <p className="text-gray-500">No business hours set</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Payment Tab */}
+                      {activeTab === "payment" && (
+                        <div className="space-y-6">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">GCash Mobile Number</label>
                             {editMode ? (
                               <>
                                 <input
                                   type="tel"
-                                  name="gcash_number"
                                   value={gcashNumber}
                                   onChange={(e) => {
-                                    const numericValue = e.target.value.replace(
-                                      /\D/g,
-                                      "",
-                                    );
+                                    const numericValue = e.target.value.replace(/\D/g, "");
                                     setGcashNumber(numericValue);
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      gcash_number: numericValue,
-                                    }));
+                                    setFormData(prev => ({ ...prev, gcash_number: numericValue }));
+                                    validateField("gcash_number", numericValue);
                                   }}
-                                  onFocus={() =>
-                                    setFocusedField("gcash_number")
-                                  }
-                                  onBlur={() => handleBlur("gcash_number")}
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                   placeholder="09171234567"
-                                  className="gcash-input"
                                   maxLength={11}
                                 />
-                                {touchedFields.gcash_number &&
-                                  fieldErrors.gcash_number && (
-                                    <span className="error-hint">
-                                      {fieldErrors.gcash_number}
-                                    </span>
-                                  )}
-                                {gcashNumber &&
-                                  gcashNumber.length > 0 &&
-                                  !fieldErrors.gcash_number && (
-                                    <span className="hint-text">
-                                      Format: 09xxxxxxxxx (11 digits)
-                                    </span>
-                                  )}
+                                {fieldErrors.gcash_number && (
+                                  <p className="text-xs text-red-500 mt-1">{fieldErrors.gcash_number}</p>
+                                )}
                               </>
                             ) : (
-                              <p className="view-field">
-                                {business?.gcash_number || "—"}
-                              </p>
+                              <p className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800">{business?.gcash_number || "—"}</p>
                             )}
                           </div>
-                        </div>
-
-                        <div className="qr-code-section">
-                          <label>GCash QR Code</label>
-
-                          {editMode ? (
-                            <div className="qr-upload-container">
-                              {gcashQrUrl ? (
-                                <div className="qr-preview">
-                                  <img
-                                    src={gcashQrUrl}
-                                    alt="GCash QR Code"
-                                    className="qr-image"
-                                  />
-                                  <button
-                                    type="button"
-                                    className="btn-remove-qr"
-                                    onClick={removeGcashQr}
-                                    disabled={uploadingQr}
-                                  >
-                                    Remove QR Code
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="qr-upload-placeholder">
-                                  <div className="upload-icon">📱</div>
-                                  <p>No GCash QR code uploaded yet</p>
-                                  <input
-                                    type="file"
-                                    id="gcash-qr-upload"
-                                    accept="image/*"
-                                    onChange={handleGcashQrUpload}
-                                    disabled={uploadingQr}
-                                    className="file-input"
-                                  />
-                                  <label
-                                    htmlFor="gcash-qr-upload"
-                                    className="btn-upload-qr"
-                                  >
-                                    {uploadingQr
-                                      ? "Uploading..."
-                                      : "Upload QR Code"}
-                                  </label>
-                                </div>
-                              )}
-                              <p className="qr-hint">
-                                Upload a clear image of your GCash QR code.
-                                Customers will scan this to pay.
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="qr-view">
-                              {business?.gcash_qr_code ? (
-                                <div className="qr-display">
-                                  <img
-                                    src={gcashQrUrl}
-                                    alt="GCash QR Code"
-                                    className="qr-image-large"
-                                  />
-                                  {business?.gcash_number && (
-                                    <p className="gcash-number-display">
-                                      GCash Number: {business.gcash_number}
-                                    </p>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="no-qr-message">
-                                  <p>No GCash QR code set</p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="payment-note">
-                          <p>
-                            ℹ️ Once uploaded, customers can scan this QR code to
-                            make payments through GCash.
-                          </p>
-                          <p>Make sure the QR code is clear and readable.</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Business Permit Tab */}
-                  {activeTab === "permit" && (
-                    <div className="business-form-section">
-                      <h2 className="section-subtitle">
-                        Business Permit Verification
-                      </h2>
-
-                      <div className="permit-section">
-                        <div className="permit-info">
-                          <div className="permit-icon">📄</div>
-                          <div className="permit-description">
-                            <h3>Upload Your Business Permit</h3>
-                            <p>
-                              To verify your business, please upload a clear
-                              image or PDF of your current business permit.
-                              Maximum file size: 5MB (JPG, PNG, PDF)
-                            </p>
-                          </div>
-                        </div>
-
-                        {business?.permit_document && (
-                          <div className="current-permit">
-                            <h4>Current Permit Document</h4>
-                            <div className="permit-document-info">
-                              <span className="permit-number">
-                                Permit #: {business.permit_number || "N/A"}
-                              </span>
-                              <span className="permit-expiry">
-                                Expires:{" "}
-                                {business.permit_expiry
-                                  ? new Date(
-                                      business.permit_expiry,
-                                    ).toLocaleDateString()
-                                  : "N/A"}
-                              </span>
-                              <span
-                                className={`permit-status ${business.permit_verified ? "verified" : "pending"}`}
-                              >
-                                {business.permit_verified
-                                  ? "✅ Verified"
-                                  : "⏳ Pending Verification"}
-                              </span>
-                            </div>
-                            <div className="permit-document-preview">
-                              {business.permit_document && (
-                                <div className="permit-file-link">
-                                  <a
-                                    href={
-                                      supabase.storage
-                                        .from("business-permits")
-                                        .getPublicUrl(business.permit_document)
-                                        .data.publicUrl
-                                    }
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn-view-permit"
-                                  >
-                                    📄 View Uploaded Permit
-                                  </a>
-                                  <button
-                                    className="btn-remove-permit"
-                                    onClick={removePermit}
-                                    disabled={uploadingPermit}
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {(!business?.permit_document ||
-                          business?.verification_status === "rejected") && (
-                          <div className="permit-upload-form">
-                            <h4>
-                              {business?.permit_document
-                                ? "Re-upload New Permit"
-                                : "Upload Your Permit"}
-                            </h4>
-
-                            <div className="form-row">
-                              <div className="form-group">
-                                <label>Permit Number *</label>
-                                <input
-                                  type="text"
-                                  value={permitNumber}
-                                  onChange={(e) =>
-                                    setPermitNumber(e.target.value)
-                                  }
-                                  placeholder="Enter permit number"
-                                  disabled={uploadingPermit}
-                                />
-                              </div>
-
-                              <div className="form-group">
-                                <label>Permit Expiry Date *</label>
-                                <input
-                                  type="date"
-                                  value={permitExpiry}
-                                  onChange={(e) =>
-                                    setPermitExpiry(e.target.value)
-                                  }
-                                  min={new Date().toISOString().split("T")[0]}
-                                  disabled={uploadingPermit}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="permit-file-upload">
-                              <div className="file-upload-area">
-                                {permitPreview ? (
-                                  <div className="permit-preview">
+                          
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">GCash QR Code</label>
+                            {editMode ? (
+                              <div className="space-y-3">
+                                {gcashQrUrl ? (
+                                  <div className="text-center">
                                     <img
-                                      src={permitPreview}
-                                      alt="Permit Preview"
-                                      className="permit-preview-image"
+                                      src={gcashQrUrl}
+                                      alt="GCash QR Code"
+                                      className="w-48 h-48 mx-auto object-cover rounded-xl border-2 border-gray-200 shadow-md"
                                     />
                                     <button
-                                      type="button"
-                                      className="btn-remove-file"
-                                      onClick={() => {
-                                        setPermitFile(null);
-                                        setPermitPreview(null);
+                                      onClick={async () => {
+                                        if (window.confirm('Remove GCash QR code?')) {
+                                          if (gcashQrCode) {
+                                            await supabase.storage
+                                              .from("gcash-qr-codes")
+                                              .remove([gcashQrCode]);
+                                          }
+                                          setGcashQrCode(null);
+                                          setGcashQrUrl("");
+                                          setFormData(prev => ({ ...prev, gcash_qr_code: null }));
+                                          toast.success('QR code removed');
+                                        }
                                       }}
+                                      className="mt-3 text-red-600 hover:text-red-700 text-sm flex items-center gap-1 mx-auto"
                                     >
-                                      ✕
+                                      <Trash2 className="w-4 h-4" />
+                                      Remove QR Code
                                     </button>
                                   </div>
                                 ) : (
-                                  <>
+                                  <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
+                                    <QrCode className="w-12 h-12 text-gray-400 mb-3" />
+                                    <span className="text-sm text-gray-600 mb-1">Click to upload QR code</span>
+                                    <span className="text-xs text-gray-400">PNG, JPG up to 2MB</span>
                                     <input
                                       type="file"
-                                      id="permit-upload"
-                                      accept=".jpg,.jpeg,.png,.pdf"
-                                      onChange={handlePermitFileChange}
-                                      disabled={uploadingPermit}
-                                      className="file-input"
+                                      accept="image/*"
+                                      onChange={handleGcashQrUpload}
+                                      className="hidden"
+                                      disabled={uploadingQr}
                                     />
-                                    <label
-                                      htmlFor="permit-upload"
-                                      className="file-upload-label"
-                                    >
-                                      <span className="upload-icon">📎</span>
-                                      <span className="upload-text">
-                                        {permitFile
-                                          ? permitFile.name
-                                          : "Choose file or drag here"}
-                                      </span>
-                                    </label>
-                                  </>
+                                  </label>
                                 )}
                               </div>
-
-                              <button
-                                className="btn-upload-permit"
-                                onClick={uploadPermit}
-                                disabled={
-                                  !permitFile ||
-                                  !permitNumber ||
-                                  !permitExpiry ||
-                                  uploadingPermit
-                                }
-                              >
-                                {uploadingPermit
-                                  ? "Uploading..."
-                                  : "Upload Permit"}
-                              </button>
-                            </div>
-
-                            <p className="permit-note">
-                              ℹ️ After uploading, your permit will be reviewed
-                              by an admin. This usually takes 1-2 business days.
-                            </p>
-                          </div>
-                        )}
-
-                        {business?.permit_verified && (
-                          <div className="permit-verified-message">
-                            <div className="verified-icon">✅</div>
-                            <div className="verified-content">
-                              <h4>Permit Verified!</h4>
-                              <p>
-                                Your business permit has been verified. You now
-                                have full access to all business features.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Membership Plans Tab */}
-                  {activeTab === "plans" && (
-                    <div className="membership-plans-tab">
-                      <div className="plans-header">
-                        <h2 className="section-subtitle">Membership Plans</h2>
-                        <button
-                          className="btn-add-plan"
-                          onClick={() => {
-                            resetPlanForm();
-                            setShowPlanForm(true);
-                          }}
-                        >
-                          <span className="btn-icon">➕</span> Add New Plan
-                        </button>
-                      </div>
-
-                      {showPlanForm && (
-                        <div className="plan-form-container">
-                          <h3>
-                            {editingPlan ? "Edit Plan" : "Create New Plan"}
-                          </h3>
-
-                          <div className="form-row">
-                            <div className="form-group">
-                              <label>Plan Name *</label>
-                              <input
-                                type="text"
-                                name="name"
-                                value={planFormData.name}
-                                onChange={handlePlanInputChange}
-                                placeholder="e.g., Coffee Lover, Basic Plan"
-                                required
-                              />
-                            </div>
-
-                            <div className="form-group">
-                              <label>Price *</label>
-                              <input
-                                type="number"
-                                name="price"
-                                value={planFormData.price}
-                                onChange={handlePlanInputChange}
-                                placeholder="0.00"
-                                min="0"
-                                step="0.01"
-                                required
-                              />
-                            </div>
-                          </div>
-
-                          <div className="form-row">
-                            <div className="form-group">
-                              <label>Duration</label>
-                              <select
-                                name="duration"
-                                value={planFormData.duration}
-                                onChange={handlePlanInputChange}
-                              >
-                                <option value="month">per month</option>
-                                <option value="year">per year</option>
-                                <option value="week">per week</option>
-                                <option value="day">per day</option>
-                                <option value="session">per session</option>
-                              </select>
-                            </div>
-
-                            <div className="form-group">
-                              <label>Status</label>
-                              <select
-                                name="is_active"
-                                value={planFormData.is_active}
-                                onChange={(e) =>
-                                  setPlanFormData((prev) => ({
-                                    ...prev,
-                                    is_active: e.target.value === "true",
-                                  }))
-                                }
-                              >
-                                <option value="true">Active</option>
-                                <option value="false">Inactive</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="form-group full-width">
-                            <label>Features</label>
-                            {planFormData.features.map((feature, index) => (
-                              <div key={index} className="feature-input-row">
-                                <input
-                                  type="text"
-                                  value={feature}
-                                  onChange={(e) =>
-                                    handleFeatureChange(index, e.target.value)
-                                  }
-                                  placeholder={`Feature ${index + 1}`}
-                                  className="feature-input"
-                                />
-                                <button
-                                  type="button"
-                                  className="remove-feature-btn"
-                                  onClick={() => removeFeature(index)}
-                                  disabled={planFormData.features.length === 1}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              type="button"
-                              className="add-feature-btn"
-                              onClick={addFeature}
-                            >
-                              + Add Feature
-                            </button>
-                          </div>
-
-                          <div className="plan-form-actions">
-                            <button
-                              className="btn-save-plan"
-                              onClick={saveMembershipPlan}
-                              disabled={saving}
-                            >
-                              {saving
-                                ? "Saving..."
-                                : editingPlan
-                                  ? "Update Plan"
-                                  : "Create Plan"}
-                            </button>
-                            <button
-                              className="btn-cancel-plan"
-                              onClick={resetPlanForm}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {membershipPlans.length > 0 ? (
-                        <div className="plans-grid-owner">
-                          {membershipPlans.map((plan) => (
-                            <div
-                              key={plan.id}
-                              className={`plan-card-owner ${!plan.is_active ? "inactive" : ""}`}
-                            >
-                              <div className="plan-card-header">
-                                <h4>{plan.name}</h4>
-                                <div className="plan-badge">
-                                  {plan.is_active ? "Active" : "Inactive"}
-                                </div>
-                              </div>
-                              <div className="plan-price">
-                                ₱{plan.price.toLocaleString()}
-                                <span className="plan-duration">
-                                  /{plan.duration}
-                                </span>
-                              </div>
-                              <ul className="plan-features-list">
-                                {plan.features.map((feature, idx) => (
-                                  <li key={idx}>
-                                    <span className="feature-check">✓</span>
-                                    {feature}
-                                  </li>
-                                ))}
-                              </ul>
-                              <div className="plan-actions">
-                                <button
-                                  className="plan-action-btn edit"
-                                  onClick={() => editPlan(plan)}
-                                >
-                                  ✏️ Edit
-                                </button>
-                                <button
-                                  className="plan-action-btn toggle"
-                                  onClick={() => togglePlanStatus(plan)}
-                                >
-                                  {plan.is_active
-                                    ? "🔴 Deactivate"
-                                    : "🟢 Activate"}
-                                </button>
-                                <button
-                                  className="plan-action-btn delete"
-                                  onClick={() => deletePlan(plan.id)}
-                                >
-                                  🗑️ Delete
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="no-plans-state">
-                          <p>No membership plans created yet.</p>
-                          <p>
-                            Create your first plan to start offering
-                            memberships!
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="plans-preview-section">
-                        <h3 className="preview-subtitle">
-                          Preview - How plans will appear to clients
-                        </h3>
-                        <div className="plans-grid-preview">
-                          {membershipPlans.filter((p) => p.is_active).length >
-                          0 ? (
-                            membershipPlans
-                              .filter((p) => p.is_active)
-                              .map((plan, index) => (
-                                <div
-                                  key={plan.id}
-                                  className="plan-card-preview"
-                                >
-                                  <h4>{plan.name}</h4>
-                                  <div className="plan-price">
-                                    ₱{plan.price.toLocaleString()}
-                                    <span className="plan-duration">
-                                      /{plan.duration}
-                                    </span>
-                                  </div>
-                                  <ul className="plan-features">
-                                    {plan.features.map((feature, idx) => (
-                                      <li key={idx}>
-                                        <span className="feature-check">✓</span>
-                                        {feature}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                  <button
-                                    className="join-plan-btn-preview"
-                                    disabled
-                                  >
-                                    Join Now
-                                  </button>
-                                </div>
-                              ))
-                          ) : (
-                            <div className="no-active-plans-message">
-                              No active plans to display. Activate plans to show
-                              them to clients.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Reviews & Ratings Tab */}
-                  {activeTab === "reviews" && (
-                    <div className="reviews-tab">
-                      <h2 className="section-subtitle">
-                        Customer Reviews & Ratings
-                      </h2>
-
-                      <div className="rating-summary-section">
-                        <div className="average-rating-card">
-                          <div className="average-rating-display">
-                            <span className="big-rating">
-                              {ratingStats.average.toFixed(1)}
-                            </span>
-                            <div className="stars-display">
-                              {renderStars(ratingStats.average)}
-                            </div>
-                            <span className="total-reviews">
-                              Based on {ratingStats.total}{" "}
-                              {ratingStats.total === 1 ? "review" : "reviews"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="rating-distribution">
-                          <h4>Rating Distribution</h4>
-                          {[5, 4, 3, 2, 1].map((stars) => {
-                            const count = ratingStats.distribution[stars];
-                            const percentage =
-                              ratingStats.total > 0
-                                ? Math.round((count / ratingStats.total) * 100)
-                                : 0;
-                            return (
-                              <div key={stars} className="distribution-row">
-                                <span className="stars-label">{stars} ★</span>
-                                <div className="progress-bar-container">
-                                  <div
-                                    className="progress-bar-fill"
-                                    style={{ width: `${percentage}%` }}
-                                  ></div>
-                                </div>
-                                <span className="count-label">{count}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="reviews-list-section">
-                        <h3>All Reviews</h3>
-
-                        {reviewsLoading ? (
-                          <div className="reviews-loading">
-                            <div className="loading-spinner-small"></div>
-                            <p>Loading reviews...</p>
-                          </div>
-                        ) : reviews.length > 0 ? (
-                          <div className="reviews-grid">
-                            {reviews.map((review) => (
-                              <div
-                                key={review.id}
-                                className="review-card-owner"
-                              >
-                                <div className="review-card-header">
-                                  <div className="reviewer-info">
-                                    <div className="reviewer-avatar">
-                                      {review.profiles?.avatar_url ? (
-                                        <img
-                                          src={review.profiles.avatar_url}
-                                          alt="avatar"
-                                        />
-                                      ) : (
-                                        <span className="avatar-placeholder">
-                                          {review.profiles?.first_name?.[0] ||
-                                            "U"}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div>
-                                      <h4 className="reviewer-name">
-                                        {review.profiles?.first_name}{" "}
-                                        {review.profiles?.last_name}
-                                      </h4>
-                                      <span className="review-date">
-                                        {new Date(
-                                          review.created_at,
-                                        ).toLocaleDateString("en-US", {
-                                          year: "numeric",
-                                          month: "long",
-                                          day: "numeric",
-                                        })}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="review-rating-display">
-                                    {renderStars(review.rating)}
-                                  </div>
-                                </div>
-                                <div className="review-content">
-                                  <p className="review-comment">
-                                    {review.comment}
-                                  </p>
-                                </div>
-                                <div className="review-footer">
-                                  <button
-                                    className="delete-review-btn"
-                                    onClick={() => {
-                                      setSelectedReview(review);
-                                      setShowDeleteReviewModal(true);
-                                    }}
-                                  >
-                                    <span className="btn-icon">🗑️</span> Delete
-                                    Review
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="no-reviews-state">
-                            <div className="empty-icon">⭐</div>
-                            <h3>No Reviews Yet</h3>
-                            <p>
-                              When customers leave reviews, they will appear
-                              here.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Preview Tab */}
-                  {activeTab === "preview" && (
-                    <div className="business-preview">
-                      <h3 className="section-subtitle">
-                        Preview - How your business will appear in Browse
-                      </h3>
-
-                      <div className="preview-business-card">
-                        <div className="business-card-glow"></div>
-                        <div className="business-card-content">
-                          <div className="business-card-header">
-                            <div className="business-image-large">
-                              <span className="business-emoji-preview">
-                                {formData.emoji ||
-                                  getEmojiForCategory(formData.business_type) ||
-                                  "🏢"}
-                              </span>
-                            </div>
-                            <div className="business-card-tags">
-                              <span className="business-type-tag">
-                                {formData.business_type?.toUpperCase() ||
-                                  "BUSINESS"}
-                              </span>
-                              <span className="business-rating-tag">
-                                <span className="rating-star">⭐</span>
-                                {formData.rating || "0.0"}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="business-card-body">
-                            <h3 className="business-card-title">
-                              {formData.name || "Business Name"}
-                            </h3>
-                            <p className="business-card-owner">
-                              <span className="owner-icon">👑</span>
-                              {formData.owner_name ||
-                                (profile?.first_name && profile?.last_name
-                                  ? `${profile.first_name} ${profile.last_name}`.trim()
-                                  : "Owner Name")}
-                            </p>
-                            <p className="business-card-description">
-                              {formData.short_description ||
-                                formData.description?.substring(0, 100) ||
-                                "No description provided..."}
-                            </p>
-
-                            <div className="business-card-details">
-                              <div className="business-detail-item">
-                                <span className="detail-icon">📍</span>
-                                <span className="detail-text">
-                                  {formData.location || "Location"}
-                                </span>
-                              </div>
-                              <div className="business-detail-item">
-                                <span className="detail-icon">👥</span>
-                                <span className="detail-text">
-                                  {business?.members_count || 0} members
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="business-card-footer">
-                            <div className="business-price">
-                              <span className="price-amount">
-                                ₱{(formData.price || 0).toLocaleString()}
-                              </span>
-                              <span className="price-period">
-                                /{formData.price_unit || "month"}
-                              </span>
-                            </div>
-                            <button
-                              className="view-details-btn-preview"
-                              disabled
-                            >
-                              View Details →
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="payment-methods-preview">
-                        <h4 className="preview-subtitle">
-                          Payment Methods - How clients will pay
-                        </h4>
-
-                        <div className="payment-options-preview">
-                          <div className="payment-option-card">
-                            <div className="payment-option-header">
-                              <span className="payment-option-icon">📱</span>
-                              <span className="payment-option-title">
-                                GCash
-                              </span>
-                              {gcashQrUrl ? (
-                                <span className="payment-option-badge available">
-                                  Available
-                                </span>
-                              ) : (
-                                <span className="payment-option-badge unavailable">
-                                  Not Set
-                                </span>
-                              )}
-                            </div>
-
-                            {gcashQrUrl ? (
-                              <div className="gcash-preview-content">
-                                <div className="qr-code-preview">
+                            ) : (
+                              <div>
+                                {gcashQrUrl ? (
                                   <img
                                     src={gcashQrUrl}
                                     alt="GCash QR Code"
-                                    className="preview-qr-image"
+                                    className="w-48 h-48 object-cover rounded-xl border border-gray-200"
                                   />
-                                </div>
-                                <div className="gcash-details-preview">
-                                  <p className="gcash-number-preview">
-                                    <span className="preview-label">
-                                      Number:
-                                    </span>
-                                    {gcashNumber || "0917 123 4567"}
-                                  </p>
-                                  <p className="gcash-instruction">
-                                    Scan the QR code with your GCash app to pay
-                                  </p>
-                                  <div className="gcash-steps">
-                                    <span className="step">1. Open GCash</span>
-                                    <span className="step-arrow">→</span>
-                                    <span className="step">2. Scan QR</span>
-                                    <span className="step-arrow">→</span>
-                                    <span className="step">
-                                      3. Enter amount
-                                    </span>
-                                    <span className="step-arrow">→</span>
-                                    <span className="step">4. Pay</span>
-                                  </div>
+                                ) : (
+                                  <p className="text-gray-500">No QR code uploaded</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Permit Tab */}
+                      {activeTab === "permit" && (
+                        <div className="space-y-6">
+                          <div className="bg-blue-50 rounded-xl p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                              <FileText className="w-8 h-8 text-blue-600" />
+                              <div>
+                                <h3 className="font-semibold text-gray-800">Business Permit Verification</h3>
+                                <p className="text-sm text-gray-600">Upload your business permit for verification</p>
+                              </div>
+                            </div>
+                            
+                            {business?.permit_document && (
+                              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                <h4 className="font-medium text-gray-700 mb-2">Current Permit</h4>
+                                <p className="text-sm">Permit #: {business.permit_number || "N/A"}</p>
+                                <p className="text-sm">Expires: {business.permit_expiry ? new Date(business.permit_expiry).toLocaleDateString() : "N/A"}</p>
+                                <p className="text-sm mt-2">
+                                  Status: 
+                                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                                    business.permit_verified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                  }`}>
+                                    {business.permit_verified ? "Verified" : "Pending"}
+                                  </span>
+                                </p>
+                                <div className="flex gap-2 mt-3">
+                                  <a
+                                    href={supabase.storage.from("business-permits").getPublicUrl(business.permit_document).data.publicUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                                  >
+                                    View Permit
+                                  </a>
+                                  {editMode && (
+                                    <button
+                                      onClick={removePermit}
+                                      className="px-3 py-1 border border-red-500 text-red-600 rounded text-sm hover:bg-red-50"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
                                 </div>
                               </div>
-                            ) : (
-                              <div className="payment-unavailable">
-                                <p>GCash payment not available</p>
-                                <p className="unavailable-note">
-                                  Owner hasn't set up GCash yet
+                            )}
+                            
+                            {editMode && (!business?.permit_document || business?.verification_status === "rejected") && (
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Permit Number *</label>
+                                    <input
+                                      type="text"
+                                      value={permitNumber}
+                                      onChange={(e) => setPermitNumber(e.target.value)}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                      placeholder="Enter permit number"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date *</label>
+                                    <input
+                                      type="date"
+                                      value={permitExpiry}
+                                      onChange={(e) => setPermitExpiry(e.target.value)}
+                                      min={new Date().toISOString().split("T")[0]}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Permit Document *</label>
+                                  <input
+                                    type="file"
+                                    accept=".jpg,.jpeg,.png,.pdf"
+                                    onChange={handlePermitFileChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                  />
+                                  {permitPreview && (
+                                    <img src={permitPreview} alt="Preview" className="mt-2 h-32 object-cover rounded" />
+                                  )}
+                                </div>
+                                
+                                <button
+                                  onClick={handlePermitUpload}
+                                  disabled={!permitFile || !permitNumber || !permitExpiry || uploadingPermit}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                  {uploadingPermit ? "Uploading..." : "Upload Permit"}
+                                </button>
+                                
+                                <p className="text-xs text-gray-500 mt-2">
+                                  ℹ️ After uploading, your permit will be reviewed by an admin. This usually takes 1-2 business days.
                                 </p>
                               </div>
                             )}
                           </div>
-
-                          <div className="payment-option-card">
-                            <div className="payment-option-header">
-                              <span className="payment-option-icon">🏪</span>
-                              <span className="payment-option-title">
-                                Pay at the Business
-                              </span>
-                              <span className="payment-option-badge available">
-                                Available
-                              </span>
-                            </div>
-                            <div className="onsite-preview-content">
-                              <p className="onsite-instruction">
-                                Pay directly at{" "}
-                                {formData.name || "the business"} premises
-                              </p>
-                              <div className="onsite-details">
-                                <p>
-                                  <span className="preview-label">
-                                    Location:
-                                  </span>{" "}
-                                  {formData.location || "Downtown"}
-                                </p>
-                                <p>
-                                  <span className="preview-label">
-                                    Address:
-                                  </span>{" "}
-                                  {formData.address ||
-                                    formData.location ||
-                                    "Business location"}
-                                </p>
-                              </div>
-                            </div>
+                        </div>
+                      )}
+                      
+                      {/* Preview Tab */}
+                      {activeTab === "preview" && (
+                        <Suspense fallback={
+                          <div className="flex items-center justify-center py-12">
+                            <Loader className="w-8 h-8 animate-spin text-blue-500" />
                           </div>
-                        </div>
-
-                        <div className="preview-note">
-                          <p>
-                            ✨ This is how payment options will appear to
-                            clients when they view your business
-                          </p>
-                          <p>
-                            Make sure your GCash QR code is clear and readable
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                        }>
+                          <BusinessPreview 
+                            business={business} 
+                            formData={formData}
+                            businessHours={businessHours}
+                            gcashQrUrl={gcashQrUrl}
+                            gcashNumber={gcashNumber}
+                            profile={profile}
+                          />
+                        </Suspense>
+                      )}
+                      
+                      {/* Plans Tab */}
+                      {activeTab === "plans" && (
+                        <Suspense fallback={
+                          <div className="flex items-center justify-center py-12">
+                            <Loader className="w-8 h-8 animate-spin text-blue-500" />
+                          </div>
+                        }>
+                          <MembershipPlansManager businessId={business?.id} />
+                        </Suspense>
+                      )}
+                      
+                      {/* Reviews Tab */}
+                      {activeTab === "reviews" && (
+                        <Suspense fallback={
+                          <div className="flex items-center justify-center py-12">
+                            <Loader className="w-8 h-8 animate-spin text-blue-500" />
+                          </div>
+                        }>
+                          <ReviewsManager businessId={business?.id} />
+                        </Suspense>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
-
+                
                 {editMode && (
-                  <div className="business-form-actions">
+                  <div className="border-t border-gray-200 p-6 bg-gray-50/50 flex justify-end gap-3">
                     <button
-                      className="btn-save-business"
-                      onClick={saveBusiness}
-                      disabled={saving}
+                      onClick={handleCancelEdit}
+                      className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors flex items-center gap-2"
                     >
-                      {saving
-                        ? "Saving..."
-                        : business?.id
-                          ? "Update Business"
-                          : "Create Business"}
+                      <X className="w-4 h-4" />
+                      Cancel
                     </button>
                     <button
-                      className="btn-cancel-edit"
-                      onClick={cancelEdit}
+                      onClick={saveBusiness}
                       disabled={saving}
+                      className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
                     >
-                      Cancel
+                      {saving ? (
+                        <>
+                          <Loader className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          {business?.id ? 'Update Business' : 'Create Business'}
+                        </>
+                      )}
                     </button>
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        </main>
-      </div>
-
-      {/* Delete Review Confirmation Modal */}
-      {showDeleteReviewModal && selectedReview && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowDeleteReviewModal(false)}
-        >
-          <div
-            className="modal-content delete-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h2>Delete Review</h2>
-              <button
-                className="modal-close"
-                onClick={() => setShowDeleteReviewModal(false)}
-              >
-                ×
-              </button>
             </div>
-            <div className="modal-body">
-              <p>Are you sure you want to delete this review?</p>
-              <div className="review-preview">
-                <div className="preview-rating">
-                  {renderStars(selectedReview.rating)}
-                </div>
-                <p className="preview-comment">"{selectedReview.comment}"</p>
-                <p className="preview-author">
-                  - {selectedReview.profiles?.first_name}{" "}
-                  {selectedReview.profiles?.last_name}
-                </p>
-              </div>
-              <p className="warning-text">This action cannot be undone.</p>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="btn-secondary"
-                onClick={() => setShowDeleteReviewModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn-delete"
-                onClick={handleDeleteReview}
-                disabled={deletingReview}
-              >
-                {deletingReview ? "Deleting..." : "Delete Review"}
-              </button>
-            </div>
-          </div>
+          ) : null}
         </div>
-      )}
+      </div>
+      
+      {/* Unsaved Changes Modal */}
+      <AnimatePresence>
+        {showUnsavedChangesModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowUnsavedChangesModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl max-w-md w-full p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-yellow-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-800">Unsaved Changes</h3>
+              </div>
+              <p className="text-gray-600 mb-6">
+                You have unsaved changes. Are you sure you want to leave? Your changes will be lost.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowUnsavedChangesModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Continue Editing
+                </button>
+                <button
+                  onClick={() => {
+                    setShowUnsavedChangesModal(false);
+                    cancelEdit();
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Discard Changes
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
