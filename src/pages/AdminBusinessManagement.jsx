@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import AdminSidebarNav from '../components/admin/AdminSidebarNav';
 import RejectionModal from '../components/admin/RejectionModal';
 import PermitViewerModal from '../components/admin/PermitViewerModal';
-import '../styles/AdminBusinessManagement.css';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const AdminBusinessManagement = () => {
   const navigate = useNavigate();
@@ -464,47 +464,36 @@ const AdminBusinessManagement = () => {
   const getStatusBadge = (status) => {
     switch(status) {
       case 'active':
-        return <span className="status-badge active">Active</span>;
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>;
       case 'pending':
-        return <span className="status-badge pending">Pending</span>;
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Pending</span>;
       case 'suspended':
-        return <span className="status-badge suspended">Suspended</span>;
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">Suspended</span>;
       case 'rejected':
-        return <span className="status-badge rejected">Rejected</span>;
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Rejected</span>;
       default:
-        return <span className="status-badge">{status}</span>;
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{status}</span>;
     }
-  };
-
-  const getVerificationBadge = (business) => {
-    if (business.verification_status === 'approved' && business.permit_verified) {
-      return <span className="verification-badge approved">✅ Fully Verified</span>;
-    } else if (business.verification_status === 'approved' && !business.permit_verified) {
-      return <span className="verification-badge pending">📄 Permit Pending</span>;
-    } else if (business.verification_status === 'pending') {
-      return <span className="verification-badge pending">⏳ Pending Review</span>;
-    } else if (business.verification_status === 'rejected') {
-      return <span className="verification-badge rejected">❌ Rejected</span>;
-    }
-    return <span className="verification-badge">Not Set</span>;
   };
 
   const getPermitBadge = (business) => {
     if (!business.permit_document) {
-      return <span className="permit-badge missing">📄 No Permit</span>;
+      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">📄 No Permit</span>;
     }
     if (business.permit_verified) {
-      return <span className="permit-badge verified">✅ Permit Verified</span>;
+      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">✅ Permit Verified</span>;
     }
-    return <span className="permit-badge pending">⏳ Permit Pending</span>;
+    return <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">⏳ Permit Pending</span>;
   };
 
   if (loading) {
     return (
       <AdminSidebarNav>
-        <div className="admin-loading">
-          <div className="loading-spinner"></div>
-          <p>Loading businesses...</p>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading businesses...</p>
+          </div>
         </div>
       </AdminSidebarNav>
     );
@@ -512,237 +501,229 @@ const AdminBusinessManagement = () => {
 
   return (
     <AdminSidebarNav>
-      <div className="business-management-container">
+      <div className="space-y-6">
         {/* Header */}
-        <div className="business-management-header">
-          <div className="header-left">
-            <h1 className="page-title">Business Management</h1>
-            <div className="header-decoration"></div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Business Management</h1>
+            <p className="text-gray-600 mt-1">Manage and verify business accounts</p>
           </div>
-          <div className="header-right">
-            <button 
-              className="btn-primary"
-              onClick={() => navigate('/admin/businesses/add')}
-            >
-              <span className="btn-icon">➕</span>
-              Add Business
-            </button>
-          </div>
+          <button 
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
+            onClick={() => navigate('/admin/businesses/add')}
+          >
+            <span>➕</span> Add Business
+          </button>
         </div>
 
         {/* Stats Cards */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon-wrapper total">
-              <span className="stat-icon">🏢</span>
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.total}</span>
-              <span className="stat-label">Total Businesses</span>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon-wrapper verified">
-              <span className="stat-icon">✅</span>
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.verified}</span>
-              <span className="stat-label">Fully Verified</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                <span className="text-2xl">🏢</span>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-sm text-gray-600">Total Businesses</p>
+              </div>
             </div>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-icon-wrapper pending">
-              <span className="stat-icon">⏳</span>
-            </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.permitPending}</span>
-              <span className="stat-label">Permit Pending</span>
+          <div className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+                <span className="text-2xl">✅</span>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{stats.verified}</p>
+                <p className="text-sm text-gray-600">Fully Verified</p>
+              </div>
             </div>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-icon-wrapper suspended">
-              <span className="stat-icon">⚠️</span>
+          <div className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center">
+                <span className="text-2xl">⏳</span>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{stats.permitPending}</p>
+                <p className="text-sm text-gray-600">Permit Pending</p>
+              </div>
             </div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.suspended}</span>
-              <span className="stat-label">Suspended</span>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{stats.suspended}</p>
+                <p className="text-sm text-gray-600">Suspended</p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Search and Filter Bar */}
-        <div className="filters-bar">
-          <div className="search-box">
-            <span className="search-icon">🔍</span>
-            <input
-              type="text"
-              placeholder="Search businesses by name, type, permit #, or owner..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            {searchTerm && (
-              <button 
-                className="clear-search"
-                onClick={() => setSearchTerm('')}
+        <div className="bg-white rounded-xl shadow-lg p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+              <input
+                type="text"
+                placeholder="Search businesses by name, type, permit #, or owner..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {searchTerm && (
+                <button 
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setSearchTerm('')}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <select
+                value={verificationFilter}
+                onChange={(e) => setVerificationFilter(e.target.value)}
+                className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
               >
-                ✕
-              </button>
-            )}
-          </div>
+                <option value="all">All Verification</option>
+                <option value="approved">Fully Verified</option>
+                <option value="pending">Pending</option>
+                <option value="rejected">Rejected</option>
+              </select>
 
-          <div className="filter-group">
-            <select
-              value={verificationFilter}
-              onChange={(e) => setVerificationFilter(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Verification</option>
-              <option value="approved">Fully Verified</option>
-              <option value="pending">Pending</option>
-              <option value="rejected">Rejected</option>
-            </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="suspended">Suspended</option>
+                <option value="rejected">Rejected</option>
+              </select>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="filter-select"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="pending">Pending</option>
-              <option value="suspended">Suspended</option>
-              <option value="rejected">Rejected</option>
-            </select>
-
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="filter-select"
-            >
-              {businessTypes.map(type => (
-                <option key={type.id} value={type.id}>
-                  {type.icon} {type.label}
-                </option>
-              ))}
-            </select>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                {businessTypes.map(type => (
+                  <option key={type.id} value={type.id}>
+                    {type.icon} {type.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
         {/* Results count */}
-        <div className="results-info">
-          <span className="results-count">
-            Showing {filteredBusinesses.length} of {businesses.length} businesses
-          </span>
+        <div className="text-sm text-gray-600">
+          Showing {filteredBusinesses.length} of {businesses.length} businesses
         </div>
 
         {/* Businesses Grid */}
         {filteredBusinesses.length > 0 ? (
-          <div className="businesses-grid">
-            {filteredBusinesses.map((business) => (
-              <div key={business.id} className="business-card">
-                <div className="business-card-header">
-                  <div className="business-icon-large">
-                    <span className="business-emoji-large">{getBusinessIcon(business)}</span>
-                  </div>
-                  <div className="business-title-section">
-                    <h3 className="business-name">{business.name}</h3>
-                    <span className="business-type-badge">
-                      {getBusinessIcon(business)} {business.business_type}
-                    </span>
-                  </div>
-                  <div className="badge-group">
-                    {getStatusBadge(business.status)}
-                    {getPermitBadge(business)}
-                  </div>
-                </div>
-
-                <div className="business-card-body">
-                  <div className="business-info-row">
-                    <span className="info-label">👑 Owner:</span>
-                    <span className="info-value">
-                      {business.owner ? (
-                        <>
-                          {business.owner.first_name} {business.owner.last_name}
-                          <span className="owner-email"> ({business.owner.email})</span>
-                        </>
-                      ) : 'No owner assigned'}
-                    </span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {filteredBusinesses.map((business, index) => (
+              <motion.div
+                key={business.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300"
+              >
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center text-3xl">
+                        {getBusinessIcon(business)}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-lg text-gray-900">{business.name}</h3>
+                        <span className="text-sm text-gray-500">{business.business_type}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {getStatusBadge(business.status)}
+                      {getPermitBadge(business)}
+                    </div>
                   </div>
 
-                  <div className="business-info-row">
-                    <span className="info-label">📍 Location:</span>
-                    <span className="info-value">{business.location || 'Not specified'}</span>
-                  </div>
-
-                  <div className="business-info-row">
-                    <span className="info-label">📄 Permit #:</span>
-                    <span className="info-value">
-                      {business.permit_number || 'Not submitted'}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-500 w-20">👑 Owner:</span>
+                      <span className="text-gray-700">
+                        {business.owner ? `${business.owner.first_name || ''} ${business.owner.last_name || ''}`.trim() || business.owner.email : 'No owner'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-500 w-20">📍 Location:</span>
+                      <span className="text-gray-700">{business.location || 'Not specified'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-500 w-20">📄 Permit #:</span>
+                      <span className="text-gray-700">{business.permit_number || 'Not submitted'}</span>
                       {business.permit_document && (
                         <button
-                          className="view-permit-link"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewPermit(business);
-                          }}
+                          onClick={() => handleViewPermit(business)}
+                          className="text-blue-600 hover:text-blue-700 text-sm underline ml-2"
                         >
                           View Document
                         </button>
                       )}
-                    </span>
-                  </div>
-
-                  {business.permit_expiry && (
-                    <div className="business-info-row">
-                      <span className="info-label">📅 Permit Expiry:</span>
-                      <span className="info-value">{formatDate(business.permit_expiry)}</span>
                     </div>
-                  )}
-
-                  <div className="business-info-row">
-                    <span className="info-label">📅 Created:</span>
-                    <span className="info-value">{formatDate(business.created_at)}</span>
-                  </div>
-
-                  <div className="business-description">
-                    <span className="info-label">📝 Description:</span>
-                    <p className="description-text">
-                      {business.description 
-                        ? business.description.length > 100 
-                          ? `${business.description.substring(0, 100)}...` 
-                          : business.description
-                        : 'No description provided'}
-                    </p>
-                  </div>
-
-                  {business.rejection_reason && (
-                    <div className="rejection-reason">
-                      <span className="rejection-icon">❌</span>
-                      <span className="rejection-text">Rejection reason: {business.rejection_reason}</span>
+                    {business.permit_expiry && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-500 w-20">📅 Expiry:</span>
+                        <span className="text-gray-700">{formatDate(business.permit_expiry)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-500 w-20">📅 Created:</span>
+                      <span className="text-gray-700">{formatDate(business.created_at)}</span>
                     </div>
-                  )}
-                </div>
+                    {business.description && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <p className="text-sm text-gray-600 line-clamp-2">
+                          {business.description.length > 100 ? `${business.description.substring(0, 100)}...` : business.description}
+                        </p>
+                      </div>
+                    )}
+                    {business.rejection_reason && (
+                      <div className="mt-2 p-2 bg-red-50 rounded-lg">
+                        <p className="text-xs text-red-600 font-medium">Rejection reason:</p>
+                        <p className="text-sm text-red-700">{business.rejection_reason}</p>
+                      </div>
+                    )}
+                  </div>
 
-                <div className="business-card-footer">
-                  <div className="action-buttons">
+                  <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
                     {/* Permit Verification Button */}
                     {business.permit_document && !business.permit_verified && (
                       <button
-                        className="action-btn verify-permit"
                         onClick={() => handleVerifyPermit(business.id)}
                         disabled={actionLoading[business.id]}
+                        className="flex-1 px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium disabled:opacity-50"
                       >
                         {actionLoading[business.id] === 'verifyPermit' ? (
-                          <span className="loading-spinner-small"></span>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Verifying...
+                          </div>
                         ) : (
-                          <>
-                            <span className="btn-icon">✓</span>
-                            Verify Permit
-                          </>
+                          <>✓ Verify Permit</>
                         )}
                       </button>
                     )}
@@ -751,31 +732,31 @@ const AdminBusinessManagement = () => {
                     {business.verification_status === 'pending' && business.permit_document && (
                       <>
                         <button
-                          className="action-btn approve"
                           onClick={() => handleApproveBusiness(business)}
                           disabled={actionLoading[business.id]}
+                          className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
                         >
                           {actionLoading[business.id] === 'approve' ? (
-                            <span className="loading-spinner-small"></span>
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Approving...
+                            </div>
                           ) : (
-                            <>
-                              <span className="btn-icon">✓</span>
-                              Approve
-                            </>
+                            <>✓ Approve</>
                           )}
                         </button>
                         <button
-                          className="action-btn reject"
                           onClick={() => handleRejectClick(business)}
                           disabled={actionLoading[business.id]}
+                          className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
                         >
                           {actionLoading[business.id] === 'reject' ? (
-                            <span className="loading-spinner-small"></span>
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Rejecting...
+                            </div>
                           ) : (
-                            <>
-                              <span className="btn-icon">✗</span>
-                              Reject
-                            </>
+                            <>✗ Reject</>
                           )}
                         </button>
                       </>
@@ -783,86 +764,82 @@ const AdminBusinessManagement = () => {
 
                     {business.status === 'active' ? (
                       <button
-                        className="action-btn suspend"
                         onClick={() => handleSuspendBusiness(business.id)}
                         disabled={actionLoading[business.id]}
+                        className="flex-1 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium disabled:opacity-50"
                       >
                         {actionLoading[business.id] === 'suspend' ? (
-                          <span className="loading-spinner-small"></span>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Suspending...
+                          </div>
                         ) : (
-                          <>
-                            <span className="btn-icon">⚠️</span>
-                            Suspend
-                          </>
+                          <>⚠️ Suspend</>
                         )}
                       </button>
                     ) : business.status === 'suspended' ? (
                       <button
-                        className="action-btn activate"
                         onClick={() => handleActivateBusiness(business.id)}
                         disabled={actionLoading[business.id]}
+                        className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
                       >
                         {actionLoading[business.id] === 'activate' ? (
-                          <span className="loading-spinner-small"></span>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Activating...
+                          </div>
                         ) : (
-                          <>
-                            <span className="btn-icon">✓</span>
-                            Activate
-                          </>
+                          <>✓ Activate</>
                         )}
                       </button>
                     ) : business.status === 'rejected' && business.permit_document && (
                       <button
-                        className="action-btn reactivate"
                         onClick={() => handleApproveBusiness(business)}
                         disabled={actionLoading[business.id]}
+                        className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
                       >
                         {actionLoading[business.id] === 'approve' ? (
-                          <span className="loading-spinner-small"></span>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Reactivating...
+                          </div>
                         ) : (
-                          <>
-                            <span className="btn-icon">🔄</span>
-                            Reactivate
-                          </>
+                          <>🔄 Reactivate</>
                         )}
                       </button>
                     )}
 
                     <button
-                      className="action-btn view"
                       onClick={() => handleViewDetails(business)}
+                      className="flex-1 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
                     >
-                      <span className="btn-icon">👁️</span>
-                      View
+                      👁️ View Details
                     </button>
 
                     <button
-                      className="action-btn delete"
                       onClick={() => handleDeleteBusiness(business.id)}
                       disabled={actionLoading[business.id]}
+                      className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
                     >
                       {actionLoading[business.id] === 'delete' ? (
-                        <span className="loading-spinner-small"></span>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       ) : (
-                        <>
-                          <span className="btn-icon">🗑️</span>
-                          Delete
-                        </>
+                        <>🗑️ Delete</>
                       )}
                     </button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         ) : (
-          <div className="empty-state">
-            <div className="empty-icon">🏢</div>
-            <h3>No Businesses Found</h3>
-            <p>Try adjusting your search or filter to find what you're looking for.</p>
+          <div className="text-center py-12 bg-white rounded-xl shadow-lg">
+            <div className="text-6xl mb-4">🏢</div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">No Businesses Found</h3>
+            <p className="text-gray-500">Try adjusting your search or filter to find what you're looking for.</p>
             {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all' || verificationFilter !== 'all') && (
               <button
-                className="clear-filters-btn"
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 onClick={() => {
                   setSearchTerm('');
                   setStatusFilter('all');
@@ -876,238 +853,121 @@ const AdminBusinessManagement = () => {
           </div>
         )}
 
-        {/* Business Details Modal */}
-        {showDetailsModal && selectedBusiness && (
-          <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
-            <div className="modal-content business-details-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <div className="modal-title">
-                  <span className="modal-icon">{getBusinessIcon(selectedBusiness)}</span>
-                  <h2>{selectedBusiness.name}</h2>
+        {/* Business Details Modal - Tailwind Styled */}
+        <AnimatePresence>
+          {showDetailsModal && selectedBusiness && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDetailsModal(false)}>
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{getBusinessIcon(selectedBusiness)}</span>
+                    <h2 className="text-xl font-bold text-white">{selectedBusiness.name}</h2>
+                  </div>
+                  <button onClick={() => setShowDetailsModal(false)} className="text-white hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center">
+                    ×
+                  </button>
                 </div>
-                <button className="modal-close" onClick={() => setShowDetailsModal(false)}>×</button>
-              </div>
-
-              <div className="modal-body">
-                <div className="details-grid">
-                  <div className="detail-section">
-                    <h3>Business Information</h3>
-                    <div className="detail-item">
-                      <span className="detail-label">Type:</span>
-                      <span className="detail-value">{selectedBusiness.business_type}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Status:</span>
-                      <span className="detail-value">{getStatusBadge(selectedBusiness.status)}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Verification:</span>
-                      <span className="detail-value">{getVerificationBadge(selectedBusiness)}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Location:</span>
-                      <span className="detail-value">{selectedBusiness.location || 'Not specified'}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Address:</span>
-                      <span className="detail-value">{selectedBusiness.address || 'Not specified'}</span>
-                    </div>
-                  </div>
-
-                  <div className="detail-section">
-                    <h3>Owner Information</h3>
-                    <div className="detail-item">
-                      <span className="detail-label">Name:</span>
-                      <span className="detail-value">
-                        {selectedBusiness.owner ? (
-                          `${selectedBusiness.owner.first_name} ${selectedBusiness.owner.last_name}`
-                        ) : 'No owner'}
-                      </span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Email:</span>
-                      <span className="detail-value">{selectedBusiness.owner?.email || 'N/A'}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Owner Status:</span>
-                      <span className="detail-value">
-                        {selectedBusiness.owner?.role === 'owner' ? (
-                          <span className="status-badge active">Approved Owner</span>
-                        ) : (
-                          'Unknown'
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="detail-section">
-                    <h3>Permit Information</h3>
-                    <div className="detail-item">
-                      <span className="detail-label">Permit Number:</span>
-                      <span className="detail-value">{selectedBusiness.permit_number || 'Not provided'}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Expiry Date:</span>
-                      <span className="detail-value">
-                        {selectedBusiness.permit_expiry 
-                          ? new Date(selectedBusiness.permit_expiry).toLocaleDateString() 
-                          : 'Not provided'}
-                      </span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Permit Status:</span>
-                      <span className="detail-value">
-                        {selectedBusiness.permit_verified ? (
-                          <span className="status-badge active">Verified</span>
-                        ) : selectedBusiness.permit_document ? (
-                          <span className="status-badge pending">Pending Verification</span>
-                        ) : (
-                          <span className="status-badge">Not Uploaded</span>
-                        )}
-                      </span>
-                    </div>
-                    {selectedBusiness.permit_document && (
-                      <div className="detail-item">
-                        <span className="detail-label">Document:</span>
-                        <button
-                          className="view-permit-button"
-                          onClick={() => {
-                            setShowDetailsModal(false);
-                            handleViewPermit(selectedBusiness);
-                          }}
-                        >
-                          📄 View Permit Document
-                        </button>
+                
+                <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Business Information */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-gray-900 border-b pb-2">Business Information</h3>
+                      <div className="space-y-2">
+                        <div><span className="text-gray-500">Type:</span> {selectedBusiness.business_type}</div>
+                        <div><span className="text-gray-500">Status:</span> {getStatusBadge(selectedBusiness.status)}</div>
+                        <div><span className="text-gray-500">Verification:</span> {getPermitBadge(selectedBusiness)}</div>
+                        <div><span className="text-gray-500">Location:</span> {selectedBusiness.location || 'Not specified'}</div>
+                        <div><span className="text-gray-500">Address:</span> {selectedBusiness.address || 'Not specified'}</div>
                       </div>
-                    )}
-                    {selectedBusiness.rejection_reason && (
-                      <div className="detail-item">
-                        <span className="detail-label">Rejection:</span>
-                        <span className="detail-value rejection-text">{selectedBusiness.rejection_reason}</span>
+                    </div>
+
+                    {/* Owner Information */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-gray-900 border-b pb-2">Owner Information</h3>
+                      <div className="space-y-2">
+                        <div><span className="text-gray-500">Name:</span> {selectedBusiness.owner ? `${selectedBusiness.owner.first_name || ''} ${selectedBusiness.owner.last_name || ''}`.trim() || 'N/A' : 'No owner'}</div>
+                        <div><span className="text-gray-500">Email:</span> {selectedBusiness.owner?.email || 'N/A'}</div>
                       </div>
-                    )}
-                  </div>
+                    </div>
 
-                  <div className="detail-section">
-                    <h3>Contact Information</h3>
-                    <div className="detail-item">
-                      <span className="detail-label">Phone:</span>
-                      <span className="detail-value">{selectedBusiness.contact_phone || 'Not provided'}</span>
+                    {/* Permit Information */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-gray-900 border-b pb-2">Permit Information</h3>
+                      <div className="space-y-2">
+                        <div><span className="text-gray-500">Permit Number:</span> {selectedBusiness.permit_number || 'Not provided'}</div>
+                        <div><span className="text-gray-500">Expiry Date:</span> {selectedBusiness.permit_expiry ? new Date(selectedBusiness.permit_expiry).toLocaleDateString() : 'Not provided'}</div>
+                        {selectedBusiness.permit_document && (
+                          <div><button onClick={() => { setShowDetailsModal(false); handleViewPermit(selectedBusiness); }} className="text-blue-600 hover:underline">📄 View Permit Document</button></div>
+                        )}
+                      </div>
                     </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Email:</span>
-                      <span className="detail-value">{selectedBusiness.contact_email || 'Not provided'}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Website:</span>
-                      <span className="detail-value">{selectedBusiness.website || 'Not provided'}</span>
-                    </div>
-                  </div>
 
-                  <div className="detail-section">
-                    <h3>Business Metrics</h3>
-                    <div className="detail-item">
-                      <span className="detail-label">Members:</span>
-                      <span className="detail-value">{selectedBusiness.members_count || 0}</span>
+                    {/* Contact Information */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-gray-900 border-b pb-2">Contact Information</h3>
+                      <div className="space-y-2">
+                        <div><span className="text-gray-500">Phone:</span> {selectedBusiness.contact_phone || 'Not provided'}</div>
+                        <div><span className="text-gray-500">Email:</span> {selectedBusiness.contact_email || 'Not provided'}</div>
+                        <div><span className="text-gray-500">Website:</span> {selectedBusiness.website || 'Not provided'}</div>
+                      </div>
                     </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Rating:</span>
-                      <span className="detail-value">{selectedBusiness.rating || '0.0'} ⭐</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Created:</span>
-                      <span className="detail-value">{formatDate(selectedBusiness.created_at)}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Last Updated:</span>
-                      <span className="detail-value">{formatDate(selectedBusiness.updated_at)}</span>
+
+                    {/* Business Metrics */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-gray-900 border-b pb-2">Business Metrics</h3>
+                      <div className="space-y-2">
+                        <div><span className="text-gray-500">Members:</span> {selectedBusiness.members_count || 0}</div>
+                        <div><span className="text-gray-500">Rating:</span> {selectedBusiness.rating || '0.0'} ⭐</div>
+                        <div><span className="text-gray-500">Created:</span> {formatDate(selectedBusiness.created_at)}</div>
+                        <div><span className="text-gray-500">Last Updated:</span> {formatDate(selectedBusiness.updated_at)}</div>
+                      </div>
                     </div>
                   </div>
 
+                  {/* Description */}
+                  <div className="mt-6">
+                    <h3 className="font-semibold text-gray-900 border-b pb-2">Description</h3>
+                    <p className="mt-2 text-gray-700">{selectedBusiness.description || 'No description provided.'}</p>
+                  </div>
+
+                  {/* Rejection Reason */}
                   {selectedBusiness.rejection_reason && (
-                    <div className="detail-section full-width">
-                      <h3>Rejection Reason</h3>
-                      <div className="rejection-detail">
-                        <p>{selectedBusiness.rejection_reason}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="detail-section full-width">
-                    <h3>Description</h3>
-                    <p className="full-description">
-                      {selectedBusiness.description || 'No description provided.'}
-                    </p>
-                  </div>
-
-                  {selectedBusiness.business_hours && (
-                    <div className="detail-section full-width">
-                      <h3>Business Hours</h3>
-                      <div className="hours-grid">
-                        {Object.entries(selectedBusiness.business_hours).map(([day, hours]) => (
-                          <div key={day} className="hours-row">
-                            <span className="hours-day">{day}:</span>
-                            <span className="hours-time">
-                              {hours.closed ? 'Closed' : `${hours.open} - ${hours.close}`}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedBusiness.amenities && selectedBusiness.amenities.length > 0 && (
-                    <div className="detail-section full-width">
-                      <h3>Amenities</h3>
-                      <div className="amenities-list">
-                        {selectedBusiness.amenities.map((amenity, index) => (
-                          <span key={index} className="amenity-tag">{amenity}</span>
-                        ))}
-                      </div>
+                    <div className="mt-4 p-4 bg-red-50 rounded-lg">
+                      <h3 className="font-semibold text-red-800">Rejection Reason</h3>
+                      <p className="text-red-700">{selectedBusiness.rejection_reason}</p>
                     </div>
                   )}
                 </div>
-              </div>
 
-              <div className="modal-footer">
-                <button className="btn-secondary" onClick={() => setShowDetailsModal(false)}>
-                  Close
-                </button>
-                {selectedBusiness.verification_status === 'pending' && selectedBusiness.permit_document && (
-                  <>
-                    <button 
-                      className="btn-approve"
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        handleApproveBusiness(selectedBusiness);
-                      }}
-                    >
-                      ✓ Approve Business
-                    </button>
-                    <button 
-                      className="btn-reject"
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        handleRejectClick(selectedBusiness);
-                      }}
-                    >
-                      ✗ Reject Business
-                    </button>
-                  </>
-                )}
-                <button 
-                  className="btn-primary"
-                  onClick={() => {
-                    setShowDetailsModal(false);
-                    navigate(`/admin/businesses/edit/${selectedBusiness.id}`);
-                  }}
-                >
-                  Edit Business
-                </button>
-              </div>
+                <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+                  <button onClick={() => setShowDetailsModal(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                    Close
+                  </button>
+                  {selectedBusiness.verification_status === 'pending' && selectedBusiness.permit_document && (
+                    <>
+                      <button onClick={() => { setShowDetailsModal(false); handleApproveBusiness(selectedBusiness); }} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                        ✓ Approve Business
+                      </button>
+                      <button onClick={() => { setShowDetailsModal(false); handleRejectClick(selectedBusiness); }} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                        ✗ Reject Business
+                      </button>
+                    </>
+                  )}
+                  <button onClick={() => { setShowDetailsModal(false); navigate(`/admin/businesses/edit/${selectedBusiness.id}`); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    Edit Business
+                  </button>
+                </div>
+              </motion.div>
             </div>
-          </div>
-        )}
+          )}
+        </AnimatePresence>
 
         {/* Permit Viewer Modal */}
         <PermitViewerModal
@@ -1127,7 +987,7 @@ const AdminBusinessManagement = () => {
             setSelectedBusiness(null);
           }}
           onConfirm={(reason) => handleRejectBusiness(selectedBusiness, reason)}
-          ownerName={selectedBusiness ? `${selectedBusiness.owner?.first_name} ${selectedBusiness.owner?.last_name}` : ''}
+          ownerName={selectedBusiness ? `${selectedBusiness.owner?.first_name || ''} ${selectedBusiness.owner?.last_name || ''}`.trim() : ''}
           businessName={selectedBusiness?.name || ''}
         />
       </div>

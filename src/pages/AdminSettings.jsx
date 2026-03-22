@@ -2,13 +2,35 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import AdminSidebarNav from '../components/admin/AdminSidebarNav';
-import '../styles/AdminSettings.css';
+import { motion } from 'framer-motion';
+import {
+  Settings,
+  Globe,
+  Shield,
+  Database,
+  Users,
+  Building,
+  AlertCircle,
+  Save,
+  RefreshCw,
+  Download,
+  Moon,
+  Sun,
+  Mail,
+  Lock,
+  UserCheck,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  XCircle
+} from 'lucide-react';
 
 const AdminSettings = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalOwners: 0,
@@ -22,12 +44,31 @@ const AdminSettings = () => {
     allowRegistrations: true,
     requireEmailVerification: true,
     defaultUserRole: 'client',
-    maintenanceMode: false
+    maintenanceMode: false,
+    sessionTimeout: 60,
+    maxLoginAttempts: 5
   });
 
   useEffect(() => {
+    // Check for saved dark mode preference
+    const savedDarkMode = localStorage.getItem('adminDarkMode') === 'true';
+    setDarkMode(savedDarkMode);
+    if (savedDarkMode) {
+      document.documentElement.classList.add('dark');
+    }
     fetchAdminData();
   }, []);
+
+  useEffect(() => {
+    // Apply dark mode class to html element
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('adminDarkMode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('adminDarkMode', 'false');
+    }
+  }, [darkMode]);
 
   const fetchAdminData = async () => {
     try {
@@ -107,7 +148,6 @@ const AdminSettings = () => {
       setSaving(true);
       
       // Here you would typically save settings to a database table
-      // For now, we'll just simulate a save
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       alert('Settings saved successfully!');
@@ -123,7 +163,6 @@ const AdminSettings = () => {
     if (!window.confirm('Are you sure you want to clear the system cache?')) return;
     
     try {
-      // Simulate cache clearing
       await new Promise(resolve => setTimeout(resolve, 1000));
       alert('Cache cleared successfully!');
     } catch (error) {
@@ -135,7 +174,6 @@ const AdminSettings = () => {
   const handleBackupDatabase = async () => {
     try {
       alert('Starting database backup... This may take a few minutes.');
-      // Simulate backup
       await new Promise(resolve => setTimeout(resolve, 2000));
       alert('Database backup completed successfully!');
     } catch (error) {
@@ -144,12 +182,18 @@ const AdminSettings = () => {
     }
   };
 
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+  };
+
   if (loading) {
     return (
       <AdminSidebarNav>
-        <div className="admin-loading">
-          <div className="loading-spinner"></div>
-          <p>Loading settings...</p>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading settings...</p>
+          </div>
         </div>
       </AdminSidebarNav>
     );
@@ -157,175 +201,267 @@ const AdminSettings = () => {
 
   return (
     <AdminSidebarNav>
-      <div className="settings-container">
-        <h1 className="page-title">System Settings</h1>
+      <div className={`min-h-screen space-y-6 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Settings</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">Configure platform settings and preferences</p>
+          </div>
+          <div className="flex gap-3">
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+            >
+              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              {darkMode ? 'Light Mode' : 'Dark Mode'}
+            </button>
+            <button 
+              onClick={handleSaveSettings}
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50"
+            >
+              <Save className="w-5 h-5" />
+              {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
+        </div>
 
-        <div className="settings-grid">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* General Settings */}
-          <div className="settings-card">
-            <h2>General Settings</h2>
-            
-            <div className="settings-form">
-              <div className="form-group">
-                <label>Site Name</label>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <h2 className="font-semibold text-gray-900 dark:text-white">General Settings</h2>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Site Name</label>
                 <input
                   type="text"
                   value={settings.siteName}
                   onChange={(e) => handleSettingChange('siteName', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
               </div>
 
-              <div className="form-group">
-                <label>Admin Email</label>
-                <input
-                  type="email"
-                  value={settings.adminEmail}
-                  onChange={(e) => handleSettingChange('adminEmail', e.target.value)}
-                />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Admin Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="email"
+                    value={settings.adminEmail}
+                    onChange={(e) => handleSettingChange('adminEmail', e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
               </div>
 
-              <div className="form-group">
-                <label>Default User Role</label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Default User Role</label>
                 <select
                   value={settings.defaultUserRole}
                   onChange={(e) => handleSettingChange('defaultUserRole', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="client">Client</option>
-                  <option value="owner">Owner</option>
+                  <option value="owner">Business Owner</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
 
-              <div className="toggle-group">
-                <span>Allow Registrations</span>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={settings.allowRegistrations}
-                    onChange={(e) => handleSettingChange('allowRegistrations', e.target.checked)}
-                  />
-                  <span className="toggle-slider"></span>
-                </label>
-              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">Allow Registrations</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Allow new users to register on the platform</p>
+                  </div>
+                  <button
+                    onClick={() => handleSettingChange('allowRegistrations', !settings.allowRegistrations)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settings.allowRegistrations ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      settings.allowRegistrations ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
 
-              <div className="toggle-group">
-                <span>Require Email Verification</span>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={settings.requireEmailVerification}
-                    onChange={(e) => handleSettingChange('requireEmailVerification', e.target.checked)}
-                  />
-                  <span className="toggle-slider"></span>
-                </label>
-              </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">Require Email Verification</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Users must verify their email before accessing the platform</p>
+                  </div>
+                  <button
+                    onClick={() => handleSettingChange('requireEmailVerification', !settings.requireEmailVerification)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settings.requireEmailVerification ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      settings.requireEmailVerification ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
 
-              <div className="toggle-group">
-                <span>Maintenance Mode</span>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={settings.maintenanceMode}
-                    onChange={(e) => handleSettingChange('maintenanceMode', e.target.checked)}
-                  />
-                  <span className="toggle-slider"></span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">Maintenance Mode</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Put the platform in maintenance mode (only admins can access)</p>
+                  </div>
+                  <button
+                    onClick={() => handleSettingChange('maintenanceMode', !settings.maintenanceMode)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settings.maintenanceMode ? 'bg-red-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      settings.maintenanceMode ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Security Settings */}
-          <div className="settings-card">
-            <h2>Security Settings</h2>
-            
-            <div className="settings-form">
-              <div className="form-group">
-                <label>Session Timeout (minutes)</label>
-                <input
-                  type="number"
-                  defaultValue="60"
-                />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <h2 className="font-semibold text-gray-900 dark:text-white">Security Settings</h2>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Session Timeout (minutes)</label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="number"
+                    value={settings.sessionTimeout}
+                    onChange={(e) => handleSettingChange('sessionTimeout', parseInt(e.target.value))}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
               </div>
 
-              <div className="form-group">
-                <label>Max Login Attempts</label>
-                <input
-                  type="number"
-                  defaultValue="5"
-                />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Login Attempts</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="number"
+                    value={settings.maxLoginAttempts}
+                    onChange={(e) => handleSettingChange('maxLoginAttempts', parseInt(e.target.value))}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
               </div>
 
-              <button className="btn-secondary">
+              <button className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2">
+                <Lock className="w-4 h-4" />
                 Change Password
               </button>
             </div>
-          </div>
+          </motion.div>
 
-          {/* System Stats */}
-          <div className="settings-card">
-            <h2>System Statistics</h2>
-            <div className="stats-list">
-              <div className="stat-item">
-                <span>Total Users:</span>
-                <span className="stat-value">{stats.totalUsers}</span>
-              </div>
-              <div className="stat-item">
-                <span>Business Owners:</span>
-                <span className="stat-value">{stats.totalOwners}</span>
-              </div>
-              <div className="stat-item">
-                <span>Total Businesses:</span>
-                <span className="stat-value">{stats.totalBusinesses}</span>
-              </div>
-              <div className="stat-item">
-                <span>Pending Applications:</span>
-                <span className="stat-value pending">{stats.pendingApplications}</span>
+          {/* System Statistics */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800">
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <h2 className="font-semibold text-gray-900 dark:text-white">System Statistics</h2>
               </div>
             </div>
-          </div>
+            <div className="p-6 space-y-3">
+              <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-gray-600 dark:text-gray-400">Total Users:</span>
+                <span className="text-lg font-bold text-gray-900 dark:text-white">{stats.totalUsers}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-gray-600 dark:text-gray-400">Business Owners:</span>
+                <span className="text-lg font-bold text-purple-600 dark:text-purple-400">{stats.totalOwners}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-gray-600 dark:text-gray-400">Total Businesses:</span>
+                <span className="text-lg font-bold text-green-600 dark:text-green-400">{stats.totalBusinesses}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-600 dark:text-gray-400">Pending Applications:</span>
+                <span className={`text-lg font-bold ${stats.pendingApplications > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                  {stats.pendingApplications}
+                </span>
+              </div>
+            </div>
+          </motion.div>
 
           {/* Quick Actions */}
-          <div className="settings-card">
-            <h2>Quick Actions</h2>
-            <div className="quick-actions">
-              <button onClick={handleClearCache} className="quick-action-btn">
-                <span className="btn-icon">🗑️</span>
-                Clear Cache
-              </button>
-              <button onClick={handleBackupDatabase} className="quick-action-btn">
-                <span className="btn-icon">💾</span>
-                Backup Database
-              </button>
-              <button onClick={() => navigate('/admin/users')} className="quick-action-btn">
-                <span className="btn-icon">👥</span>
-                Manage Users
-              </button>
-              <button onClick={() => navigate('/admin/businesses')} className="quick-action-btn">
-                <span className="btn-icon">🏢</span>
-                Manage Businesses
-              </button>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <h2 className="font-semibold text-gray-900 dark:text-white">Quick Actions</h2>
+              </div>
             </div>
-          </div>
-
-          {/* Save Button */}
-          <div className="settings-card save-card">
-            <button
-              onClick={handleSaveSettings}
-              disabled={saving}
-              className="btn-primary save-btn"
-            >
-              {saving ? (
-                <>
-                  <div className="loading-spinner-small"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  💾 Save Settings
-                </>
-              )}
-            </button>
-          </div>
+            <div className="p-6">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={handleClearCache}
+                  className="px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex flex-col items-center gap-2"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                  <span className="text-sm">Clear Cache</span>
+                </button>
+                <button
+                  onClick={handleBackupDatabase}
+                  className="px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex flex-col items-center gap-2"
+                >
+                  <Download className="w-5 h-5" />
+                  <span className="text-sm">Backup DB</span>
+                </button>
+                <button
+                  onClick={() => navigate('/admin/users')}
+                  className="px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex flex-col items-center gap-2"
+                >
+                  <Users className="w-5 h-5" />
+                  <span className="text-sm">Manage Users</span>
+                </button>
+                <button
+                  onClick={() => navigate('/admin/businesses')}
+                  className="px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex flex-col items-center gap-2"
+                >
+                  <Building className="w-5 h-5" />
+                  <span className="text-sm">Manage Businesses</span>
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </div>
     </AdminSidebarNav>

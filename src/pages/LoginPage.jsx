@@ -1,7 +1,22 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import '../styles/LoginPage.css';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  AlertCircle,
+  Users,
+  TrendingUp,
+  Sparkles,
+  Shield,
+  Crown,
+  ChevronRight,
+  CheckCircle
+} from 'lucide-react';
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({
@@ -10,43 +25,21 @@ const LoginPage = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [focusedField, setFocusedField] = useState(null);
-  const [touchedFields, setTouchedFields] = useState({});
-  const [fieldErrors, setFieldErrors] = useState({
-    email: ''
-  });
   const [error, setError] = useState('');
+  const [focusedField, setFocusedField] = useState(null);
 
   const validateEmail = (email) => {
-    if (!email.trim()) {
-      return 'Email is required';
-    }
-    
+    if (!email.trim()) return 'Email is required';
     if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email)) {
       return 'Must be a valid Gmail address';
     }
-    
     return '';
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
     setError('');
-  };
-
-  const handleBlur = (fieldName) => {
-    setFocusedField(null);
-    setTouchedFields(prev => ({ ...prev, [fieldName]: true }));
-    
-    if (fieldName === 'email') {
-      setFieldErrors({
-        email: validateEmail(formData.email)
-      });
-    }
   };
 
   const togglePasswordVisibility = () => {
@@ -59,22 +52,15 @@ const LoginPage = () => {
       setError(emailError);
       return false;
     }
-
     if (!formData.password) {
       setError('Password is required');
       return false;
     }
-
     return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    setTouchedFields({ email: true });
-    const emailError = validateEmail(formData.email);
-    setFieldErrors({ email: emailError });
-    
     if (!validateForm()) return;
 
     setLoading(true);
@@ -87,7 +73,6 @@ const LoginPage = () => {
       });
       
       if (error) throw error;
-      
       
     } catch (error) {
       console.error('Login error:', error);
@@ -103,160 +88,239 @@ const LoginPage = () => {
     }
   };
 
-  const getInputClassName = (fieldName) => {
-    let className = 'input-group';
-    if (focusedField === fieldName) className += ' focused';
-    
-    if (fieldName === 'email' && touchedFields[fieldName]) {
-      if (fieldErrors[fieldName]) {
-        className += ' error';
-      } else if (formData[fieldName] && !fieldErrors[fieldName]) {
-        className += ' valid';
-      }
-    }
-    
-    return className;
-  };
+  const features = [
+    { icon: Crown, text: "Premium Features", value: "Enterprise", color: "from-yellow-500 to-orange-500" },
+    { icon: Users, text: "Active Businesses", value: "500+", color: "from-blue-500 to-cyan-500" },
+    { icon: TrendingUp, text: "Happy Members", value: "10k+", color: "from-green-500 to-emerald-500" },
+    { icon: Shield, text: "Uptime", value: "99.9%", color: "from-purple-500 to-pink-500" }
+  ];
+
+  const benefits = [
+    "Smart membership tracking",
+    "Easy application management",
+    "Real-time updates",
+    "Secure & reliable"
+  ];
 
   return (
-    <div className="login-container">
-      {/* Left Side - Branding */}
-      <div className="login-brand">
-        <div className="brand-content">
-          <div className="brand-title">
-            <span className="logo-icon">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M2 17L12 22L22 17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M2 12L12 17L22 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="12" cy="12" r="2" fill="white"/>
-              </svg>
-            </span>
-            <span>Memsphere</span>
-          </div>
-          <p>Sign in to continue to your dashboard</p>
-          
-          <div className="brand-features">
-            <div className="brand-feature">
-              <span className="feature-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </span>
-              <span className="feature-text">Smart membership tracking</span>
-            </div>
-            <div className="brand-feature">
-              <span className="feature-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </span>
-              <span className="feature-text">Easy application management</span>
-            </div>
-            <div className="brand-feature">
-              <span className="feature-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </span>
-              <span className="feature-text">Real-time updates</span>
-            </div>
-            <div className="brand-feature">
-              <span className="feature-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </span>
-              <span className="feature-text">Secure & reliable</span>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100">
+      {/* Decorative Elements */}
+      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
 
-      {/* Right Side - Login Form */}
-      <div className="login-form-container">
-        <div className="app-header">
-          <div className="logo-container">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="logo-svg">
-              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#00b4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M2 17L12 22L22 17" stroke="#00b4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M2 12L12 17L22 12" stroke="#00b4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="12" r="2" fill="#00b4ff"/>
-            </svg>
-            <h1 className="logo">Memsphere</h1>
+      <div className="relative min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-6xl w-full mx-auto">
+          <div className="grid lg:grid-cols-2 gap-12">
+            {/* Left Side - Branding */}
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6 }}
+              className="hidden lg:block"
+            >
+              <div className="space-y-8">
+                {/* Logo - Changed to dark text */}
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="12" cy="12" r="2" fill="white"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-bold text-gray-900">Memsphere</h1>
+                      <p className="text-gray-500 text-sm">Membership Management Platform</p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 text-lg">
+                    Welcome back! Sign in to continue managing your memberships and business.
+                  </p>
+                </div>
+
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 gap-4">
+                  {features.map((feature, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
+                      className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${feature.color} p-2 mb-3`}>
+                        <feature.icon className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="text-2xl font-bold text-gray-900 mb-1">{feature.value}</div>
+                      <div className="text-xs text-gray-600">{feature.text}</div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Benefits List - Enhanced text colors */}
+                <div className="space-y-3">
+                  <p className="text-gray-800 text-sm font-semibold">Why choose Memsphere?</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {benefits.map((benefit, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.6 + index * 0.1 }}
+                        className="flex items-center gap-2"
+                      >
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                        <span className="text-sm text-gray-700 font-medium">{benefit}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Right Side - Login Form */}
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6 }}
+              className="bg-white rounded-2xl shadow-xl p-8"
+            >
+              {/* Header */}
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full mb-4">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs text-blue-600 font-medium">Secure Login</span>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h2>
+                <p className="text-gray-500 text-sm">Sign in to access your dashboard</p>
+              </div>
+
+              {/* Error Alert */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3"
+                  >
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <p className="text-sm text-red-600">{error}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Login Form */}
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Email Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      onFocus={() => setFocusedField('email')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="example@gmail.com"
+                      disabled={loading}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Must be a valid Gmail address</p>
+                </div>
+
+                {/* Password Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      onFocus={() => setFocusedField('password')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="Enter your password"
+                      disabled={loading}
+                      className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={togglePasswordVisibility}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Forgot Password Link */}
+                <div className="flex justify-end">
+                  <Link 
+                    to="/forgot-password" 
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                  >
+                    Forgot Password?
+                  </Link>
+                </div>
+
+                {/* Login Button */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      SIGNING IN...
+                    </>
+                  ) : (
+                    <>
+                      SIGN IN
+                      <ArrowRight className="w-5 h-5" />
+                    </>
+                  )}
+                </motion.button>
+              </form>
+
+              {/* Divider */}
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="px-4 bg-white text-gray-500">New to Memsphere?</span>
+                </div>
+              </div>
+
+              {/* Sign Up Link */}
+              <div className="text-center">
+                <Link 
+                  to="/register" 
+                  className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium transition-colors group"
+                >
+                  Create an account
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </div>
+
+              {/* Demo Credentials */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <p className="text-xs text-gray-400 text-center">
+                  Demo: admin@memsphere.com | password123
+                </p>
+              </div>
+            </motion.div>
           </div>
-          <p className="login-subtitle">Sign in to your account</p>
-        </div>
-
-        {error && (
-          <div className="error-alert">
-            <span className="error-icon">⚠️</span>
-            <span className="error-text">{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="login-form">
-          {/* Email Field */}
-          <div className={getInputClassName('email')}>
-            <label>EMAIL</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              onFocus={() => setFocusedField('email')}
-              onBlur={() => handleBlur('email')}
-              placeholder="example@gmail.com"
-              disabled={loading}
-            />
-            {touchedFields.email && fieldErrors.email && (
-              <span className="error-hint">{fieldErrors.email}</span>
-            )}
-          </div>
-
-          {/* Password Field */}
-          <div className="input-group">
-            <label>PASSWORD</label>
-            <div className="password-input-wrapper">
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                onFocus={() => setFocusedField('password')}
-                onBlur={() => setFocusedField(null)}
-                placeholder="Enter your password"
-                disabled={loading}
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={togglePasswordVisibility}
-                tabIndex="-1"
-              >
-                {showPassword ? '👁️' : '👁️‍🗨️'}
-              </button>
-            </div>
-          </div>
-
-          {/* Forgot Password Link */}
-          <div className="forgot-password-link">
-            <Link to="/forgot-password">Forgot Password?</Link>
-          </div>
-
-          {/* Login Button */}
-          <button 
-            type="submit" 
-            className="login-btn"
-            disabled={loading}
-          >
-            {loading ? 'SIGNING IN...' : 'SIGN IN'}
-          </button>
-        </form>
-
-        {/* Sign Up Link */}
-        <div className="signup-redirect">
-          Don't have an account? <Link to="/register">Sign up</Link>
         </div>
       </div>
     </div>
