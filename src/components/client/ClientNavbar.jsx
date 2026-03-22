@@ -1,9 +1,11 @@
 // src/components/ClientNavbar/ClientNavbar.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
-import logo from '../../assets/logo.png';
-import './ClientNavbar.css'; // Import the CSS file
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "../../lib/supabase";
+import { useTheme } from "../../contexts/ThemeContext"; // Add this import
+import logo from "../../assets/logo.png";
+import logo2 from "../../assets/logo2.png";
+import "./ClientNavbar.css";
 import {
   Bell,
   User,
@@ -32,8 +34,8 @@ import {
   Sun,
   Mail as MailIcon,
   Info,
-  PhoneCall
-} from 'lucide-react';
+  PhoneCall,
+} from "lucide-react";
 
 const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   const navigate = useNavigate();
@@ -45,15 +47,21 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   const [user, setUser] = useState(null);
   const [subscription, setSubscription] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  
+
+  // Use the global theme context instead of local state
+  const { isDarkMode, toggleTheme } = useTheme();
+
   const dropdownRef = useRef(null);
   const notificationRef = useRef(null);
   const mobileMenuRef = useRef(null);
 
+  // Remove the local dark mode useEffect hooks - they're now handled by ThemeProvider
+
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       setUser(user);
     };
     getUser();
@@ -78,52 +86,52 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     const newSubscription = supabase
       .channel(`navbar-notifications-${user.id}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          setUnreadCount(prev => prev + 1);
-          setNotifications(prev => {
-            const exists = prev.some(n => n.id === payload.new.id);
+          setUnreadCount((prev) => prev + 1);
+          setNotifications((prev) => {
+            const exists = prev.some((n) => n.id === payload.new.id);
             if (exists) return prev;
             const newList = [payload.new, ...prev].slice(0, 5);
             return newList;
           });
-          
-          if (Notification.permission === 'granted') {
-            new Notification('New Notification', {
-              body: payload.new.title || 'You have a new notification',
-              icon: logo
+
+          if (Notification.permission === "granted") {
+            new Notification("New Notification", {
+              body: payload.new.title || "You have a new notification",
+              icon: isDarkMode ? logo2 : logo,
             });
           }
-        }
+        },
       )
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
           if (payload.new.is_read === true && payload.old.is_read === false) {
-            setUnreadCount(prev => Math.max(0, prev - 1));
+            setUnreadCount((prev) => Math.max(0, prev - 1));
           }
-          setNotifications(prev => 
-            prev.map(n => n.id === payload.new.id ? payload.new : n)
+          setNotifications((prev) =>
+            prev.map((n) => (n.id === payload.new.id ? payload.new : n)),
           );
-        }
+        },
       )
       .subscribe();
 
     setSubscription(newSubscription);
 
-    if (Notification.permission === 'default') {
+    if (Notification.permission === "default") {
       Notification.requestPermission();
     }
 
@@ -139,16 +147,23 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target)
+      ) {
         setShowNotifications(false);
       }
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target) && !event.target.closest('.md\\:hidden')) {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target) &&
+        !event.target.closest(".md\\:hidden")
+      ) {
         setMobileMenuOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -157,39 +172,39 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
 
   const fetchUnreadCount = async () => {
     if (!user) return;
-    
+
     try {
       const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false);
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false);
 
       if (error) throw error;
       setUnreadCount(count || 0);
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      console.error("Error fetching unread count:", error);
     }
   };
 
   const fetchRecentNotifications = async () => {
     if (!user) return;
-    
+
     try {
       const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
         .limit(10);
 
       if (error) throw error;
-      
+
       setNotifications(data || []);
-      const unread = data?.filter(n => !n.is_read).length || 0;
+      const unread = data?.filter((n) => !n.is_read).length || 0;
       setUnreadCount(unread);
     } catch (error) {
-      console.error('Error fetching recent notifications:', error);
+      console.error("Error fetching recent notifications:", error);
     }
   };
 
@@ -197,54 +212,58 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     if (!notification.is_read) {
       try {
         await supabase
-          .from('notifications')
-          .update({ 
+          .from("notifications")
+          .update({
             is_read: true,
-            read_at: new Date().toISOString() 
+            read_at: new Date().toISOString(),
           })
-          .eq('id', notification.id);
-        
-        setUnreadCount(prev => Math.max(0, prev - 1));
-        setNotifications(prev => 
-          prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
+          .eq("id", notification.id);
+
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notification.id ? { ...n, is_read: true } : n,
+          ),
         );
       } catch (error) {
-        console.error('Error marking notification as read:', error);
+        console.error("Error marking notification as read:", error);
       }
     }
 
     const navigationMap = {
-      'membership_pending': '/ClientDashboard',
-      'membership_approved': '/ClientDashboard',
-      'membership_rejected': '/browse',
-      'membership_cancelled': '/browse',
-      'welcome': '/profile',
-      'announcement': '/announcements',
-      'promo': '/offers',
+      membership_pending: "/ClientDashboard",
+      membership_approved: "/ClientDashboard",
+      membership_rejected: "/browse",
+      membership_cancelled: "/browse",
+      welcome: "/profile",
+      announcement: "/announcements",
+      promo: "/offers",
     };
 
-    const path = navigationMap[notification.type] || `/notifications?highlight=${notification.id}`;
+    const path =
+      navigationMap[notification.type] ||
+      `/notifications?highlight=${notification.id}`;
     navigate(path);
     setShowNotifications(false);
   };
 
   const markAllAsRead = async () => {
     if (!user) return;
-    
+
     try {
       await supabase
-        .from('notifications')
-        .update({ 
+        .from("notifications")
+        .update({
           is_read: true,
-          read_at: new Date().toISOString() 
+          read_at: new Date().toISOString(),
         })
-        .eq('user_id', user.id)
-        .eq('is_read', false);
+        .eq("user_id", user.id)
+        .eq("is_read", false);
 
       setUnreadCount(0);
-      setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+      setNotifications(notifications.map((n) => ({ ...n, is_read: true })));
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      console.error("Error marking all as read:", error);
     }
   };
 
@@ -252,9 +271,9 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      navigate('/login');
+      navigate("/login");
     } catch (err) {
-      console.error('Error signing out:', err);
+      console.error("Error signing out:", err);
     }
   };
 
@@ -265,50 +284,60 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     setMobileMenuOpen(false);
   };
 
-  const getFirstName = () => profile?.first_name || 'Client';
+  const getFirstName = () => profile?.first_name || "Client";
   const getFullName = () => {
     if (profile?.first_name && profile?.last_name) {
       return `${profile.first_name} ${profile.last_name}`;
     }
-    return profile?.first_name || 'Client User';
+    return profile?.first_name || "Client User";
   };
   const getInitials = () => {
     if (profile?.first_name && profile?.last_name) {
       return `${profile.first_name.charAt(0)}${profile.last_name.charAt(0)}`.toUpperCase();
     }
-    return profile?.first_name?.charAt(0).toUpperCase() || 'C';
+    return profile?.first_name?.charAt(0).toUpperCase() || "C";
   };
   const getUserRole = () => {
-    if (profile?.role === 'client') return 'Client';
-    if (profile?.role === 'admin') return 'Administrator';
-    if (profile?.role === 'Owner') return 'Business Owner';
-    return 'Member';
+    if (profile?.role === "client") return "Client";
+    if (profile?.role === "admin") return "Administrator";
+    if (profile?.role === "Owner") return "Business Owner";
+    return "Member";
   };
 
   const formatTime = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffMins = Math.floor((now - date) / (1000 * 60));
-    
-    if (diffMins < 1) return 'Just now';
+
+    if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins} min ago`;
     if (diffMins < 1440) return `${Math.floor(diffMins / 60)} hour ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
   const getNotificationIcon = (type) => {
     const iconMap = {
-      'welcome': <Sparkles className="w-5 h-5 text-yellow-500" />,
-      'announcement': <BellRing className="w-5 h-5 text-purple-500" />,
-      'direct': <Mail className="w-5 h-5 text-blue-500" />,
-      'membership_pending': <Clock className="w-5 h-5 text-orange-500" />,
-      'membership_approved': <CheckCircle className="w-5 h-5 text-green-500" />,
-      'membership_rejected': <XCircle className="w-5 h-5 text-red-500" />,
-      'membership_cancelled': <AlertCircle className="w-5 h-5 text-gray-500" />,
-      'promo': <Gift className="w-5 h-5 text-pink-500" />,
-      'subscription_renewed': <RefreshCw className="w-5 h-5 text-blue-500" />,
+      welcome: <Sparkles className="w-5 h-5 text-yellow-500" />,
+      announcement: <BellRing className="w-5 h-5 text-purple-500" />,
+      direct: <Mail className="w-5 h-5 text-blue-500" />,
+      membership_pending: <Clock className="w-5 h-5 text-orange-500" />,
+      membership_approved: <CheckCircle className="w-5 h-5 text-green-500" />,
+      membership_rejected: <XCircle className="w-5 h-5 text-red-500" />,
+      membership_cancelled: <AlertCircle className="w-5 h-5 text-gray-500" />,
+      promo: <Gift className="w-5 h-5 text-pink-500" />,
+      subscription_renewed: <RefreshCw className="w-5 h-5 text-blue-500" />,
     };
     return iconMap[type] || <Bell className="w-5 h-5 text-blue-500" />;
+  };
+
+  // Function to determine which logo to show based on dark mode and current page
+  const getCurrentLogo = () => {
+    // Use logo2.png for dark mode across all pages
+    if (isDarkMode) {
+      return logo2;
+    }
+    // Default light mode logo
+    return logo;
   };
 
   const firstName = getFirstName();
@@ -318,44 +347,57 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
 
   // Nav items - Dashboard, Browse, About, and Contact
   const navItems = [
-    { path: '/ClientDashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/browse', label: 'Browse', icon: Compass },
-    { path: '/about', label: 'About', icon: Info },
-    { path: '/contact', label: 'Contact', icon: PhoneCall },
+    { path: "/ClientDashboard", label: "Dashboard", icon: LayoutDashboard },
+    { path: "/browse", label: "Browse", icon: Compass },
+    { path: "/about", label: "About", icon: Info },
+    { path: "/contact", label: "Contact", icon: PhoneCall },
   ];
 
   return (
-    <nav className={`
+    <nav
+      className={`
       fixed top-0 left-0 right-0 z-50 w-full
       transition-all duration-300
-      ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-r from-blue-600 to-blue-700'}
+      ${isDarkMode ? "bg-gray-900" : "bg-gradient-to-r from-blue-600 to-blue-700"}
       shadow-lg
-    `}>
+    `}
+    >
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
-          {/* Left section - Logo (positioned at left corner) */}
+          {/* Left section - Logo */}
           <div className="flex items-center flex-shrink-0">
-            <div 
-              onClick={() => handleNavigation('/ClientDashboard')}
+            <div
+              onClick={() => handleNavigation("/ClientDashboard")}
               className="flex items-center space-x-3 cursor-pointer transform transition-all duration-300 hover:scale-105 active:scale-95"
             >
-              <img 
-                src={logo} 
-                alt="Memsphere Logo" 
-                className="h-12 w-auto"
+              <img
+                src={getCurrentLogo()}
+                alt="Memsphere Logo"
+                className="h-12 w-auto transition-all duration-300"
+                style={{
+                  transition: "opacity 0.3s ease-in-out",
+                }}
+                onError={(e) => {
+                  // Fallback if logo2.png doesn't exist
+                  e.target.src = logo;
+                }}
               />
-              <span className="text-2xl font-bold text-white tracking-wider">
+              <span
+                className={`text-2xl font-bold tracking-wider transition-colors duration-300 ${
+                  isDarkMode ? "text-white" : "text-white"
+                }`}
+              >
                 MEMSPHERE
               </span>
             </div>
           </div>
 
-          {/* Center section - Navigation Links (Dashboard, Browse, About, Contact) */}
+          {/* Center section - Navigation Links */}
           <div className="hidden md:flex items-center justify-center flex-1 space-x-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
-              
+
               return (
                 <button
                   key={item.path}
@@ -363,27 +405,31 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                   className={`
                     relative px-6 py-2.5 rounded-xl font-medium text-sm transition-all duration-300
                     flex items-center space-x-2 whitespace-nowrap
-                    ${isActive
-                      ? 'bg-white text-blue-600 shadow-lg scale-105' 
-                      : 'text-white hover:bg-white/20 hover:scale-105'
+                    ${
+                      isActive
+                        ? "bg-white text-blue-600 shadow-lg scale-105"
+                        : "text-white hover:bg-white/20 hover:scale-105"
                     }
                   `}
                 >
-                  <Icon className={`w-4 h-4 ${
-                    isActive ? 'text-blue-600' : 'text-white'
-                  }`} />
+                  <Icon
+                    className={`w-4 h-4 ${
+                      isActive ? "text-blue-600" : "text-white"
+                    }`}
+                  />
                   <span>{item.label}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* Right section - Notifications & User Menu only (no search) */}
+          {/* Right section - Notifications & User Menu */}
           <div className="flex items-center space-x-2 flex-shrink-0">
             {/* Dark Mode Toggle */}
             <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
+              onClick={toggleTheme} // Use global toggleTheme
               className="hidden sm:block p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-all duration-300 group"
+              aria-label="Toggle dark mode"
             >
               {isDarkMode ? (
                 <Sun className="w-5 h-5 text-white group-hover:rotate-180 transition-transform duration-500" />
@@ -404,24 +450,46 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                 <Bell className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 border-2 border-blue-600 animate-bounce">
-                    {unreadCount > 9 ? '9+' : unreadCount}
+                    {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </button>
 
               {/* Notifications Dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-slideDown">
-                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
+                <div
+                  className={`absolute right-0 mt-3 w-96 rounded-2xl shadow-2xl border overflow-hidden animate-slideDown ${
+                    isDarkMode
+                      ? "bg-gray-800 border-gray-700"
+                      : "bg-white border-gray-100"
+                  }`}
+                >
+                  <div
+                    className={`p-4 border-b ${
+                      isDarkMode
+                        ? "bg-gray-700 border-gray-600"
+                        : "bg-gradient-to-r from-blue-50 to-indigo-50 border-gray-100"
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <Bell className="w-5 h-5 text-blue-600" />
-                        <h3 className="font-semibold text-gray-800">Notifications</h3>
+                        <Bell
+                          className={`w-5 h-5 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
+                        />
+                        <h3
+                          className={`font-semibold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+                        >
+                          Notifications
+                        </h3>
                       </div>
                       {unreadCount > 0 && (
                         <button
                           onClick={markAllAsRead}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center space-x-1 px-3 py-1.5 bg-white rounded-lg shadow-sm hover:shadow transition-all"
+                          className={`text-sm font-medium flex items-center space-x-1 px-3 py-1.5 rounded-lg shadow-sm hover:shadow transition-all ${
+                            isDarkMode
+                              ? "text-blue-400 bg-gray-700 hover:bg-gray-600"
+                              : "text-blue-600 bg-white hover:bg-gray-50"
+                          }`}
                         >
                           <CheckCheck className="w-4 h-4" />
                           <span>Mark all read</span>
@@ -437,24 +505,47 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                           key={notification.id}
                           onClick={() => handleNotificationClick(notification)}
                           className={`
-                            flex items-start space-x-3 p-4 border-b border-gray-50 cursor-pointer
-                            transition-all duration-300 hover:bg-gray-50 hover:pl-6
-                            ${!notification.is_read ? 'bg-blue-50/30' : ''}
+                            flex items-start space-x-3 p-4 border-b cursor-pointer
+                            transition-all duration-300 hover:pl-6
+                            ${
+                              !notification.is_read
+                                ? isDarkMode
+                                  ? "bg-gray-700/50"
+                                  : "bg-blue-50/30"
+                                : ""
+                            }
+                            ${isDarkMode ? "border-gray-700 hover:bg-gray-700" : "border-gray-50 hover:bg-gray-50"}
                           `}
                         >
-                          <div className="flex-shrink-0 w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center">
+                          <div
+                            className={`flex-shrink-0 w-10 h-10 rounded-xl shadow-sm flex items-center justify-center ${
+                              isDarkMode ? "bg-gray-600" : "bg-white"
+                            }`}
+                          >
                             {getNotificationIcon(notification.type)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 mb-1 line-clamp-2">
+                            <p
+                              className={`text-sm font-medium mb-1 line-clamp-2 ${
+                                isDarkMode ? "text-white" : "text-gray-800"
+                              }`}
+                            >
                               {notification.title || notification.type}
                             </p>
                             {notification.message && (
-                              <p className="text-xs text-gray-600 mb-2 line-clamp-1">
+                              <p
+                                className={`text-xs mb-2 line-clamp-1 ${
+                                  isDarkMode ? "text-gray-300" : "text-gray-600"
+                                }`}
+                              >
                                 {notification.message}
                               </p>
                             )}
-                            <p className="text-xs text-gray-500 flex items-center">
+                            <p
+                              className={`text-xs flex items-center ${
+                                isDarkMode ? "text-gray-400" : "text-gray-500"
+                              }`}
+                            >
                               <Clock className="w-3 h-3 mr-1" />
                               {formatTime(notification.created_at)}
                             </p>
@@ -465,22 +556,52 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                         </div>
                       ))
                     ) : (
-                      <div className="p-12 text-center">
-                        <Bell className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                        <p className="text-gray-700 font-semibold mb-1">All caught up!</p>
-                        <p className="text-sm text-gray-500">No new notifications</p>
+                      <div
+                        className={`p-12 text-center ${
+                          isDarkMode ? "text-gray-400" : ""
+                        }`}
+                      >
+                        <Bell
+                          className={`w-16 h-16 mx-auto mb-4 ${
+                            isDarkMode ? "text-gray-600" : "text-gray-200"
+                          }`}
+                        />
+                        <p
+                          className={`font-semibold mb-1 ${
+                            isDarkMode ? "text-white" : "text-gray-700"
+                          }`}
+                        >
+                          All caught up!
+                        </p>
+                        <p
+                          className={`text-sm ${
+                            isDarkMode ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        >
+                          No new notifications
+                        </p>
                       </div>
                     )}
                   </div>
 
                   {notifications.length > 0 && (
-                    <div className="p-3 bg-gray-50 border-t border-gray-100">
+                    <div
+                      className={`p-3 border-t ${
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600"
+                          : "bg-gray-50 border-gray-100"
+                      }`}
+                    >
                       <button
                         onClick={() => {
-                          navigate('/notifications');
+                          navigate("/notifications");
                           setShowNotifications(false);
                         }}
-                        className="w-full py-3 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-white rounded-xl transition-all duration-300"
+                        className={`w-full py-3 text-sm font-medium rounded-xl transition-all duration-300 ${
+                          isDarkMode
+                            ? "text-blue-400 hover:text-blue-300 hover:bg-gray-600"
+                            : "text-blue-600 hover:text-blue-700 hover:bg-white"
+                        }`}
                       >
                         View All Notifications
                       </button>
@@ -513,30 +634,36 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                   )}
                   <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full animate-pulse"></span>
                 </div>
-                
+
                 <div className="hidden lg:block text-left">
                   <p className="text-sm font-semibold text-white flex items-center space-x-1">
                     <span>{firstName}</span>
-                    {profile?.membership_tier === 'premium' && (
+                    {profile?.membership_tier === "premium" && (
                       <Crown className="w-3 h-3 text-yellow-300 ml-1" />
                     )}
                   </p>
-                  <p className="text-xs text-blue-100">
-                    {userRole}
-                  </p>
+                  <p className="text-xs text-blue-100">{userRole}</p>
                 </div>
-                
-                <ChevronDown className={`w-4 h-4 text-white transition-all duration-300 ${showDropdown ? 'rotate-180' : ''}`} />
+
+                <ChevronDown
+                  className={`w-4 h-4 text-white transition-all duration-300 ${showDropdown ? "rotate-180" : ""}`}
+                />
               </button>
 
-              {/* Profile Dropdown - Simplified without stats and messages */}
+              {/* Profile Dropdown */}
               {showDropdown && (
-                <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-slideDown">
+                <div
+                  className={`absolute right-0 mt-3 w-72 rounded-2xl shadow-2xl border overflow-hidden animate-slideDown ${
+                    isDarkMode
+                      ? "bg-gray-800 border-gray-700"
+                      : "bg-white border-gray-100"
+                  }`}
+                >
                   {/* Header */}
                   <div className="p-5 bg-gradient-to-r from-blue-600 to-blue-700 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-8 -mt-8"></div>
                     <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-8 -mb-8"></div>
-                    
+
                     <div className="relative flex items-center space-x-4">
                       <div className="relative group/avatar">
                         {avatarUrl ? (
@@ -558,7 +685,9 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                         <p className="font-bold text-lg truncate">{fullName}</p>
                         <p className="text-sm text-blue-100 truncate flex items-center space-x-1">
                           <MailIcon className="w-3 h-3 flex-shrink-0" />
-                          <span className="truncate">{profile?.email || user?.email}</span>
+                          <span className="truncate">
+                            {profile?.email || user?.email}
+                          </span>
                         </p>
                         <div className="flex items-center space-x-2 mt-2">
                           <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-medium flex items-center space-x-1">
@@ -570,33 +699,73 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                     </div>
                   </div>
 
-                  {/* Menu Items - Simplified (no messages, no events) */}
+                  {/* Menu Items */}
                   <div className="p-2">
                     {/* Profile */}
                     <button
-                      onClick={() => handleNavigation('/profile')}
-                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 rounded-xl transition-all duration-300 group"
+                      onClick={() => handleNavigation("/profile")}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                        isDarkMode
+                          ? "text-gray-200 hover:bg-gray-700"
+                          : "text-gray-700 hover:bg-blue-50"
+                      }`}
                     >
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-600 transition-colors">
-                        <User className="w-4 h-4 text-blue-600 group-hover:text-white" />
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          isDarkMode
+                            ? "bg-gray-700 group-hover:bg-blue-600"
+                            : "bg-blue-100 group-hover:bg-blue-600"
+                        }`}
+                      >
+                        <User
+                          className={`w-4 h-4 ${
+                            isDarkMode
+                              ? "text-gray-400 group-hover:text-white"
+                              : "text-blue-600 group-hover:text-white"
+                          }`}
+                        />
                       </div>
                       <div className="flex-1 text-left">
                         <span className="font-medium block">My Profile</span>
-                        <span className="text-xs text-gray-500">View and edit your profile</span>
+                        <span
+                          className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          View and edit your profile
+                        </span>
                       </div>
                     </button>
 
                     {/* Notifications */}
                     <button
-                      onClick={() => handleNavigation('/notifications')}
-                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-xl transition-all duration-300 group"
+                      onClick={() => handleNavigation("/notifications")}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                        isDarkMode
+                          ? "text-gray-200 hover:bg-gray-700"
+                          : "text-gray-700 hover:bg-purple-50"
+                      }`}
                     >
-                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-600 transition-colors">
-                        <Bell className="w-4 h-4 text-purple-600 group-hover:text-white" />
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          isDarkMode
+                            ? "bg-gray-700 group-hover:bg-purple-600"
+                            : "bg-purple-100 group-hover:bg-purple-600"
+                        }`}
+                      >
+                        <Bell
+                          className={`w-4 h-4 ${
+                            isDarkMode
+                              ? "text-gray-400 group-hover:text-white"
+                              : "text-purple-600 group-hover:text-white"
+                          }`}
+                        />
                       </div>
                       <div className="flex-1 text-left">
                         <span className="font-medium block">Notifications</span>
-                        <span className="text-xs text-gray-500">Stay updated</span>
+                        <span
+                          className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          Stay updated
+                        </span>
                       </div>
                       {unreadCount > 0 && (
                         <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
@@ -607,45 +776,109 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
 
                     {/* Settings */}
                     <button
-                      onClick={() => handleNavigation('/settings')}
-                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-300 group"
+                      onClick={() => handleNavigation("/settings")}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                        isDarkMode
+                          ? "text-gray-200 hover:bg-gray-700"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
                     >
-                      <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gray-600 transition-colors">
-                        <Settings className="w-4 h-4 text-gray-600 group-hover:text-white" />
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          isDarkMode
+                            ? "bg-gray-700 group-hover:bg-gray-600"
+                            : "bg-gray-100 group-hover:bg-gray-600"
+                        }`}
+                      >
+                        <Settings
+                          className={`w-4 h-4 ${
+                            isDarkMode
+                              ? "text-gray-400 group-hover:text-white"
+                              : "text-gray-600 group-hover:text-white"
+                          }`}
+                        />
                       </div>
                       <div className="flex-1 text-left">
                         <span className="font-medium block">Settings</span>
-                        <span className="text-xs text-gray-500">Account preferences</span>
+                        <span
+                          className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          Account preferences
+                        </span>
                       </div>
                     </button>
 
                     {/* Help & Support */}
                     <button
-                      onClick={() => handleNavigation('/help')}
-                      className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-purple-50 rounded-xl transition-all duration-300 group"
+                      onClick={() => handleNavigation("/help")}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                        isDarkMode
+                          ? "text-gray-200 hover:bg-gray-700"
+                          : "text-gray-700 hover:bg-purple-50"
+                      }`}
                     >
-                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-600 transition-colors">
-                        <HelpCircle className="w-4 h-4 text-purple-600 group-hover:text-white" />
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          isDarkMode
+                            ? "bg-gray-700 group-hover:bg-purple-600"
+                            : "bg-purple-100 group-hover:bg-purple-600"
+                        }`}
+                      >
+                        <HelpCircle
+                          className={`w-4 h-4 ${
+                            isDarkMode
+                              ? "text-gray-400 group-hover:text-white"
+                              : "text-purple-600 group-hover:text-white"
+                          }`}
+                        />
                       </div>
                       <div className="flex-1 text-left">
-                        <span className="font-medium block">Help & Support</span>
-                        <span className="text-xs text-gray-500">Get assistance</span>
+                        <span className="font-medium block">
+                          Help & Support
+                        </span>
+                        <span
+                          className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          Get assistance
+                        </span>
                       </div>
                     </button>
 
-                    <div className="my-2 border-t border-gray-100"></div>
+                    <div
+                      className={`my-2 border-t ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}
+                    ></div>
 
                     {/* Logout */}
                     <button
                       onClick={handleSignOut}
-                      className="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300 group"
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                        isDarkMode
+                          ? "text-red-400 hover:bg-gray-700"
+                          : "text-red-600 hover:bg-red-50"
+                      }`}
                     >
-                      <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-600 transition-colors">
-                        <LogOut className="w-4 h-4 text-red-600 group-hover:text-white" />
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          isDarkMode
+                            ? "bg-gray-700 group-hover:bg-red-600"
+                            : "bg-red-100 group-hover:bg-red-600"
+                        }`}
+                      >
+                        <LogOut
+                          className={`w-4 h-4 ${
+                            isDarkMode
+                              ? "text-red-400 group-hover:text-white"
+                              : "text-red-600 group-hover:text-white"
+                          }`}
+                        />
                       </div>
                       <div className="flex-1 text-left">
                         <span className="font-medium block">Logout</span>
-                        <span className="text-xs text-red-400">Sign out of your account</span>
+                        <span
+                          className={`text-xs ${isDarkMode ? "text-red-400" : "text-red-400"}`}
+                        >
+                          Sign out of your account
+                        </span>
                       </div>
                     </button>
                   </div>
@@ -668,9 +901,16 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
         </div>
       </div>
 
-      {/* Mobile Navigation Menu - Updated with About and Contact */}
+      {/* Mobile Navigation Menu */}
       {mobileMenuOpen && (
-        <div ref={mobileMenuRef} className="md:hidden bg-white border-t border-gray-100 animate-slideDown shadow-xl">
+        <div
+          ref={mobileMenuRef}
+          className={`md:hidden border-t animate-slideDown shadow-xl ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-white border-gray-100"
+          }`}
+        >
           <div className="px-4 py-3 space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -681,29 +921,52 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                   onClick={() => handleNavigation(item.path)}
                   className={`
                     w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300
-                    ${isActive 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'text-gray-700 hover:bg-gray-50'
+                    ${
+                      isActive
+                        ? isDarkMode
+                          ? "bg-gray-700 text-blue-400"
+                          : "bg-blue-50 text-blue-600"
+                        : isDarkMode
+                          ? "text-gray-300 hover:bg-gray-700"
+                          : "text-gray-700 hover:bg-gray-50"
                     }
                   `}
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-gray-500'}`} />
+                  <Icon
+                    className={`w-5 h-5 ${
+                      isActive
+                        ? isDarkMode
+                          ? "text-blue-400"
+                          : "text-blue-600"
+                        : isDarkMode
+                          ? "text-gray-400"
+                          : "text-gray-500"
+                    }`}
+                  />
                   <span className="font-medium">{item.label}</span>
                 </button>
               );
             })}
-            
-            <div className="border-t border-gray-100 my-2 pt-2">
+
+            <div
+              className={`border-t my-2 pt-2 ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}
+            >
               <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-xl transition-all"
+                onClick={toggleTheme} // Use global toggleTheme
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
+                  isDarkMode
+                    ? "text-gray-300 hover:bg-gray-700"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
               >
                 {isDarkMode ? (
                   <Sun className="w-5 h-5 text-yellow-500" />
                 ) : (
                   <Moon className="w-5 h-5 text-gray-500" />
                 )}
-                <span className="font-medium">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                <span className="font-medium">
+                  {isDarkMode ? "Light Mode" : "Dark Mode"}
+                </span>
               </button>
             </div>
           </div>

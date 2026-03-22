@@ -2,88 +2,24 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
+import { useTheme } from "../contexts/ThemeContext"; // Import the hook
 import "../styles/ClientDashboard.css";
 import {
-  // Navigation & Actions
   ChevronRight,
   Compass,
-  Home,
-  Search,
-  Filter,
-  Bookmark,
-  Share2,
-  MoreVertical,
-  Download,
-  Upload,
-  RefreshCw,
-  Settings,
-  HelpCircle,
-  LogOut,
-
-  // User & Profile
-  User,
-  Mail,
-  Phone,
-  Globe,
   Crown,
-  Medal,
-  Target,
-  Flag,
-
-  // Business & Memberships
-  Briefcase,
-  GraduationCap,
-  Coffee,
-  Dumbbell,
-  Brain,
-  BookOpen,
-  Music,
-  Camera,
-  Video,
-  Palette,
-  Code,
-  PenTool,
-
-  // Health & Wellness
-  Heart,
-  HeartPulse,
-  Activity,
-  Shield,
-  Zap,
-
-  // Status & Indicators
   CheckCircle,
   XCircle,
-  AlertCircle,
-  Info,
-  Award,
-  Star,
-  TrendingUp,
-  Sparkles,
-  Bell,
-  Gift,
-  CreditCard,
-  DollarSign,
-
-  // Time & Date
   Clock,
   Calendar,
-  Play,
-
-  // Location
-  MapPin,
-  Map,
-  PhoneCall,
-  MessageCircle,
-
-  // Social
+  Award,
+  TrendingUp,
+  Heart,
+  Bookmark,
+  Star,
   Users,
-
-  // Actions
+  MapPin,
   Plus,
-
-  // Misc
-  MoreHorizontal,
 } from "lucide-react";
 
 const ClientDashboard = () => {
@@ -97,7 +33,13 @@ const ClientDashboard = () => {
   const [recommendedBusinesses, setRecommendedBusinesses] = useState([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [sortBy, setSortBy] = useState("expiry");
+
+  // Use the theme hook instead of local state
+  const { isDarkMode } = useTheme();
+
   const navigate = useNavigate();
+
+  // Remove the local dark mode useEffect - it's now handled by ThemeProvider
 
   useEffect(() => {
     console.log("ClientDashboard mounted");
@@ -220,8 +162,6 @@ const ClientDashboard = () => {
       }
 
       console.log("Memberships found:", data?.length || 0);
-      console.log("All memberships data:", data);
-
       setMemberships(data || []);
       updateTimeRemaining(data || []);
     } catch (error) {
@@ -268,12 +208,6 @@ const ClientDashboard = () => {
         console.error("Error fetching recommended businesses:", error);
         throw error;
       }
-
-      console.log("Recommended businesses found:", data?.length || 0);
-      console.log(
-        "Business ratings:",
-        data?.map((b) => ({ name: b.name, rating: b.rating })),
-      );
 
       const businessesWithRatings = data?.filter((b) => b.rating != null) || [];
       const businessesWithoutRatings =
@@ -325,14 +259,10 @@ const ClientDashboard = () => {
           const diffHours = Math.floor(
             (diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
           );
-          const diffMinutes = Math.floor(
-            (diffTime % (1000 * 60 * 60)) / (1000 * 60),
-          );
 
           newTimeRemaining[membership.id] = {
             days: diffDays,
             hours: diffHours,
-            minutes: diffMinutes,
             expired: false,
             endDate: membership.end_date,
           };
@@ -340,7 +270,6 @@ const ClientDashboard = () => {
           newTimeRemaining[membership.id] = {
             days: 0,
             hours: 0,
-            minutes: 0,
             expired: true,
             endDate: membership.end_date,
           };
@@ -405,10 +334,6 @@ const ClientDashboard = () => {
           id: activeMembership.id,
           businessId: activeMembership.businesses?.id,
           businessName: activeMembership.businesses?.name || "Business",
-          businessLocation:
-            activeMembership.businesses?.city ||
-            activeMembership.businesses?.location ||
-            "Unknown location",
           planName:
             activeMembership.membership_plans?.name || "Membership Plan",
           applied: new Date(activeMembership.created_at).toLocaleDateString(
@@ -436,12 +361,7 @@ const ClientDashboard = () => {
                 day: "numeric",
               })
             : "N/A",
-          price:
-            activeMembership.membership_plans?.price ||
-            activeMembership.price_paid,
-          duration: activeMembership.membership_plans?.duration || "month",
           features: activeMembership.membership_plans?.features || [],
-          businessType: activeMembership.businesses?.business_type,
           emoji: activeMembership.businesses?.emoji || "🏢",
           timeRemaining: timeRemaining[activeMembership.id],
         };
@@ -458,7 +378,7 @@ const ClientDashboard = () => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
-      month: "long",
+      month: "short",
       day: "numeric",
     });
   };
@@ -467,7 +387,7 @@ const ClientDashboard = () => {
     if (!timeData) return null;
     if (timeData.expired) {
       return (
-        <div className="expired-badge">
+        <div className={`expired-badge ${isDarkMode ? "dark-mode" : ""}`}>
           <XCircle size={18} />
           <span>Expired</span>
         </div>
@@ -484,7 +404,7 @@ const ClientDashboard = () => {
 
     if (timeData.days > 30) {
       return (
-        <div className={statusClass}>
+        <div className={`${statusClass} ${isDarkMode ? "dark-mode" : ""}`}>
           <Clock className="timer-icon" size={18} />
           <span className="timer-text">{timeData.days} days remaining</span>
         </div>
@@ -492,7 +412,7 @@ const ClientDashboard = () => {
     }
 
     return (
-      <div className={statusClass}>
+      <div className={`${statusClass} ${isDarkMode ? "dark-mode" : ""}`}>
         <Clock className="timer-icon" size={18} />
         <span className="timer-text">
           {timeData.days}d {timeData.hours}h remaining
@@ -507,12 +427,14 @@ const ClientDashboard = () => {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
+      <div className={`dashboard-container ${isDarkMode ? "dark-mode" : ""}`}>
         <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
         <div className="dashboard-main">
-          <div className="loading-container">
-            <div className="spinner"></div>
-            <p className="loading-text">Loading your dashboard...</p>
+          <div className={`loading-container ${isDarkMode ? "dark-mode" : ""}`}>
+            <div className={`spinner ${isDarkMode ? "dark-mode" : ""}`}></div>
+            <p className={`loading-text ${isDarkMode ? "dark-mode" : ""}`}>
+              Loading your dashboard...
+            </p>
           </div>
         </div>
       </div>
@@ -524,33 +446,42 @@ const ClientDashboard = () => {
   const activeMembership = getActiveMembership();
   const sortedMemberships = getSortedMemberships();
 
-  console.log("Total memberships:", memberships.length);
-  console.log("Sorted memberships:", sortedMemberships.length);
-
   return (
-    <div className="dashboard-container">
+    <div className={`dashboard-container ${isDarkMode ? "dark-mode" : ""}`}>
       <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
 
       <div className="dashboard-main">
-        {/* Header Section - Only greeting, no welcome back text */}
+        {/* Header Section */}
         <div className="dashboard-header">
-          <div className="user-greeting">
+          <div className={`user-greeting ${isDarkMode ? "dark-mode" : ""}`}>
             <span className="greeting-wave">👋</span>
-            <span className="greeting-text">Good to see you,</span>
-            <span className="greeting-name">{firstName}</span>
+            <span className={`greeting-text ${isDarkMode ? "dark-mode" : ""}`}>
+              Good to see you,
+            </span>
+            <span className={`greeting-name ${isDarkMode ? "dark-mode" : ""}`}>
+              {firstName}
+            </span>
           </div>
         </div>
 
-        {/* Enhanced Stats Cards with Smaller Icons */}
+        {/* Stats Cards */}
         <div className="enhanced-stats-grid">
-          <div className="enhanced-stat-card">
+          <div
+            className={`enhanced-stat-card ${isDarkMode ? "dark-mode" : ""}`}
+          >
             <div className="stat-icon-wrapper gradient-blue">
               <Award className="stat-icon" />
             </div>
             <div className="stat-content">
-              <div className="stat-label">Active Memberships</div>
-              <div className="stat-value-large">{membershipCount}</div>
-              <div className="stat-footer">
+              <div className={`stat-label ${isDarkMode ? "dark-mode" : ""}`}>
+                Active Memberships
+              </div>
+              <div
+                className={`stat-value-large ${isDarkMode ? "dark-mode" : ""}`}
+              >
+                {membershipCount}
+              </div>
+              <div className={`stat-footer ${isDarkMode ? "dark-mode" : ""}`}>
                 <TrendingUp size={14} />
                 <span>Currently active</span>
               </div>
@@ -558,13 +489,19 @@ const ClientDashboard = () => {
             <div className="stat-decoration"></div>
           </div>
 
-          <div className="enhanced-stat-card">
+          <div
+            className={`enhanced-stat-card ${isDarkMode ? "dark-mode" : ""}`}
+          >
             <div className="stat-icon-wrapper gradient-purple">
               <Clock className="stat-icon" />
             </div>
             <div className="stat-content">
-              <div className="stat-label">Member Since</div>
-              <div className="stat-value-large">
+              <div className={`stat-label ${isDarkMode ? "dark-mode" : ""}`}>
+                Member Since
+              </div>
+              <div
+                className={`stat-value-large ${isDarkMode ? "dark-mode" : ""}`}
+              >
                 {profile?.created_at
                   ? new Date(profile.created_at).toLocaleDateString("en-US", {
                       month: "short",
@@ -572,7 +509,7 @@ const ClientDashboard = () => {
                     })
                   : "N/A"}
               </div>
-              <div className="stat-footer">
+              <div className={`stat-footer ${isDarkMode ? "dark-mode" : ""}`}>
                 <Calendar size={14} />
                 <span>Join date</span>
               </div>
@@ -580,14 +517,22 @@ const ClientDashboard = () => {
             <div className="stat-decoration"></div>
           </div>
 
-          <div className="enhanced-stat-card">
+          <div
+            className={`enhanced-stat-card ${isDarkMode ? "dark-mode" : ""}`}
+          >
             <div className="stat-icon-wrapper gradient-green">
               <Heart className="stat-icon" />
             </div>
             <div className="stat-content">
-              <div className="stat-label">Saved Businesses</div>
-              <div className="stat-value-large">0</div>
-              <div className="stat-footer">
+              <div className={`stat-label ${isDarkMode ? "dark-mode" : ""}`}>
+                Saved Businesses
+              </div>
+              <div
+                className={`stat-value-large ${isDarkMode ? "dark-mode" : ""}`}
+              >
+                0
+              </div>
+              <div className={`stat-footer ${isDarkMode ? "dark-mode" : ""}`}>
                 <Bookmark size={14} />
                 <span>Your favorites</span>
               </div>
@@ -596,24 +541,26 @@ const ClientDashboard = () => {
           </div>
         </div>
 
-        {/* Membership Status - Removed count badge */}
+        {/* Membership Status */}
         <div className="membership-header">
           <div className="membership-status">
-            <div className="status-badge">
+            <div className={`status-badge ${isDarkMode ? "dark-mode" : ""}`}>
               <span className="status-dot"></span>
-              <span className="status-label">My Memberships</span>
+              <span className={`status-label ${isDarkMode ? "dark-mode" : ""}`}>
+                My Memberships
+              </span>
             </div>
           </div>
           <div className="sort-controls">
             <button
-              className={`sort-btn ${sortBy === "expiry" ? "active" : ""}`}
+              className={`sort-btn ${sortBy === "expiry" ? "active" : ""} ${isDarkMode ? "dark-mode" : ""}`}
               onClick={() => setSortBy("expiry")}
             >
               <Clock size={14} />
               <span>Closest to Expiry</span>
             </button>
             <button
-              className={`sort-btn ${sortBy === "recent" ? "active" : ""}`}
+              className={`sort-btn ${sortBy === "recent" ? "active" : ""} ${isDarkMode ? "dark-mode" : ""}`}
               onClick={() => setSortBy("recent")}
             >
               <Calendar size={14} />
@@ -622,27 +569,25 @@ const ClientDashboard = () => {
           </div>
         </div>
 
-        {/* Loading State */}
-        {loadingMemberships && (
-          <div className="loading-container">
-            <div className="spinner-small"></div>
-            <p className="loading-text">Loading your memberships...</p>
-          </div>
-        )}
-
         {/* Active Membership Card */}
         {!loadingMemberships && activeMembership ? (
-          <div className="membership-card-enhanced">
+          <div
+            className={`membership-card-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+          >
             <div className="card-gradient-bg"></div>
             <div className="card-header-enhanced">
               <div className="business-icon-large">
                 <span>{activeMembership.emoji}</span>
               </div>
               <div className="business-info-enhanced">
-                <h2 className="business-name-enhanced">
+                <h2
+                  className={`business-name-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+                >
                   {activeMembership.businessName}
                 </h2>
-                <div className="plan-badge-container">
+                <div
+                  className={`plan-badge-container ${isDarkMode ? "dark-mode" : ""}`}
+                >
                   <Crown size={16} />
                   <span>{activeMembership.planName}</span>
                   <span className="active-badge">Active</span>
@@ -659,8 +604,14 @@ const ClientDashboard = () => {
               <div className="timeline-item">
                 <div className="timeline-marker"></div>
                 <div className="timeline-content">
-                  <span className="timeline-label">Applied</span>
-                  <span className="timeline-value">
+                  <span
+                    className={`timeline-label ${isDarkMode ? "dark-mode" : ""}`}
+                  >
+                    Applied
+                  </span>
+                  <span
+                    className={`timeline-value ${isDarkMode ? "dark-mode" : ""}`}
+                  >
                     {activeMembership.applied}
                   </span>
                 </div>
@@ -668,8 +619,14 @@ const ClientDashboard = () => {
               <div className="timeline-item">
                 <div className="timeline-marker"></div>
                 <div className="timeline-content">
-                  <span className="timeline-label">Started</span>
-                  <span className="timeline-value">
+                  <span
+                    className={`timeline-label ${isDarkMode ? "dark-mode" : ""}`}
+                  >
+                    Started
+                  </span>
+                  <span
+                    className={`timeline-value ${isDarkMode ? "dark-mode" : ""}`}
+                  >
                     {activeMembership.startDate}
                   </span>
                 </div>
@@ -677,8 +634,14 @@ const ClientDashboard = () => {
               <div className="timeline-item">
                 <div className="timeline-marker"></div>
                 <div className="timeline-content">
-                  <span className="timeline-label">Valid Until</span>
-                  <span className="timeline-value">
+                  <span
+                    className={`timeline-label ${isDarkMode ? "dark-mode" : ""}`}
+                  >
+                    Valid Until
+                  </span>
+                  <span
+                    className={`timeline-value ${isDarkMode ? "dark-mode" : ""}`}
+                  >
                     {activeMembership.validUntil}
                   </span>
                 </div>
@@ -688,18 +651,27 @@ const ClientDashboard = () => {
             {activeMembership.features &&
               activeMembership.features.length > 0 && (
                 <div className="features-container">
-                  <h4 className="features-title">Membership Benefits</h4>
+                  <h4
+                    className={`features-title ${isDarkMode ? "dark-mode" : ""}`}
+                  >
+                    Membership Benefits
+                  </h4>
                   <div className="benefits-grid">
                     {activeMembership.features
                       .slice(0, 4)
                       .map((feature, idx) => (
-                        <div key={idx} className="benefit-item">
+                        <div
+                          key={idx}
+                          className={`benefit-item ${isDarkMode ? "dark-mode" : ""}`}
+                        >
                           <CheckCircle size={16} />
                           <span>{feature}</span>
                         </div>
                       ))}
                     {activeMembership.features.length > 4 && (
-                      <div className="benefit-item more">
+                      <div
+                        className={`benefit-item more ${isDarkMode ? "dark-mode" : ""}`}
+                      >
                         <Plus size={16} />
                         <span>{activeMembership.features.length - 4} more</span>
                       </div>
@@ -711,10 +683,18 @@ const ClientDashboard = () => {
         ) : (
           !loadingMemberships &&
           !activeMembership && (
-            <div className="empty-state-enhanced">
+            <div
+              className={`empty-state-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+            >
               <div className="empty-icon-large">📋</div>
-              <h3 className="empty-title-large">No Active Membership</h3>
-              <p className="empty-description-enhanced">
+              <h3
+                className={`empty-title-large ${isDarkMode ? "dark-mode" : ""}`}
+              >
+                No Active Membership
+              </h3>
+              <p
+                className={`empty-description-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+              >
                 You haven't joined any businesses yet. Explore our recommended
                 businesses below and find the perfect membership for you!
               </p>
@@ -730,7 +710,7 @@ const ClientDashboard = () => {
           )
         )}
 
-        {/* All Memberships Table - No count badge, no blue line */}
+        {/* All Memberships Table */}
         {!loadingMemberships && memberships.length > 0 && (
           <div className="memberships-table-container">
             <div className="section-header no-bottom-border">
@@ -738,7 +718,7 @@ const ClientDashboard = () => {
                 <h3 className="title-text">All Memberships</h3>
               </div>
               <button
-                className="view-all-btn"
+                className={`view-all-btn ${isDarkMode ? "dark-mode" : ""}`}
                 onClick={() => navigate("/memberships")}
               >
                 <span>View All</span>
@@ -746,8 +726,10 @@ const ClientDashboard = () => {
               </button>
             </div>
 
-            <div className="memberships-table">
-              <div className="table-header blue-theme">
+            <div
+              className={`memberships-table ${isDarkMode ? "dark-mode" : ""}`}
+            >
+              <div className="table-header">
                 <div className="table-cell">Business</div>
                 <div className="table-cell">Plan</div>
                 <div className="table-cell">Applied</div>
@@ -760,34 +742,49 @@ const ClientDashboard = () => {
                   const expiryStatus = getExpiryStatus(timeData);
 
                   return (
-                    <div key={membership.id} className="table-row">
+                    <div
+                      key={membership.id}
+                      className={`table-row ${isDarkMode ? "dark-mode" : ""}`}
+                    >
                       <div className="table-cell business-cell">
-                        <div className="business-mini-icon centered">
-                          {membership.businesses?.emoji || "🏢"}
+                        <div className="business-mini-icon">
+                          <span>{membership.businesses?.emoji || "🏢"}</span>
                         </div>
-                        <span className="business-name-mini">
+                        <span
+                          className={`business-name-mini ${isDarkMode ? "dark-mode" : ""}`}
+                        >
                           {membership.businesses?.name}
                         </span>
                       </div>
                       <div className="table-cell plan-cell">
-                        <span className="plan-tag">
+                        <span
+                          className={`plan-tag ${isDarkMode ? "dark-mode" : ""}`}
+                        >
                           {membership.membership_plans?.name || "Membership"}
                         </span>
                       </div>
-                      <div className="table-cell date-cell">
+                      <div
+                        className={`table-cell date-cell ${isDarkMode ? "dark-mode" : ""}`}
+                      >
                         {formatDate(membership.created_at)}
                       </div>
-                      <div className="table-cell date-cell">
+                      <div
+                        className={`table-cell date-cell ${isDarkMode ? "dark-mode" : ""}`}
+                      >
                         {formatDate(membership.end_date)}
                       </div>
                       <div className="table-cell status-cell">
                         {timeData && !timeData.expired ? (
-                          <div className={`status-indicator ${expiryStatus}`}>
+                          <div
+                            className={`status-indicator ${expiryStatus} ${isDarkMode ? "dark-mode" : ""}`}
+                          >
                             <Clock size={14} />
                             <span>{timeData.days}d left</span>
                           </div>
                         ) : (
-                          <div className="status-indicator expired">
+                          <div
+                            className={`status-indicator expired ${isDarkMode ? "dark-mode" : ""}`}
+                          >
                             <XCircle size={14} />
                             <span>Expired</span>
                           </div>
@@ -801,7 +798,7 @@ const ClientDashboard = () => {
           </div>
         )}
 
-        {/* Recommended Section - Fire icon on the right, no blue line */}
+        {/* Recommended Section */}
         <div className="recommended-section">
           <div className="section-header no-bottom-border">
             <div className="section-title">
@@ -809,7 +806,7 @@ const ClientDashboard = () => {
               <span className="title-icon-fire">🔥</span>
             </div>
             <button
-              className="view-all-btn"
+              className={`view-all-btn ${isDarkMode ? "dark-mode" : ""}`}
               onClick={() => navigate("/browse")}
             >
               <span>View All</span>
@@ -818,16 +815,22 @@ const ClientDashboard = () => {
           </div>
 
           {loadingRecommendations ? (
-            <div className="loading-container">
-              <div className="spinner-small"></div>
-              <p className="loading-text">Finding recommendations for you...</p>
+            <div
+              className={`loading-container ${isDarkMode ? "dark-mode" : ""}`}
+            >
+              <div
+                className={`spinner-small ${isDarkMode ? "dark-mode" : ""}`}
+              ></div>
+              <p className={`loading-text ${isDarkMode ? "dark-mode" : ""}`}>
+                Finding recommendations for you...
+              </p>
             </div>
           ) : (
             <div className="recommended-grid-enhanced">
               {recommendedBusinesses.map((business, index) => (
                 <div
                   key={business.id}
-                  className="recommended-card-enhanced"
+                  className={`recommended-card-enhanced ${isDarkMode ? "dark-mode" : ""}`}
                   style={{ animationDelay: `${index * 0.1}s` }}
                   onClick={() => handleViewBusiness(business.id)}
                 >
@@ -852,32 +855,50 @@ const ClientDashboard = () => {
                     )}
                   </div>
 
-                  <h4 className="card-title-enhanced">{business.name}</h4>
+                  <h4
+                    className={`card-title-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+                  >
+                    {business.name}
+                  </h4>
 
-                  <div className="owner-highlight">
+                  <div
+                    className={`owner-highlight ${isDarkMode ? "dark-mode" : ""}`}
+                  >
                     <Crown size={14} className="owner-icon" />
-                    <span className="owner-name">{business.owner_name}</span>
+                    <span
+                      className={`owner-name ${isDarkMode ? "dark-mode" : ""}`}
+                    >
+                      {business.owner_name}
+                    </span>
                     <span className="owner-badge">Owner</span>
                   </div>
 
                   {business.short_description && (
-                    <p className="card-description-enhanced">
+                    <p
+                      className={`card-description-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+                    >
                       {business.short_description}
                     </p>
                   )}
 
                   <div className="card-meta-enhanced">
-                    <span className="meta-item-enhanced">
+                    <span
+                      className={`meta-item-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+                    >
                       <MapPin size={14} />
                       {business.city || business.location}
                     </span>
-                    <span className="meta-item-enhanced price">
+                    <span
+                      className={`meta-item-enhanced price ${isDarkMode ? "dark-mode" : ""}`}
+                    >
                       <span className="price-value">₱{business.price}</span>
                       <span className="price-unit">/{business.price_unit}</span>
                     </span>
                   </div>
 
-                  <button className="card-btn-enhanced">
+                  <button
+                    className={`card-btn-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+                  >
                     <span>View Details</span>
                     <ChevronRight size={16} className="btn-icon" />
                   </button>
@@ -887,8 +908,10 @@ const ClientDashboard = () => {
           )}
 
           {!loadingRecommendations && recommendedBusinesses.length === 0 && (
-            <div className="empty-container-enhanced">
-              <p className="empty-text">
+            <div
+              className={`empty-container-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+            >
+              <p className={`empty-text ${isDarkMode ? "dark-mode" : ""}`}>
                 No recommendations available at the moment.
               </p>
               <button

@@ -75,7 +75,8 @@
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0px);
   }
   50% {
@@ -88,7 +89,8 @@
 }
 
 @keyframes glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 5px rgba(59, 130, 246, 0.3);
   }
   50% {
@@ -111,7 +113,11 @@
 }
 
 .stat-card-enhanced {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.98));
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 255, 255, 0.98)
+  );
   backdrop-filter: blur(10px);
   border-radius: 1.5rem;
   padding: 1.75rem;
@@ -125,13 +131,18 @@
 }
 
 .stat-card-enhanced::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(59, 130, 246, 0.1),
+    transparent
+  );
   transition: left 0.6s ease;
 }
 
@@ -242,14 +253,16 @@
   padding: 2rem 1.5rem;
   text-align: center;
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.05),
+    0 8px 10px -6px rgba(0, 0, 0, 0.02);
   cursor: pointer;
   position: relative;
   overflow: hidden;
 }
 
 .team-card-enhanced::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -443,11 +456,11 @@
   .stats-grid {
     gap: 1rem;
   }
-  
+
   .team-grid-horizontal {
     gap: 1.5rem;
   }
-  
+
   .team-card-enhanced {
     min-width: 200px;
   }
@@ -459,30 +472,30 @@
     gap: 1rem;
     margin-top: -2rem;
   }
-  
+
   .team-grid-horizontal {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .team-card-enhanced {
     max-width: 320px;
     width: 100%;
   }
-  
+
   .values-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
-  
+
   .stat-value {
     font-size: 1.5rem;
   }
-  
+
   .hero-title {
     font-size: 2.5rem;
   }
-  
+
   .hero-subtitle {
     font-size: 1.125rem;
   }
@@ -492,24 +505,24 @@
   .stats-grid {
     gap: 0.75rem;
   }
-  
+
   .stat-card-enhanced {
     padding: 1.25rem;
   }
-  
+
   .stat-icon {
     width: 3rem;
     height: 3rem;
   }
-  
+
   .stat-value {
     font-size: 1.25rem;
   }
-  
+
   .team-card-enhanced {
     padding: 1.5rem;
   }
-  
+
   .team-avatar-enhanced {
     width: 100px;
     height: 100px;
@@ -538,4 +551,149 @@
 /* ===== SMOOTH SCROLLING ===== */
 html {
   scroll-behavior: smooth;
+}
+
+/* ===== DARK MODE STYLES FOR ABOUT PAGE ===== */
+.about-container.dark-mode {
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+  min-height: 100vh;
+}
+
+/* Hero section in dark mode */
+.about-container.dark-mode .hero-title {
+  background: linear-gradient(135deg, #ffffff, #9ca3af);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.about-container.dark-mode .hero-subtitle {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Stats cards in dark mode */
+.about-container.dark-mode .stat-card-enhanced {
+  background: linear-gradient(135deg, #1f2937, #374151);
+  border: 1px solid #4b5563;
+}
+
+.about-container.dark-mode .stat-card-enhanced .stat-value {
+  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.about-container.dark-mode .stat-card-enhanced .stat-label {
+  color: #9ca3af;
+}
+
+.about-container.dark-mode .stat-blue .stat-icon {
+  background: linear-gradient(135deg, #1e3a8a, #1e40af);
+  color: #60a5fa;
+}
+
+.about-container.dark-mode .stat-purple .stat-icon {
+  background: linear-gradient(135deg, #5b21b6, #6d28d9);
+  color: #a78bfa;
+}
+
+.about-container.dark-mode .stat-green .stat-icon {
+  background: linear-gradient(135deg, #065f46, #047857);
+  color: #34d399;
+}
+
+.about-container.dark-mode .stat-orange .stat-icon {
+  background: linear-gradient(135deg, #9a3412, #c2410c);
+  color: #fb923c;
+}
+
+/* Value cards in dark mode */
+.about-container.dark-mode .value-card-enhanced {
+  background: #1f2937;
+  border: 1px solid #374151;
+}
+
+.about-container.dark-mode .value-card-enhanced:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+.about-container.dark-mode .value-title {
+  color: #f3f4f6;
+}
+
+.about-container.dark-mode .value-description {
+  color: #9ca3af;
+}
+
+/* Team cards in dark mode */
+.about-container.dark-mode .team-card-enhanced {
+  background: #1f2937;
+  border: 1px solid #374151;
+}
+
+.about-container.dark-mode .team-card-enhanced:hover {
+  box-shadow: 0 25px 35px -12px rgba(0, 0, 0, 0.4);
+  border-color: #3b82f6;
+}
+
+.about-container.dark-mode .team-name-enhanced {
+  color: #f3f4f6;
+}
+
+.about-container.dark-mode .team-card-enhanced:hover .team-name-enhanced {
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.about-container.dark-mode .team-role-enhanced {
+  color: #9ca3af;
+}
+
+.about-container.dark-mode .team-bio-enhanced {
+  color: #6b7280;
+}
+
+.about-container.dark-mode .team-social-link {
+  background: #374151;
+}
+
+.about-container.dark-mode .team-social-link svg {
+  color: #9ca3af;
+}
+
+.about-container.dark-mode .team-social-link:hover {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+}
+
+.about-container.dark-mode .team-social-link:hover svg {
+  color: white;
+}
+
+/* Mission text in dark mode */
+.about-container.dark-mode .mission-text {
+  color: #e5e7eb;
+}
+
+/* Loading spinner in dark mode */
+.about-container.dark-mode .loading-spinner,
+.about-container.dark-mode .loading-spinner.dark-mode {
+  border-color: #374151;
+  border-top-color: #3b82f6;
+}
+
+/* Scrollbar in dark mode */
+.about-container.dark-mode ::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+.about-container.dark-mode ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.about-container.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }

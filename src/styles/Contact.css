@@ -6,6 +6,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -56,7 +57,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -87,7 +89,7 @@
 }
 
 .contact-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -143,7 +145,7 @@
   .contact-card {
     padding: 1.25rem;
   }
-  
+
   .hero-subtitle {
     font-size: 1.125rem;
   }
@@ -153,17 +155,17 @@
   .contact-card {
     padding: 1rem;
   }
-  
+
   .contact-card .w-16 {
     width: 3rem;
     height: 3rem;
   }
-  
+
   .contact-card .w-8 {
     width: 1.25rem;
     height: 1.25rem;
   }
-  
+
   .hero-subtitle {
     font-size: 1rem;
   }
@@ -222,4 +224,92 @@ html {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   font-weight: 400;
   line-height: 1.6;
+}
+
+/* ===== DARK MODE STYLES FOR CONTACT PAGE ===== */
+.contact-container.dark-mode {
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+  min-height: 100vh;
+}
+
+/* Hero section in dark mode */
+.contact-container.dark-mode .hero-subtitle {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* Contact cards in dark mode */
+.contact-container.dark-mode .contact-card {
+  background: #1f2937;
+  border: 1px solid #374151;
+}
+
+.contact-container.dark-mode .contact-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 25px 35px -12px rgba(0, 0, 0, 0.4);
+}
+
+/* Contact icons in dark mode */
+.contact-container.dark-mode .contact-card .bg-green-100,
+.contact-container.dark-mode .contact-card .bg-yellow-100,
+.contact-container.dark-mode .contact-card .bg-blue-100,
+.contact-container.dark-mode .contact-card .bg-pink-100,
+.contact-container.dark-mode .contact-card .bg-purple-100 {
+  background: #374151;
+}
+
+.contact-container.dark-mode .contact-card .text-green-600,
+.contact-container.dark-mode .contact-card .text-yellow-600,
+.contact-container.dark-mode .contact-card .text-blue-600,
+.contact-container.dark-mode .contact-card .text-pink-600,
+.contact-container.dark-mode .contact-card .text-purple-600 {
+  color: #60a5fa;
+}
+
+/* FAQ section in dark mode */
+.contact-container.dark-mode .faq-card {
+  background: #1f2937;
+  border: 1px solid #374151;
+}
+
+.contact-container.dark-mode .faq-card:hover {
+  background: #374151;
+  border-color: #3b82f6;
+}
+
+.contact-container.dark-mode .faq-card h3 {
+  color: #f3f4f6;
+}
+
+.contact-container.dark-mode .faq-card p {
+  color: #9ca3af;
+}
+
+/* Scrollbar in dark mode */
+.contact-container.dark-mode ::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+.contact-container.dark-mode ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.contact-container.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Loading spinner in dark mode */
+.contact-container.dark-mode .loading-spinner {
+  border-color: #374151;
+  border-top-color: #3b82f6;
+}
+
+/* Badge styles in dark mode */
+.contact-container.dark-mode .bg-blue-100 {
+  background: #1e3a8a;
+  color: #60a5fa;
+}
+
+.contact-container.dark-mode .bg-purple-100 {
+  background: #5b21b6;
+  color: #a78bfa;
 }

@@ -18,7 +18,7 @@ import Browse from "./pages/Browse";
 import BusinessReviews from "./pages/BusinessReviews";
 import LandingPage from "./pages/LandingPage";
 import About from "./pages/About";
-import Contact from "./pages/Contact"; // ✅ ADD THIS IMPORT
+import Contact from "./pages/Contact";
 import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import OwnerMemberManagement from "./pages/OwnerMemberManagement";
@@ -28,6 +28,7 @@ import AdminSettings from "./pages/AdminSettings";
 import AdminProfile from "./components/admin/AdminProfile";
 import OwnerNotifications from "./pages/OwnerNotifications";
 import OwnerSettings from "./pages/OwnerSettings";
+import { useTheme } from "./contexts/ThemeContext"; // Add this import
 import "./App.css";
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
   const [initialRedirectDone, setInitialRedirectDone] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const { isDarkMode } = useTheme(); // Add this line
 
   const hasProcessedSignIn = useRef(false);
   const authInitialized = useRef(false);
@@ -291,7 +293,7 @@ function App() {
       "/register",
       "/forgot-password",
       "/about",
-      "/contact", // ✅ ADDED CONTACT TO PUBLIC PATHS
+      "/contact",
     ];
 
     // Only redirect if on a public path AND logged in with valid session
@@ -333,10 +335,14 @@ function App() {
   // Don't render anything until auth is checked
   if (!authChecked) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div
+        className={`min-h-screen flex items-center justify-center ${isDarkMode ? "dark-mode" : ""}`}
+      >
         <div className="text-center">
           <div className="loading-spinner mx-auto"></div>
-          <p className="mt-4">Loading application...</p>
+          <p className={`mt-4 ${isDarkMode ? "text-gray-300" : ""}`}>
+            Loading application...
+          </p>
         </div>
       </div>
     );
@@ -344,7 +350,9 @@ function App() {
 
   if (configError) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500 text-white">
+      <div
+        className={`min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-purple-400 to-pink-500 text-white ${isDarkMode ? "dark-mode" : ""}`}
+      >
         <h1 className="text-3xl font-bold mb-4">Configuration Error</h1>
         <p className="mb-4">
           Supabase is not configured properly. Please check your environment
@@ -379,10 +387,14 @@ function App() {
 
     if (userRole === null) {
       return (
-        <div className="min-h-screen flex items-center justify-center">
+        <div
+          className={`min-h-screen flex items-center justify-center ${isDarkMode ? "dark-mode" : ""}`}
+        >
           <div className="text-center">
             <div className="loading-spinner mx-auto"></div>
-            <p className="mt-4">Loading your profile...</p>
+            <p className={`mt-4 ${isDarkMode ? "text-gray-300" : ""}`}>
+              Loading your profile...
+            </p>
           </div>
         </div>
       );
@@ -413,7 +425,7 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/about" element={<About />} />
-      <Route path="/contact" element={<Contact />} /> {/* ✅ ADDED CONTACT ROUTE */}
+      <Route path="/contact" element={<Contact />} />
 
       {/* Client Routes */}
       <Route
@@ -499,7 +511,7 @@ function App() {
           </ProtectedRoute>
         }
       />
-      
+
       {/* Admin Routes */}
       <Route
         path="/admin-dashboard"
