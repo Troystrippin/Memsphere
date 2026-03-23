@@ -1,32 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import OwnerNavbar from '../components/owner/OwnerNavbar';
-import { toast, Toaster } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  CheckCircle, XCircle, Clock, Eye, Download, 
-  ChevronDown, ChevronUp, User, Mail, Phone, 
-  Building, CreditCard, Calendar, FileText, 
-  AlertCircle, Check, X, ExternalLink, Search,
-  Filter, TrendingUp, Users, DollarSign
-} from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import OwnerNavbar from "../components/owner/OwnerNavbar";
+import { toast, Toaster } from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "../contexts/ThemeContext";
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Eye,
+  Download,
+  ChevronDown,
+  ChevronUp,
+  User,
+  Mail,
+  Phone,
+  Building,
+  CreditCard,
+  Calendar,
+  FileText,
+  AlertCircle,
+  Check,
+  X,
+  ExternalLink,
+  Search,
+  Filter,
+  TrendingUp,
+  Users,
+  DollarSign,
+} from "lucide-react";
 
 const Applications = () => {
   const navigate = useNavigate();
+  const { isDarkMode, toggleTheme } = useTheme();
   const [profile, setProfile] = useState(null);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState({});
   const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [clientAvatars, setClientAvatars] = useState({});
-  const [filter, setFilter] = useState('pending');
+  const [filter, setFilter] = useState("pending");
   const [expandedCard, setExpandedCard] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     fetchUserProfile();
@@ -39,17 +59,20 @@ const Applications = () => {
 
   const fetchUserProfile = async () => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) {
-        navigate('/login');
+        navigate("/login");
         return;
       }
 
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
         .single();
 
       if (profileError) throw profileError;
@@ -59,20 +82,20 @@ const Applications = () => {
         downloadAvatar(profileData.avatar_url);
       }
     } catch (err) {
-      console.error('Error fetching profile:', err);
+      console.error("Error fetching profile:", err);
     }
   };
 
   const downloadAvatar = async (path) => {
     try {
       const { data, error } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .download(path);
       if (error) throw error;
       const url = URL.createObjectURL(data);
       setAvatarUrl(url);
     } catch (error) {
-      console.error('Error downloading avatar:', error);
+      console.error("Error downloading avatar:", error);
     }
   };
 
@@ -81,33 +104,37 @@ const Applications = () => {
     if (clientAvatars[userId]) return clientAvatars[userId];
 
     try {
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('avatars')
+      const { data: publicUrlData } = supabase.storage
+        .from("avatars")
         .getPublicUrl(avatarPath);
-      
+
       if (publicUrlData?.publicUrl) {
         try {
-          const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
+          const response = await fetch(publicUrlData.publicUrl, {
+            method: "HEAD",
+          });
           if (response.ok) {
-            setClientAvatars(prev => ({ ...prev, [userId]: publicUrlData.publicUrl }));
+            setClientAvatars((prev) => ({
+              ...prev,
+              [userId]: publicUrlData.publicUrl,
+            }));
             return publicUrlData.publicUrl;
           }
         } catch (e) {
-          console.log('Public URL not accessible, trying download...');
+          console.log("Public URL not accessible, trying download...");
         }
       }
 
       const { data, error } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .download(avatarPath);
 
       if (error) throw error;
       const url = URL.createObjectURL(data);
-      setClientAvatars(prev => ({ ...prev, [userId]: url }));
+      setClientAvatars((prev) => ({ ...prev, [userId]: url }));
       return url;
     } catch (error) {
-      console.error('Error getting client avatar:', error);
+      console.error("Error getting client avatar:", error);
       return null;
     }
   };
@@ -121,30 +148,31 @@ const Applications = () => {
     if (!receiptPath) return null;
 
     try {
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('payment-receipts')
+      const { data: publicUrlData } = supabase.storage
+        .from("payment-receipts")
         .getPublicUrl(receiptPath);
-      
+
       if (publicUrlData?.publicUrl) {
         try {
-          const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
+          const response = await fetch(publicUrlData.publicUrl, {
+            method: "HEAD",
+          });
           if (response.ok) {
             return publicUrlData.publicUrl;
           }
         } catch (e) {
-          console.log('Public URL not accessible, trying download...');
+          console.log("Public URL not accessible, trying download...");
         }
       }
 
       const { data, error } = await supabase.storage
-        .from('payment-receipts')
+        .from("payment-receipts")
         .download(receiptPath);
 
       if (error) throw error;
       return URL.createObjectURL(data);
     } catch (error) {
-      console.error('Error getting receipt URL:', error);
+      console.error("Error getting receipt URL:", error);
       return null;
     }
   };
@@ -152,17 +180,20 @@ const Applications = () => {
   const fetchApplications = async () => {
     try {
       setLoading(true);
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) {
-        navigate('/login');
+        navigate("/login");
         return;
       }
 
       const { data: businessesData, error: businessesError } = await supabase
-        .from('businesses')
-        .select('id, verification_status')
-        .eq('owner_id', user.id);
+        .from("businesses")
+        .select("id, verification_status")
+        .eq("owner_id", user.id);
 
       if (businessesError) throw businessesError;
 
@@ -172,15 +203,16 @@ const Applications = () => {
         return;
       }
 
-      const businessIds = businessesData.map(b => b.id);
+      const businessIds = businessesData.map((b) => b.id);
       const businessVerificationMap = {};
-      businessesData.forEach(b => {
+      businessesData.forEach((b) => {
         businessVerificationMap[b.id] = b.verification_status;
       });
 
       let query = supabase
-        .from('memberships')
-        .select(`
+        .from("memberships")
+        .select(
+          `
           *,
           applicant:user_id (
             id,
@@ -218,46 +250,55 @@ const Applications = () => {
             created_at,
             verified_at
           )
-        `)
-        .in('business_id', businessIds)
-        .order('created_at', { ascending: false });
+        `,
+        )
+        .in("business_id", businessIds)
+        .order("created_at", { ascending: false });
 
-      if (filter !== 'all') {
-        query = query.eq('status', filter);
+      if (filter !== "all") {
+        query = query.eq("status", filter);
       }
 
       const { data, error } = await query;
 
       if (error) {
-        console.error('Query error:', error);
+        console.error("Query error:", error);
         throw error;
       }
 
-      const processedData = await Promise.all((data || []).map(async (app) => {
-        let receiptUrl = null;
-        let clientAvatarUrl = null;
-        
-        if (app.payment_method?.toLowerCase() === 'gcash') {
-          receiptUrl = await getReceiptUrl(app);
-        }
-        
-        if (app.applicant?.avatar_url) {
-          clientAvatarUrl = await getClientAvatarUrl(app.applicant.avatar_url, app.applicant.id);
-        }
-        
-        const businessVerification = app.business?.verification_status || businessVerificationMap[app.business_id] || 'pending';
-        
-        return {
-          ...app,
-          receipt_url_display: receiptUrl,
-          client_avatar_display: clientAvatarUrl,
-          business_verification: businessVerification
-        };
-      }));
+      const processedData = await Promise.all(
+        (data || []).map(async (app) => {
+          let receiptUrl = null;
+          let clientAvatarUrl = null;
+
+          if (app.payment_method?.toLowerCase() === "gcash") {
+            receiptUrl = await getReceiptUrl(app);
+          }
+
+          if (app.applicant?.avatar_url) {
+            clientAvatarUrl = await getClientAvatarUrl(
+              app.applicant.avatar_url,
+              app.applicant.id,
+            );
+          }
+
+          const businessVerification =
+            app.business?.verification_status ||
+            businessVerificationMap[app.business_id] ||
+            "pending";
+
+          return {
+            ...app,
+            receipt_url_display: receiptUrl,
+            client_avatar_display: clientAvatarUrl,
+            business_verification: businessVerification,
+          };
+        }),
+      );
 
       setApplications(processedData || []);
     } catch (err) {
-      console.error('Error fetching applications:', err);
+      console.error("Error fetching applications:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -266,73 +307,75 @@ const Applications = () => {
 
   const handleApprove = async (membershipId) => {
     try {
-      setProcessing(prev => ({ ...prev, [membershipId]: true }));
+      setProcessing((prev) => ({ ...prev, [membershipId]: true }));
       const { error } = await supabase
-        .from('memberships')
-        .update({ 
-          status: 'approved',
-          payment_status: 'paid',
+        .from("memberships")
+        .update({
+          status: "approved",
+          payment_status: "paid",
           reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', membershipId);
+        .eq("id", membershipId);
 
       if (error) throw error;
-      toast.success('Application approved successfully!');
+      toast.success("Application approved successfully!");
       fetchApplications();
     } catch (err) {
-      console.error('Error approving application:', err);
+      console.error("Error approving application:", err);
       toast.error(err.message);
     } finally {
-      setProcessing(prev => ({ ...prev, [membershipId]: false }));
+      setProcessing((prev) => ({ ...prev, [membershipId]: false }));
     }
   };
 
   const handleReject = async (membershipId) => {
     try {
-      setProcessing(prev => ({ ...prev, [membershipId]: true }));
+      setProcessing((prev) => ({ ...prev, [membershipId]: true }));
       const { error } = await supabase
-        .from('memberships')
-        .update({ 
-          status: 'rejected',
+        .from("memberships")
+        .update({
+          status: "rejected",
           reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', membershipId);
+        .eq("id", membershipId);
 
       if (error) throw error;
-      toast.success('Application rejected successfully!');
+      toast.success("Application rejected successfully!");
       fetchApplications();
     } catch (err) {
-      console.error('Error rejecting application:', err);
+      console.error("Error rejecting application:", err);
       toast.error(err.message);
     } finally {
-      setProcessing(prev => ({ ...prev, [membershipId]: false }));
+      setProcessing((prev) => ({ ...prev, [membershipId]: false }));
     }
   };
 
   const handleVerifyPayment = async (membershipId) => {
     try {
-      setProcessing(prev => ({ ...prev, [membershipId]: true }));
-      const { data: { user } } = await supabase.auth.getUser();
+      setProcessing((prev) => ({ ...prev, [membershipId]: true }));
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       const { error } = await supabase
-        .from('memberships')
-        .update({ 
-          payment_status: 'paid',
+        .from("memberships")
+        .update({
+          payment_status: "paid",
           payment_verified_at: new Date().toISOString(),
           verified_by: user.id,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', membershipId);
+        .eq("id", membershipId);
 
       if (error) throw error;
-      toast.success('Payment verified successfully!');
+      toast.success("Payment verified successfully!");
       fetchApplications();
     } catch (err) {
-      console.error('Error verifying payment:', err);
+      console.error("Error verifying payment:", err);
       toast.error(err.message);
     } finally {
-      setProcessing(prev => ({ ...prev, [membershipId]: false }));
+      setProcessing((prev) => ({ ...prev, [membershipId]: false }));
     }
   };
 
@@ -347,25 +390,25 @@ const Applications = () => {
 
   const getFirstName = () => {
     if (profile?.first_name) return profile.first_name;
-    return 'Owner';
+    return "Owner";
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const getInitials = (firstName, lastName) => {
-    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+    return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
   };
 
-  const filteredApplications = applications.filter(app => {
+  const filteredApplications = applications.filter((app) => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -379,9 +422,9 @@ const Applications = () => {
 
   const getStats = () => {
     const total = applications.length;
-    const pending = applications.filter(a => a.status === 'pending').length;
-    const approved = applications.filter(a => a.status === 'approved').length;
-    const rejected = applications.filter(a => a.status === 'rejected').length;
+    const pending = applications.filter((a) => a.status === "pending").length;
+    const approved = applications.filter((a) => a.status === "approved").length;
+    const rejected = applications.filter((a) => a.status === "rejected").length;
     return { total, pending, approved, rejected };
   };
 
@@ -389,10 +432,20 @@ const Applications = () => {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center select-none">
+      <div
+        className={`fixed inset-0 flex items-center justify-center select-none ${
+          isDarkMode
+            ? "bg-gray-900"
+            : "bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50"
+        }`}
+      >
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600 font-medium">Loading applications...</p>
+          <p
+            className={`mt-4 font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+          >
+            Loading applications...
+          </p>
         </div>
       </div>
     );
@@ -401,83 +454,166 @@ const Applications = () => {
   const firstName = getFirstName();
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 overflow-hidden select-none">
-      <Toaster position="top-right" />
-      <OwnerNavbar profile={profile} avatarUrl={avatarUrl} />
-      
+    <div
+      className={`fixed inset-0 overflow-hidden select-none ${
+        isDarkMode
+          ? "bg-gray-900"
+          : "bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50"
+      }`}
+    >
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: isDarkMode ? "#1f2937" : "#363636",
+            color: "#fff",
+          },
+        }}
+      />
+      <OwnerNavbar
+        profile={profile}
+        avatarUrl={avatarUrl}
+        isDarkMode={isDarkMode}
+        toggleDarkMode={toggleTheme}
+      />
+
       <div className="h-full pt-20 overflow-y-auto">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-12">
           {/* Header */}
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                    <h1
+                      className={`text-4xl font-bold ${isDarkMode ? "text-white" : "bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"}`}
+                    >
                       Membership Applications
                     </h1>
                     <div className="absolute -bottom-2 left-0 w-20 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-width-pulse"></div>
                   </div>
                 </div>
-                <p className="text-gray-500 mt-2 flex items-center gap-2">
+                <p
+                  className={`mt-2 flex items-center gap-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
                   <Users className="w-4 h-4" />
                   Review and manage customer membership applications
                 </p>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-200">
-                  <p className="text-xs text-gray-500">Total Applications</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
-                </div>
+              <div
+                className={`flex items-center gap-4 rounded-xl px-4 py-2 shadow-sm border ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+              >
+                <p
+                  className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
+                  Total Applications
+                </p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {stats.total}
+                </p>
               </div>
             </div>
           </motion.div>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <div
+              className={`rounded-xl p-4 border shadow-sm ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+            >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-                </div>
-                <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-yellow-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Approved</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
-                </div>
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Rejected</p>
-                  <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
-                </div>
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <XCircle className="w-5 h-5 text-red-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Total Revenue</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    ₱{applications.filter(a => a.status === 'approved').reduce((sum, a) => sum + (a.price_paid || 0), 0).toLocaleString()}
+                  <p
+                    className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    Pending
+                  </p>
+                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                    {stats.pending}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-purple-600" />
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? "bg-yellow-900/30" : "bg-yellow-100"}`}
+                >
+                  <Clock
+                    className={`w-5 h-5 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                  />
+                </div>
+              </div>
+            </div>
+            <div
+              className={`rounded-xl p-4 border shadow-sm ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p
+                    className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    Approved
+                  </p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    {stats.approved}
+                  </p>
+                </div>
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? "bg-green-900/30" : "bg-green-100"}`}
+                >
+                  <CheckCircle
+                    className={`w-5 h-5 ${isDarkMode ? "text-green-400" : "text-green-600"}`}
+                  />
+                </div>
+              </div>
+            </div>
+            <div
+              className={`rounded-xl p-4 border shadow-sm ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p
+                    className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    Rejected
+                  </p>
+                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    {stats.rejected}
+                  </p>
+                </div>
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? "bg-red-900/30" : "bg-red-100"}`}
+                >
+                  <XCircle
+                    className={`w-5 h-5 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+                  />
+                </div>
+              </div>
+            </div>
+            <div
+              className={`rounded-xl p-4 border shadow-sm ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p
+                    className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    Total Revenue
+                  </p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    ₱
+                    {applications
+                      .filter((a) => a.status === "approved")
+                      .reduce((sum, a) => sum + (a.price_paid || 0), 0)
+                      .toLocaleString()}
+                  </p>
+                </div>
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? "bg-purple-900/30" : "bg-purple-100"}`}
+                >
+                  <DollarSign
+                    className={`w-5 h-5 ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}
+                  />
                 </div>
               </div>
             </div>
@@ -486,25 +622,46 @@ const Applications = () => {
           {/* Search and Filter */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search
+                className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+              />
               <input
                 type="text"
                 placeholder="Search by name, email, business, or plan..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full pl-10 pr-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  isDarkMode
+                    ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                    : "bg-white border-gray-300 text-gray-900"
+                }`}
               />
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
               {[
-                { id: 'pending', label: 'Pending', icon: Clock, color: 'yellow' },
-                { id: 'approved', label: 'Approved', icon: CheckCircle, color: 'green' },
-                { id: 'rejected', label: 'Rejected', icon: XCircle, color: 'red' },
-                { id: 'all', label: 'All', icon: Filter, color: 'blue' }
-              ].map(tab => {
+                {
+                  id: "pending",
+                  label: "Pending",
+                  icon: Clock,
+                  color: "yellow",
+                },
+                {
+                  id: "approved",
+                  label: "Approved",
+                  icon: CheckCircle,
+                  color: "green",
+                },
+                {
+                  id: "rejected",
+                  label: "Rejected",
+                  icon: XCircle,
+                  color: "red",
+                },
+                { id: "all", label: "All", icon: Filter, color: "blue" },
+              ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = filter === tab.id;
-                const count = tab.id === 'all' ? stats.total : stats[tab.id];
+                const count = tab.id === "all" ? stats.total : stats[tab.id];
                 return (
                   <button
                     key={tab.id}
@@ -512,14 +669,16 @@ const Applications = () => {
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
                       isActive
                         ? `bg-${tab.color}-500 text-white shadow-md`
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                        : isDarkMode
+                          ? "bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700"
+                          : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
                     }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span>{tab.label}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs ${
-                      isActive ? 'bg-white/20' : 'bg-gray-100'
-                    }`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs ${isActive ? "bg-white/20" : isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}
+                    >
                       {count}
                     </span>
                   </button>
@@ -530,14 +689,16 @@ const Applications = () => {
 
           {/* Error/Success Messages */}
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
-              <p className="text-red-700">{error}</p>
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 rounded-r-lg">
+              <p className="text-red-700 dark:text-red-400">{error}</p>
             </div>
           )}
 
           {successMessage && (
-            <div className="mb-4 p-4 bg-green-50 border-l-4 border-green-500 rounded-r-lg">
-              <p className="text-green-700">{successMessage}</p>
+            <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/30 border-l-4 border-green-500 rounded-r-lg">
+              <p className="text-green-700 dark:text-green-400">
+                {successMessage}
+              </p>
             </div>
           )}
 
@@ -546,51 +707,72 @@ const Applications = () => {
             <div className="space-y-4">
               {filteredApplications.map((app) => {
                 const hasReceipt = app.receipt_url_display;
-                const isGcash = app.payment_method?.toLowerCase() === 'gcash';
-                const isVerified = ['paid'].includes(app.payment_status?.toLowerCase());
+                const isGcash = app.payment_method?.toLowerCase() === "gcash";
+                const isVerified = ["paid"].includes(
+                  app.payment_status?.toLowerCase(),
+                );
                 const isExpanded = expandedCard === app.id;
-                
+
                 return (
                   <motion.div
                     key={app.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden transition-all ${
-                      isExpanded ? 'shadow-xl' : ''
-                    }`}
+                    className={`rounded-2xl shadow-lg border overflow-hidden transition-all ${
+                      isExpanded ? "shadow-xl" : ""
+                    } ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
                   >
                     {/* Card Header */}
-                    <div className="p-5 cursor-pointer" onClick={() => toggleExpand(app.id)}>
+                    <div
+                      className="p-5 cursor-pointer"
+                      onClick={() => toggleExpand(app.id)}
+                    >
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center flex-shrink-0">
+                          <div
+                            className={`w-14 h-14 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${
+                              isDarkMode
+                                ? "bg-gray-700"
+                                : "bg-gradient-to-br from-blue-100 to-purple-100"
+                            }`}
+                          >
                             {app.client_avatar_display ? (
-                              <img 
-                                src={app.client_avatar_display} 
+                              <img
+                                src={app.client_avatar_display}
                                 alt={`${app.applicant?.first_name}`}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  e.target.style.display = 'none';
-                                  e.target.parentElement.innerHTML = `<div class="text-blue-600 font-bold text-xl">${getInitials(app.applicant?.first_name, app.applicant?.last_name)}</div>`;
+                                  e.target.style.display = "none";
+                                  e.target.parentElement.innerHTML = `<div class="text-blue-600 dark:text-blue-400 font-bold text-xl">${getInitials(app.applicant?.first_name, app.applicant?.last_name)}</div>`;
                                 }}
                               />
                             ) : (
-                              <div className="text-blue-600 font-bold text-xl">
-                                {getInitials(app.applicant?.first_name, app.applicant?.last_name)}
+                              <div className="text-blue-600 dark:text-blue-400 font-bold text-xl">
+                                {getInitials(
+                                  app.applicant?.first_name,
+                                  app.applicant?.last_name,
+                                )}
                               </div>
                             )}
                           </div>
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-800">
-                              {app.applicant?.first_name} {app.applicant?.last_name}
+                            <h3
+                              className={`text-lg font-semibold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+                            >
+                              {app.applicant?.first_name}{" "}
+                              {app.applicant?.last_name}
                             </h3>
                             <div className="flex flex-wrap gap-3 mt-1">
-                              <span className="text-sm text-gray-500 flex items-center gap-1">
+                              <span
+                                className={`text-sm flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                              >
                                 <Mail className="w-3 h-3" />
                                 {app.applicant?.email}
                               </span>
                               {app.applicant?.mobile && (
-                                <span className="text-sm text-gray-500 flex items-center gap-1">
+                                <span
+                                  className={`text-sm flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                >
                                   <Phone className="w-3 h-3" />
                                   {app.applicant.mobile}
                                 </span>
@@ -598,40 +780,100 @@ const Applications = () => {
                             </div>
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center gap-3">
-                          <div className={`px-3 py-1.5 rounded-full text-sm font-semibold flex items-center gap-1 ${
-                            app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                            app.status === 'approved' ? 'bg-green-100 text-green-700' :
-                            'bg-red-100 text-red-700'
-                          }`}>
-                            {app.status === 'pending' && <Clock className="w-3 h-3" />}
-                            {app.status === 'approved' && <CheckCircle className="w-3 h-3" />}
-                            {app.status === 'rejected' && <XCircle className="w-3 h-3" />}
+                          <div
+                            className={`px-3 py-1.5 rounded-full text-sm font-semibold flex items-center gap-1 ${
+                              app.status === "pending"
+                                ? isDarkMode
+                                  ? "bg-yellow-900/50 text-yellow-300"
+                                  : "bg-yellow-100 text-yellow-700"
+                                : app.status === "approved"
+                                  ? isDarkMode
+                                    ? "bg-green-900/50 text-green-300"
+                                    : "bg-green-100 text-green-700"
+                                  : isDarkMode
+                                    ? "bg-red-900/50 text-red-300"
+                                    : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {app.status === "pending" && (
+                              <Clock className="w-3 h-3" />
+                            )}
+                            {app.status === "approved" && (
+                              <CheckCircle className="w-3 h-3" />
+                            )}
+                            {app.status === "rejected" && (
+                              <XCircle className="w-3 h-3" />
+                            )}
                             <span className="capitalize">{app.status}</span>
                           </div>
-                          <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                          <button
+                            className={`p-2 rounded-lg transition-colors ${
+                              isDarkMode
+                                ? "hover:bg-gray-700 text-gray-300"
+                                : "hover:bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="w-5 h-5" />
+                            ) : (
+                              <ChevronDown className="w-5 h-5" />
+                            )}
                           </button>
                         </div>
                       </div>
-                      
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-100">
+
+                      <div
+                        className={`grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}
+                      >
                         <div>
-                          <p className="text-xs text-gray-500">Business</p>
-                          <p className="text-sm font-medium text-gray-800 truncate">{app.business?.name}</p>
+                          <p
+                            className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            Business
+                          </p>
+                          <p
+                            className={`text-sm font-medium truncate ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}
+                          >
+                            {app.business?.name}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Plan</p>
-                          <p className="text-sm font-medium text-gray-800">{app.plan?.name}</p>
+                          <p
+                            className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            Plan
+                          </p>
+                          <p
+                            className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}
+                          >
+                            {app.plan?.name}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Amount</p>
-                          <p className="text-sm font-bold text-blue-600">₱{app.price_paid?.toLocaleString()}</p>
+                          <p
+                            className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            Amount
+                          </p>
+                          <p
+                            className={`text-sm font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
+                          >
+                            ₱{app.price_paid?.toLocaleString()}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Applied</p>
-                          <p className="text-sm text-gray-600">{formatDate(app.created_at)}</p>
+                          <p
+                            className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            Applied
+                          </p>
+                          <p
+                            className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+                          >
+                            {formatDate(app.created_at)}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -641,83 +883,174 @@ const Applications = () => {
                       {isExpanded && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
+                          animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.3 }}
-                          className="border-t border-gray-100"
+                          className={`border-t ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}
                         >
-                          <div className="p-5 bg-gray-50/30">
+                          <div
+                            className={`p-5 ${isDarkMode ? "bg-gray-700/30" : "bg-gray-50/30"}`}
+                          >
                             {/* Plan Details */}
                             <div className="mb-6">
-                              <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                              <h4
+                                className={`font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}
+                              >
                                 <Building className="w-4 h-4 text-blue-500" />
                                 Plan Details
                               </h4>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <div className="bg-white rounded-lg p-3 border border-gray-200">
-                                  <p className="text-xs text-gray-500">Plan Name</p>
-                                  <p className="font-medium">{app.plan?.name}</p>
+                                <div
+                                  className={`rounded-lg p-3 border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"}`}
+                                >
+                                  <p
+                                    className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                  >
+                                    Plan Name
+                                  </p>
+                                  <p
+                                    className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}
+                                  >
+                                    {app.plan?.name}
+                                  </p>
                                 </div>
-                                <div className="bg-white rounded-lg p-3 border border-gray-200">
-                                  <p className="text-xs text-gray-500">Price</p>
-                                  <p className="font-medium text-blue-600">₱{app.price_paid?.toLocaleString()}/{app.plan?.duration}</p>
+                                <div
+                                  className={`rounded-lg p-3 border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"}`}
+                                >
+                                  <p
+                                    className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                  >
+                                    Price
+                                  </p>
+                                  <p
+                                    className={`font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
+                                  >
+                                    ₱{app.price_paid?.toLocaleString()}/
+                                    {app.plan?.duration}
+                                  </p>
                                 </div>
-                                <div className="bg-white rounded-lg p-3 border border-gray-200">
-                                  <p className="text-xs text-gray-500">Duration</p>
-                                  <p className="font-medium capitalize">{app.plan?.duration}</p>
+                                <div
+                                  className={`rounded-lg p-3 border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"}`}
+                                >
+                                  <p
+                                    className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                  >
+                                    Duration
+                                  </p>
+                                  <p
+                                    className={`font-medium capitalize ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}
+                                  >
+                                    {app.plan?.duration}
+                                  </p>
                                 </div>
                               </div>
-                              
-                              {app.plan?.features && app.plan.features.length > 0 && (
-                                <div className="mt-4 bg-white rounded-lg p-4 border border-gray-200">
-                                  <p className="text-sm font-semibold mb-2">Features</p>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    {app.plan.features.map((feature, idx) => (
-                                      <div key={idx} className="flex items-center gap-2 text-sm text-gray-600">
-                                        <Check className="w-4 h-4 text-green-500" />
-                                        <span>{feature}</span>
-                                      </div>
-                                    ))}
+
+                              {app.plan?.features &&
+                                app.plan.features.length > 0 && (
+                                  <div
+                                    className={`mt-4 rounded-lg p-4 border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"}`}
+                                  >
+                                    <p
+                                      className={`text-sm font-semibold mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+                                    >
+                                      Features
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      {app.plan.features.map((feature, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center gap-2 text-sm"
+                                        >
+                                          <Check className="w-4 h-4 text-green-500" />
+                                          <span
+                                            className={
+                                              isDarkMode
+                                                ? "text-gray-300"
+                                                : "text-gray-600"
+                                            }
+                                          >
+                                            {feature}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
                             </div>
 
                             {/* Timeline */}
                             <div className="mb-6">
-                              <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                              <h4
+                                className={`font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}
+                              >
                                 <Calendar className="w-4 h-4 text-blue-500" />
                                 Timeline
                               </h4>
                               <div className="space-y-2">
                                 <div className="flex items-center gap-3 text-sm">
-                                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <FileText className="w-4 h-4 text-blue-600" />
+                                  <div
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center ${isDarkMode ? "bg-gray-700" : "bg-blue-100"}`}
+                                  >
+                                    <FileText
+                                      className={`w-4 h-4 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
+                                    />
                                   </div>
                                   <div>
-                                    <p className="font-medium">Application Submitted</p>
-                                    <p className="text-gray-500 text-xs">{formatDate(app.created_at)}</p>
+                                    <p
+                                      className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}
+                                    >
+                                      Application Submitted
+                                    </p>
+                                    <p
+                                      className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}
+                                    >
+                                      {formatDate(app.created_at)}
+                                    </p>
                                   </div>
                                 </div>
                                 {app.payment_verified_at && (
                                   <div className="flex items-center gap-3 text-sm">
-                                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                      <CheckCircle className="w-4 h-4 text-green-600" />
+                                    <div
+                                      className={`w-8 h-8 rounded-full flex items-center justify-center ${isDarkMode ? "bg-gray-700" : "bg-green-100"}`}
+                                    >
+                                      <CheckCircle
+                                        className={`w-4 h-4 ${isDarkMode ? "text-green-400" : "text-green-600"}`}
+                                      />
                                     </div>
                                     <div>
-                                      <p className="font-medium">Payment Verified</p>
-                                      <p className="text-gray-500 text-xs">{formatDate(app.payment_verified_at)}</p>
+                                      <p
+                                        className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}
+                                      >
+                                        Payment Verified
+                                      </p>
+                                      <p
+                                        className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}
+                                      >
+                                        {formatDate(app.payment_verified_at)}
+                                      </p>
                                     </div>
                                   </div>
                                 )}
                                 {app.reviewed_at && (
                                   <div className="flex items-center gap-3 text-sm">
-                                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                                      <Eye className="w-4 h-4 text-purple-600" />
+                                    <div
+                                      className={`w-8 h-8 rounded-full flex items-center justify-center ${isDarkMode ? "bg-gray-700" : "bg-purple-100"}`}
+                                    >
+                                      <Eye
+                                        className={`w-4 h-4 ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}
+                                      />
                                     </div>
                                     <div>
-                                      <p className="font-medium">Application Reviewed</p>
-                                      <p className="text-gray-500 text-xs">{formatDate(app.reviewed_at)}</p>
+                                      <p
+                                        className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}
+                                      >
+                                        Application Reviewed
+                                      </p>
+                                      <p
+                                        className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}
+                                      >
+                                        {formatDate(app.reviewed_at)}
+                                      </p>
                                     </div>
                                   </div>
                                 )}
@@ -727,57 +1060,97 @@ const Applications = () => {
                             {/* Payment Section */}
                             {isGcash && (
                               <div className="mb-6">
-                                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <h4
+                                  className={`font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}
+                                >
                                   <CreditCard className="w-4 h-4 text-blue-500" />
                                   Payment Details
                                 </h4>
-                                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                <div
+                                  className={`rounded-lg p-4 border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"}`}
+                                >
                                   {hasReceipt ? (
                                     <div>
                                       <div className="mb-3">
-                                        <p className="text-sm text-gray-500 mb-1">Payment Receipt</p>
-                                        <div className="bg-gray-100 rounded-lg p-2 inline-block cursor-pointer" onClick={() => viewReceipt(app.receipt_url_display)}>
-                                          <img 
-                                            src={app.receipt_url_display} 
+                                        <p
+                                          className={`text-sm mb-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                        >
+                                          Payment Receipt
+                                        </p>
+                                        <div
+                                          className={`rounded-lg p-2 inline-block cursor-pointer ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}
+                                          onClick={() =>
+                                            viewReceipt(app.receipt_url_display)
+                                          }
+                                        >
+                                          <img
+                                            src={app.receipt_url_display}
                                             alt="Receipt"
                                             className="h-32 w-auto object-contain rounded"
                                             onError={(e) => {
-                                              e.target.style.display = 'none';
+                                              e.target.style.display = "none";
                                             }}
                                           />
-                                          <p className="text-xs text-center text-blue-600 mt-1">Click to enlarge</p>
+                                          <p
+                                            className={`text-xs text-center mt-1 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
+                                          >
+                                            Click to enlarge
+                                          </p>
                                         </div>
                                       </div>
                                       {app.payments && app.payments[0] && (
                                         <div className="grid grid-cols-2 gap-3 text-sm">
                                           <div>
-                                            <p className="text-gray-500">Reference Number</p>
-                                            <p className="font-medium">{app.payments[0].gcash_reference || 'N/A'}</p>
+                                            <p
+                                              className={`${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                            >
+                                              Reference Number
+                                            </p>
+                                            <p
+                                              className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}
+                                            >
+                                              {app.payments[0]
+                                                .gcash_reference || "N/A"}
+                                            </p>
                                           </div>
                                           <div>
-                                            <p className="text-gray-500">GCash Number</p>
-                                            <p className="font-medium">{app.payments[0].gcash_number || 'N/A'}</p>
+                                            <p
+                                              className={`${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                            >
+                                              GCash Number
+                                            </p>
+                                            <p
+                                              className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}
+                                            >
+                                              {app.payments[0].gcash_number ||
+                                                "N/A"}
+                                            </p>
                                           </div>
                                         </div>
                                       )}
-                                      {app.status === 'pending' && app.payment_status === 'pending' && (
-                                        <button
-                                          className="mt-4 w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
-                                          onClick={() => handleVerifyPayment(app.id)}
-                                          disabled={processing[app.id]}
-                                        >
-                                          {processing[app.id] ? (
-                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                          ) : (
-                                            <>
-                                              <CheckCircle className="w-4 h-4" />
-                                              Verify Payment
-                                            </>
-                                          )}
-                                        </button>
-                                      )}
+                                      {app.status === "pending" &&
+                                        app.payment_status === "pending" && (
+                                          <button
+                                            className="mt-4 w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+                                            onClick={() =>
+                                              handleVerifyPayment(app.id)
+                                            }
+                                            disabled={processing[app.id]}
+                                          >
+                                            {processing[app.id] ? (
+                                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            ) : (
+                                              <>
+                                                <CheckCircle className="w-4 h-4" />
+                                                Verify Payment
+                                              </>
+                                            )}
+                                          </button>
+                                        )}
                                       {isVerified && (
-                                        <div className="mt-3 p-2 bg-green-50 rounded-lg text-green-700 text-sm flex items-center gap-2">
+                                        <div
+                                          className={`mt-3 p-2 rounded-lg text-sm flex items-center gap-2 ${isDarkMode ? "bg-green-900/30 text-green-300" : "bg-green-50 text-green-700"}`}
+                                        >
                                           <CheckCircle className="w-4 h-4" />
                                           Payment verified - Ready for approval
                                         </div>
@@ -785,8 +1158,18 @@ const Applications = () => {
                                     </div>
                                   ) : (
                                     <div className="text-center py-6">
-                                      <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                                      <p className="text-gray-500">No receipt uploaded</p>
+                                      <AlertCircle
+                                        className={`w-12 h-12 mx-auto mb-2 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`}
+                                      />
+                                      <p
+                                        className={
+                                          isDarkMode
+                                            ? "text-gray-400"
+                                            : "text-gray-500"
+                                        }
+                                      >
+                                        No receipt uploaded
+                                      </p>
                                     </div>
                                   )}
                                 </div>
@@ -794,63 +1177,95 @@ const Applications = () => {
                             )}
 
                             {/* Onsite Payment Section */}
-                            {app.payment_method?.toLowerCase() === 'onsite' && (
+                            {app.payment_method?.toLowerCase() === "onsite" && (
                               <div className="mb-6">
-                                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <h4
+                                  className={`font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}
+                                >
                                   <Building className="w-4 h-4 text-blue-500" />
                                   Onsite Payment
                                 </h4>
-                                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                <div
+                                  className={`rounded-lg p-4 border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"}`}
+                                >
                                   <div className="mb-3">
-                                    <p className="text-sm text-gray-500">Business Location</p>
-                                    <p className="font-medium">{app.business?.address || app.business?.location || 'Address not provided'}</p>
-                                  </div>
-                                  <div className="mb-3">
-                                    <p className="text-sm text-gray-500">Amount to Collect</p>
-                                    <p className="text-xl font-bold text-blue-600">₱{app.price_paid?.toLocaleString()}</p>
-                                  </div>
-                                  {app.status === 'pending' && app.payment_status === 'pending' && (
-                                    <button
-                                      className="w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
-                                      onClick={() => handleVerifyPayment(app.id)}
-                                      disabled={processing[app.id]}
+                                    <p
+                                      className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                                     >
-                                      {processing[app.id] ? (
-                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                      ) : (
-                                        <>
-                                          <CheckCircle className="w-4 h-4" />
-                                          Mark as Paid
-                                        </>
-                                      )}
-                                    </button>
-                                  )}
+                                      Business Location
+                                    </p>
+                                    <p
+                                      className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-800"}`}
+                                    >
+                                      {app.business?.address ||
+                                        app.business?.location ||
+                                        "Address not provided"}
+                                    </p>
+                                  </div>
+                                  <div className="mb-3">
+                                    <p
+                                      className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                    >
+                                      Amount to Collect
+                                    </p>
+                                    <p
+                                      className={`text-xl font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
+                                    >
+                                      ₱{app.price_paid?.toLocaleString()}
+                                    </p>
+                                  </div>
+                                  {app.status === "pending" &&
+                                    app.payment_status === "pending" && (
+                                      <button
+                                        className="w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+                                        onClick={() =>
+                                          handleVerifyPayment(app.id)
+                                        }
+                                        disabled={processing[app.id]}
+                                      >
+                                        {processing[app.id] ? (
+                                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        ) : (
+                                          <>
+                                            <CheckCircle className="w-4 h-4" />
+                                            Mark as Paid
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
                                 </div>
                               </div>
                             )}
 
-                            {/* Action Buttons */}
-                            {app.status === 'pending' && (
+                            {/* Action Buttons - FIXED: Added text color for disabled state */}
+                            {app.status === "pending" && (
                               <div className="flex gap-3">
                                 <button
                                   className={`flex-1 py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${
-                                    (isGcash && !isVerified) || app.business_verification === 'pending'
-                                      ? 'bg-gray-300 cursor-not-allowed'
-                                      : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg'
+                                    (isGcash && !isVerified) ||
+                                    app.business_verification === "pending"
+                                      ? isDarkMode
+                                        ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                      : "bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg"
                                   }`}
                                   onClick={() => handleApprove(app.id)}
-                                  disabled={processing[app.id] || (isGcash && !isVerified) || app.business_verification === 'pending'}
+                                  disabled={
+                                    processing[app.id] ||
+                                    (isGcash && !isVerified) ||
+                                    app.business_verification === "pending"
+                                  }
                                 >
                                   {processing[app.id] ? (
                                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                   ) : (
                                     <>
                                       <CheckCircle className="w-4 h-4" />
-                                      {app.business_verification === 'pending' 
-                                        ? 'Business Not Verified' 
-                                        : (isGcash && !isVerified) 
-                                          ? 'Verify Payment First' 
-                                          : 'Approve Application'}
+                                      {app.business_verification === "pending"
+                                        ? "Business Not Verified"
+                                        : isGcash && !isVerified
+                                          ? "Verify Payment First"
+                                          : "Approve Application"}
                                     </>
                                   )}
                                 </button>
@@ -879,16 +1294,25 @@ const Applications = () => {
               })}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+            <div
+              className={`rounded-2xl shadow-lg p-12 text-center ${isDarkMode ? "bg-gray-800" : "bg-white"}`}
+            >
               <div className="text-6xl mb-4">📋</div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">No Applications Found</h3>
-              <p className="text-gray-500 mb-4">
-                There are no {filter !== 'all' ? filter : ''} applications to display.
+              <h3
+                className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}
+              >
+                No Applications Found
+              </h3>
+              <p
+                className={`mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
+                There are no {filter !== "all" ? filter : ""} applications to
+                display.
               </p>
-              {filter !== 'pending' && (
-                <button 
+              {filter !== "pending" && (
+                <button
                   className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                  onClick={() => setFilter('pending')}
+                  onClick={() => setFilter("pending")}
                 >
                   View Pending Applications
                 </button>
@@ -900,24 +1324,43 @@ const Applications = () => {
 
       {/* Receipt Modal */}
       {showReceiptModal && selectedReceipt && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setShowReceiptModal(false)}>
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800">Payment Receipt</h3>
-              <button onClick={() => setShowReceiptModal(false)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowReceiptModal(false)}
+        >
+          <div
+            className={`rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col ${isDarkMode ? "bg-gray-800" : "bg-white"}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`flex items-center justify-between p-4 border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
+            >
+              <h3
+                className={`text-lg font-semibold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+              >
+                Payment Receipt
+              </h3>
+              <button
+                onClick={() => setShowReceiptModal(false)}
+                className={`p-1 rounded-lg transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-              <img 
-                src={selectedReceipt} 
+            <div
+              className={`flex-1 overflow-y-auto p-4 ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+            >
+              <img
+                src={selectedReceipt}
                 alt="Payment Receipt"
                 className="max-w-full h-auto mx-auto rounded-lg shadow-lg"
               />
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t border-gray-200">
-              <a 
-                href={selectedReceipt} 
+            <div
+              className={`flex justify-end gap-3 p-4 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
+            >
+              <a
+                href={selectedReceipt}
                 download="payment-receipt.jpg"
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
                 target="_blank"
@@ -926,9 +1369,9 @@ const Applications = () => {
                 <Download className="w-4 h-4" />
                 Download
               </a>
-              <button 
+              <button
                 onClick={() => setShowReceiptModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className={`px-4 py-2 border rounded-lg transition-colors ${isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
               >
                 Close
               </button>
