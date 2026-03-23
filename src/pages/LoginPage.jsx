@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -121,12 +121,14 @@ const LoginPage = () => {
 
     try {
       // Sign in with password
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email.trim(),
         password: formData.password,
       });
       
-      if (error) throw error;
+      if (signInError) throw signInError;
+      
+      // No need to manually navigate here - the auth state change listener in App.js will handle it
       
     } catch (error) {
       console.error('Login error:', error);
@@ -140,7 +142,6 @@ const LoginPage = () => {
           "Login failed. Please check your internet connection and try again.",
         );
       }
-    } finally {
       setLoading(false);
     }
   };

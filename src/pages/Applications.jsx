@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronUp, User, Mail, Phone, 
   Building, CreditCard, Calendar, FileText, 
   AlertCircle, Check, X, ExternalLink, Search,
-  Filter, TrendingUp, Users, DollarSign
+  Filter, TrendingUp, Users, DollarSign, RefreshCw
 } from 'lucide-react';
 
 const Applications = () => {
@@ -248,11 +248,17 @@ const Applications = () => {
         
         const businessVerification = app.business?.verification_status || businessVerificationMap[app.business_id] || 'pending';
         
+        // Check if this is a renewal application
+        const isRenewal = app.data && (
+          (typeof app.data === 'string' ? JSON.parse(app.data) : app.data)?.type === 'renewal'
+        );
+        
         return {
           ...app,
           receipt_url_display: receiptUrl,
           client_avatar_display: clientAvatarUrl,
-          business_verification: businessVerification
+          business_verification: businessVerification,
+          is_renewal: isRenewal
         };
       }));
 
@@ -269,7 +275,6 @@ const Applications = () => {
     try {
       setProcessing(prev => ({ ...prev, [membershipId]: true }));
       
-      // Get membership details before updating to get business and plan info
       const { data: membership, error: fetchError } = await supabase
         .from('memberships')
         .select('*, business:business_id(*), plan:plan_id(*)')
@@ -290,7 +295,6 @@ const Applications = () => {
 
       if (error) throw error;
       
-      // Send notification to client
       await notificationService.sendMembershipApproval(
         membership.user_id,
         membership.id,
@@ -312,7 +316,6 @@ const Applications = () => {
     try {
       setProcessing(prev => ({ ...prev, [membershipId]: true }));
       
-      // Get membership details before updating
       const { data: membership, error: fetchError } = await supabase
         .from('memberships')
         .select('*, business:business_id(*), plan:plan_id(*)')
@@ -332,7 +335,6 @@ const Applications = () => {
 
       if (error) throw error;
       
-      // Send notification to client
       await notificationService.sendMembershipRejection(
         membership.user_id,
         membership.id,
@@ -421,7 +423,8 @@ const Applications = () => {
     const pending = applications.filter(a => a.status === 'pending').length;
     const approved = applications.filter(a => a.status === 'approved').length;
     const rejected = applications.filter(a => a.status === 'rejected').length;
-    return { total, pending, approved, rejected };
+    const renewals = applications.filter(a => a.is_renewal).length;
+    return { total, pending, approved, rejected, renewals };
   };
 
   const stats = getStats();
@@ -468,6 +471,12 @@ const Applications = () => {
                   <p className="text-xs text-gray-500">Total Applications</p>
                   <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
                 </div>
+                {stats.renewals > 0 && (
+                  <div className="bg-purple-50 rounded-xl px-4 py-2 shadow-sm border border-purple-200">
+                    <p className="text-xs text-purple-600">Renewals</p>
+                    <p className="text-2xl font-bold text-purple-600">{stats.renewals}</p>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -588,15 +597,16 @@ const Applications = () => {
                 const isGcash = app.payment_method?.toLowerCase() === 'gcash';
                 const isVerified = ['paid'].includes(app.payment_status?.toLowerCase());
                 const isExpanded = expandedCard === app.id;
+                const isRenewal = app.is_renewal;
                 
                 return (
                   <motion.div
                     key={app.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden transition-all ${
+                    className={`bg-white rounded-2xl shadow-lg border overflow-hidden transition-all ${
                       isExpanded ? 'shadow-xl' : ''
-                    }`}
+                    } ${isRenewal ? 'border-l-4 border-l-purple-500' : 'border-gray-200'}`}
                   >
                     {/* Card Header */}
                     <div className="p-5 cursor-pointer" onClick={() => toggleExpand(app.id)}>
@@ -620,9 +630,17 @@ const Applications = () => {
                             )}
                           </div>
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-800">
-                              {app.applicant?.first_name} {app.applicant?.last_name}
-                            </h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-semibold text-gray-800">
+                                {app.applicant?.first_name} {app.applicant?.last_name}
+                              </h3>
+                              {isRenewal && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                                  <RefreshCw className="w-3 h-3" />
+                                  Renewal
+                                </span>
+                              )}
+                            </div>
                             <div className="flex flex-wrap gap-3 mt-1">
                               <span className="text-sm text-gray-500 flex items-center gap-1">
                                 <Mail className="w-3 h-3" />
@@ -675,7 +693,7 @@ const Applications = () => {
                       </div>
                     </div>
 
-                    {/* Expanded Content */}
+                    {/* Expanded Content - Rest remains the same */}
                     <AnimatePresence>
                       {isExpanded && (
                         <motion.div
@@ -686,6 +704,19 @@ const Applications = () => {
                           className="border-t border-gray-100"
                         >
                           <div className="p-5 bg-gray-50/30">
+                            {/* Add Renewal Info Badge at the top of expanded content */}
+                            {isRenewal && (
+                              <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                                <div className="flex items-center gap-2">
+                                  <RefreshCw className="w-4 h-4 text-purple-600" />
+                                  <span className="text-sm font-medium text-purple-700">Renewal Application</span>
+                                </div>
+                                <p className="text-xs text-purple-600 mt-1">
+                                  This is a membership renewal request. The customer wants to continue their existing membership.
+                                </p>
+                              </div>
+                            )}
+
                             {/* Plan Details */}
                             <div className="mb-6">
                               <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -763,7 +794,7 @@ const Applications = () => {
                               </div>
                             </div>
 
-                            {/* Payment Section */}
+                            {/* Payment Section - Same as before */}
                             {isGcash && (
                               <div className="mb-6">
                                 <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -885,11 +916,7 @@ const Applications = () => {
                                   ) : (
                                     <>
                                       <CheckCircle className="w-4 h-4" />
-                                      {app.business_verification === 'pending' 
-                                        ? 'Business Not Verified' 
-                                        : (isGcash && !isVerified) 
-                                          ? 'Verify Payment First' 
-                                          : 'Approve Application'}
+                                      {isRenewal ? 'Approve Renewal' : 'Approve Application'}
                                     </>
                                   )}
                                 </button>

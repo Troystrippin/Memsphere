@@ -1,11 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import '../styles/ForgotPasswordPage.css';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  AlertCircle,
+  Users,
+  TrendingUp,
+  Sparkles,
+  Shield,
+  Crown,
+  ChevronRight,
+  CheckCircle,
+  KeyRound,
+  Send,
+  RotateCcw,
+} from "lucide-react";
+import logo from "../assets/logo3.png";
 
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // Step 1: Email, Step 2: OTP, Step 3: New Password
+  const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [newPassword, setNewPassword] = useState('');
@@ -39,7 +58,6 @@ const ForgotPasswordPage = () => {
     }
   };
 
-  // Handle email submission - Send password reset OTP
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
     
@@ -48,7 +66,6 @@ const ForgotPasswordPage = () => {
       return;
     }
 
-    // Optional: Remove if you want to allow any email domain
     if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email)) {
       setError('Please enter a valid Gmail address');
       return;
@@ -59,7 +76,6 @@ const ForgotPasswordPage = () => {
     setSuccess('');
 
     try {
-      // First, check if user exists in your profiles table
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('email')
@@ -72,8 +88,6 @@ const ForgotPasswordPage = () => {
         return;
       }
 
-      // IMPORTANT: Use resetPasswordForEmail for password reset
-      // This will send an OTP if your email template uses {{ .Token }}
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -88,7 +102,6 @@ const ForgotPasswordPage = () => {
         return;
       }
 
-      // Store email for OTP verification step
       sessionStorage.setItem('resetEmail', email);
       
       setSuccess(`Password reset OTP sent to ${email}! Check your inbox.`);
@@ -103,7 +116,6 @@ const ForgotPasswordPage = () => {
     }
   };
 
-  // Handle OTP verification
   const handleOtpSubmit = async (e) => {
     e.preventDefault();
     
@@ -127,12 +139,10 @@ const ForgotPasswordPage = () => {
         return;
       }
 
-      // IMPORTANT: For password reset, we need to verify the OTP
-      // This will create a session that allows password update
       const { data, error } = await supabase.auth.verifyOtp({
         email: storedEmail,
         token: otpCode,
-        type: 'recovery' // Use 'recovery' for password reset
+        type: 'recovery'
       });
 
       if (error) {
@@ -149,7 +159,6 @@ const ForgotPasswordPage = () => {
         return;
       }
 
-      // OTP verified successfully
       setSuccess('OTP verified successfully!');
       setStep(3);
       
@@ -161,11 +170,9 @@ const ForgotPasswordPage = () => {
     }
   };
 
-  // Handle password reset
   const handlePasswordReset = async (e) => {
     e.preventDefault();
     
-    // Validate password
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
     
     if (!passwordRegex.test(newPassword)) {
@@ -183,19 +190,16 @@ const ForgotPasswordPage = () => {
     setSuccess('');
 
     try {
-      // Update password using Supabase
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (error) throw error;
 
-      // Clear stored data
       sessionStorage.removeItem('resetEmail');
       
       setSuccess('Password updated successfully!');
       
-      // Sign out and redirect to login
       setTimeout(async () => {
         await supabase.auth.signOut();
         navigate('/login');
@@ -209,7 +213,6 @@ const ForgotPasswordPage = () => {
     }
   };
 
-  // Resend OTP
   const handleResendOtp = async () => {
     if (resendTimer > 0) return;
 
@@ -226,7 +229,6 @@ const ForgotPasswordPage = () => {
         return;
       }
 
-      // Use resetPasswordForEmail for resending
       const { error } = await supabase.auth.resetPasswordForEmail(storedEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -235,8 +237,6 @@ const ForgotPasswordPage = () => {
 
       setSuccess('New OTP sent!');
       startResendTimer();
-      
-      // Clear OTP inputs for fresh entry
       setOtp(['', '', '', '', '', '']);
       
     } catch (error) {
@@ -268,250 +268,441 @@ const ForgotPasswordPage = () => {
     }
   };
 
-  // Get display email for OTP step
   const getDisplayEmail = () => {
     return email || sessionStorage.getItem('resetEmail') || '';
   };
 
+  const features = [
+    {
+      icon: Shield,
+      text: "Secure OTP",
+      value: "30s",
+      color: "from-blue-500 to-cyan-500",
+    },
+    {
+      icon: Send,
+      text: "Quick Delivery",
+      value: "Instant",
+      color: "from-green-500 to-emerald-500",
+    },
+    {
+      icon: KeyRound,
+      text: "Safe & Encrypted",
+      value: "100%",
+      color: "from-purple-500 to-pink-500",
+    },
+  ];
+
+  const benefits = [
+    "Secure OTP verification",
+    "Quick email delivery",
+    "30-second OTP validity",
+    "Safe & encrypted",
+  ];
+
   return (
-    <div className="forgot-password-container">
-      {/* Left Side - Branding */}
-      <div className="forgot-password-brand">
-        <div className="brand-content">
-          <div className="brand-title">
-            <span className="logo-icon">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M2 17L12 22L22 17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M2 12L12 17L22 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="12" cy="12" r="2" fill="white"/>
-              </svg>
-            </span>
-            <span>Memsphere</span>
-          </div>
-          <h2>Reset Password</h2>
-          <p>We'll help you recover access to your account</p>
-          
-          <div className="brand-features">
-            <div className="brand-feature">
-              <span className="feature-icon">✓</span>
-              <span className="feature-text">Secure OTP verification</span>
-            </div>
-            <div className="brand-feature">
-              <span className="feature-icon">✓</span>
-              <span className="feature-text">Quick email delivery</span>
-            </div>
-            <div className="brand-feature">
-              <span className="feature-icon">✓</span>
-              <span className="feature-text">30-second OTP validity</span>
-            </div>
-            <div className="brand-feature">
-              <span className="feature-icon">✓</span>
-              <span className="feature-text">Safe & encrypted</span>
+    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100">
+      {/* Decorative Elements */}
+      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
+
+      <div className="h-full w-full overflow-y-auto">
+        <div className="min-h-full flex items-center justify-center p-4">
+          <div className="max-w-6xl w-full mx-auto">
+            <div className="grid lg:grid-cols-2 gap-12">
+              {/* Left Side - Branding */}
+              <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6 }}
+                className="hidden lg:block"
+              >
+                <div className="space-y-8">
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center overflow-hidden">
+                        <img
+                          src={logo}
+                          alt="Memsphere Logo"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-bold text-gray-900">
+                          Memsphere
+                        </h1>
+                        <p className="text-gray-500 text-sm">
+                          Membership Management Platform
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-gray-600 text-lg">
+                      {step === 1 && "Reset your password to regain access to your account."}
+                      {step === 2 && "Enter the verification code sent to your email."}
+                      {step === 3 && "Create a strong new password for your account."}
+                    </p>
+                  </div>
+
+                  {/* Stats Cards */}
+                  <div className="grid grid-cols-3 gap-4">
+                    {features.map((feature, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 + index * 0.1 }}
+                        className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow text-center"
+                      >
+                        <div
+                          className={`w-10 h-10 rounded-xl bg-gradient-to-r ${feature.color} flex items-center justify-center mx-auto mb-3`}
+                        >
+                          <feature.icon className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {feature.value}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {feature.text}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {/* Benefits List */}
+                  <div className="space-y-3">
+                    <p className="text-gray-800 text-sm font-semibold">
+                      Why choose Memsphere?
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {benefits.map((benefit, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.6 + index * 0.1 }}
+                          className="flex items-center gap-2"
+                        >
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <span className="text-sm text-gray-700 font-medium">
+                            {benefit}
+                          </span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Right Side - Form */}
+              <motion.div
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6 }}
+                className="bg-white rounded-2xl shadow-xl p-8"
+              >
+                {/* Header */}
+                <div className="text-center mb-8">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full mb-4">
+                    <KeyRound className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs text-blue-600 font-medium">
+                      {step === 1 && "Reset Password"}
+                      {step === 2 && "Verify OTP"}
+                      {step === 3 && "Create New Password"}
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    {step === 1 && "Forgot Password"}
+                    {step === 2 && "Verify OTP"}
+                    {step === 3 && "New Password"}
+                  </h2>
+                  <p className="text-gray-500 text-sm">
+                    {step === 1 && "Enter your email to receive a verification code"}
+                    {step === 2 && `Enter the 6-digit code sent to ${getDisplayEmail()}`}
+                    {step === 3 && "Enter your new password below"}
+                  </p>
+                </div>
+
+                {/* Error Alert */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3"
+                    >
+                      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <p className="text-sm text-red-600">{error}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Success Alert */}
+                <AnimatePresence>
+                  {success && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3"
+                    >
+                      <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                      <p className="text-sm text-green-600">{success}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Step 1: Email Form */}
+                {step === 1 && (
+                  <form onSubmit={handleEmailSubmit} className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email Address
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          onFocus={() => setFocusedField("email")}
+                          onBlur={() => setFocusedField(null)}
+                          placeholder="example@gmail.com"
+                          disabled={loading}
+                          className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Must be a valid Gmail address
+                      </p>
+                    </div>
+
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          SENDING...
+                        </>
+                      ) : (
+                        <>
+                          SEND RESET OTP
+                          <Send className="w-5 h-5" />
+                        </>
+                      )}
+                    </motion.button>
+
+                    <div className="text-center">
+                      <Link
+                        to="/login"
+                        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium transition-colors group"
+                      >
+                        <ArrowRight className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform" />
+                        Back to Login
+                      </Link>
+                    </div>
+                  </form>
+                )}
+
+                {/* Step 2: OTP Form */}
+                {step === 2 && (
+                  <form onSubmit={handleOtpSubmit} className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Enter 6-Digit OTP
+                      </label>
+                      <div className="flex gap-2 justify-center">
+                        {otp.map((digit, index) => (
+                          <input
+                            key={index}
+                            id={`otp-${index}`}
+                            type="text"
+                            maxLength="1"
+                            value={digit}
+                            onChange={(e) => handleOtpChange(index, e.target.value)}
+                            onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                            onFocus={() => setFocusedField(`otp-${index}`)}
+                            onBlur={() => setFocusedField(null)}
+                            disabled={loading}
+                            className={`w-12 h-12 text-center text-xl font-bold border rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                              focusedField === `otp-${index}` ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 text-center mt-2">
+                        OTP expires in {resendTimer > 0 ? `${resendTimer}s` : '30s'}
+                      </p>
+                    </div>
+
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          VERIFYING...
+                        </>
+                      ) : (
+                        <>
+                          VERIFY OTP
+                          <CheckCircle className="w-5 h-5" />
+                        </>
+                      )}
+                    </motion.button>
+
+                    <div className="flex justify-between items-center">
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        disabled={resendTimer > 0 || loading}
+                        className={`text-sm transition-colors ${
+                          resendTimer > 0 || loading
+                            ? 'text-gray-400 cursor-not-allowed'
+                            : 'text-blue-600 hover:text-blue-700'
+                        }`}
+                      >
+                        {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStep(1);
+                          setOtp(['', '', '', '', '', '']);
+                        }}
+                        className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        ← Back to Email
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Step 3: New Password Form */}
+                {step === 3 && (
+                  <form onSubmit={handlePasswordReset} className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        New Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          onFocus={() => setFocusedField("newPassword")}
+                          onBlur={() => setFocusedField(null)}
+                          placeholder="Enter new password"
+                          disabled={loading}
+                          className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => togglePasswordVisibility('password')}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Confirm Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          onFocus={() => setFocusedField("confirmPassword")}
+                          onBlur={() => setFocusedField(null)}
+                          placeholder="Confirm new password"
+                          disabled={loading}
+                          className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => togglePasswordVisibility('confirm')}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-gray-50 rounded-xl">
+                      <p className="text-sm font-semibold text-gray-700 mb-2">Password must:</p>
+                      <ul className="space-y-1 text-xs">
+                        <li className={`flex items-center gap-2 ${newPassword.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
+                          <CheckCircle className={`w-3 h-3 ${newPassword.length >= 8 ? 'text-green-500' : 'text-gray-400'}`} />
+                          Be at least 8 characters
+                        </li>
+                        <li className={`flex items-center gap-2 ${/(?=.*[a-z])/.test(newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                          <CheckCircle className={`w-3 h-3 ${/(?=.*[a-z])/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`} />
+                          Contain lowercase letter
+                        </li>
+                        <li className={`flex items-center gap-2 ${/(?=.*[A-Z])/.test(newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                          <CheckCircle className={`w-3 h-3 ${/(?=.*[A-Z])/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`} />
+                          Contain uppercase letter
+                        </li>
+                        <li className={`flex items-center gap-2 ${/(?=.*\d)/.test(newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                          <CheckCircle className={`w-3 h-3 ${/(?=.*\d)/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`} />
+                          Contain number
+                        </li>
+                        <li className={`flex items-center gap-2 ${/(?=.*[!@#$%^&*])/.test(newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                          <CheckCircle className={`w-3 h-3 ${/(?=.*[!@#$%^&*])/.test(newPassword) ? 'text-green-500' : 'text-gray-400'}`} />
+                          Contain special character
+                        </li>
+                      </ul>
+                    </div>
+
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          UPDATING...
+                        </>
+                      ) : (
+                        <>
+                          RESET PASSWORD
+                          <RotateCcw className="w-5 h-5" />
+                        </>
+                      )}
+                    </motion.button>
+
+                    <div className="text-center">
+                      <Link
+                        to="/login"
+                        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium transition-colors group"
+                      >
+                        <ArrowRight className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform" />
+                        Back to Login
+                      </Link>
+                    </div>
+                  </form>
+                )}
+              </motion.div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Right Side - Form */}
-      <div className="forgot-password-form-container">
-        <div className="app-header">
-          <div className="logo-container">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="logo-svg">
-              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#00b4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M2 17L12 22L22 17" stroke="#00b4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M2 12L12 17L22 12" stroke="#00b4ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="12" r="2" fill="#00b4ff"/>
-            </svg>
-            <h1 className="logo">Memsphere</h1>
-          </div>
-          <h2 className="forgot-password-title">
-            {step === 1 && 'Forgot Password'}
-            {step === 2 && 'Verify OTP'}
-            {step === 3 && 'Create New Password'}
-          </h2>
-          <p className="forgot-password-subtitle">
-            {step === 1 && 'Enter your email to receive a verification code'}
-            {step === 2 && `Enter the 6-digit code sent to ${getDisplayEmail()}`}
-            {step === 3 && 'Enter your new password below'}
-          </p>
-        </div>
-
-        {error && (
-          <div className="error-message">
-            <span className="error-icon">⚠️</span>
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="success-message">
-            <span className="success-icon">✓</span>
-            {success}
-          </div>
-        )}
-
-        {/* Step 1: Email Form */}
-        {step === 1 && (
-          <form onSubmit={handleEmailSubmit} className="forgot-password-form">
-            <div className="input-group">
-              <label>EMAIL</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onFocus={() => setFocusedField('email')}
-                onBlur={() => setFocusedField(null)}
-                placeholder="example@gmail.com"
-                disabled={loading}
-                className={focusedField === 'email' ? 'focused' : ''}
-              />
-            </div>
-
-            <button 
-              type="submit" 
-              className="forgot-password-btn"
-              disabled={loading}
-            >
-              {loading ? 'SENDING...' : 'SEND RESET OTP'}
-            </button>
-
-            <div className="back-to-login">
-              <Link to="/login">← Back to Login</Link>
-            </div>
-          </form>
-        )}
-
-        {/* Step 2: OTP Form */}
-        {step === 2 && (
-          <form onSubmit={handleOtpSubmit} className="forgot-password-form">
-            <div className="otp-input-group">
-              <label>ENTER 6-DIGIT OTP</label>
-              <div className="otp-container">
-                {otp.map((digit, index) => (
-                  <input
-                    key={index}
-                    id={`otp-${index}`}
-                    type="text"
-                    maxLength="1"
-                    value={digit}
-                    onChange={(e) => handleOtpChange(index, e.target.value)}
-                    onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                    onFocus={() => setFocusedField(`otp-${index}`)}
-                    onBlur={() => setFocusedField(null)}
-                    className={`otp-input ${focusedField === `otp-${index}` ? 'focused' : ''}`}
-                    disabled={loading}
-                  />
-                ))}
-              </div>
-              <p className="otp-hint">OTP expires in 30 seconds</p>
-            </div>
-
-            <button 
-              type="submit" 
-              className="forgot-password-btn"
-              disabled={loading}
-            >
-              {loading ? 'VERIFYING...' : 'VERIFY OTP'}
-            </button>
-
-            <div className="resend-otp">
-              <button 
-                type="button"
-                onClick={handleResendOtp}
-                disabled={resendTimer > 0 || loading}
-                className="resend-btn"
-              >
-                {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
-              </button>
-            </div>
-
-            <div className="back-to-login">
-              <button 
-                type="button"
-                onClick={() => {
-                  setStep(1);
-                  setOtp(['', '', '', '', '', '']);
-                }}
-                className="back-btn"
-              >
-                ← Back to Email
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Step 3: New Password Form */}
-        {step === 3 && (
-          <form onSubmit={handlePasswordReset} className="forgot-password-form">
-            <div className="input-group">
-              <label>NEW PASSWORD</label>
-              <div className="password-input-wrapper">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  onFocus={() => setFocusedField('newPassword')}
-                  onBlur={() => setFocusedField(null)}
-                  placeholder="••••••••"
-                  disabled={loading}
-                  className={focusedField === 'newPassword' ? 'focused' : ''}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => togglePasswordVisibility('password')}
-                  tabIndex="-1"
-                >
-                  {showPassword ? '👁️' : '👁️‍🗨️'}
-                </button>
-              </div>
-            </div>
-
-            <div className="input-group">
-              <label>CONFIRM PASSWORD</label>
-              <div className="password-input-wrapper">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  onFocus={() => setFocusedField('confirmPassword')}
-                  onBlur={() => setFocusedField(null)}
-                  placeholder="••••••••"
-                  disabled={loading}
-                  className={focusedField === 'confirmPassword' ? 'focused' : ''}
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => togglePasswordVisibility('confirm')}
-                  tabIndex="-1"
-                >
-                  {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
-                </button>
-              </div>
-            </div>
-
-            <div className="password-requirements">
-              <p className="requirements-title">Password must:</p>
-              <ul className="requirements-list">
-                <li className={newPassword.length >= 8 ? 'met' : ''}>✓ Be at least 8 characters</li>
-                <li className={/(?=.*[a-z])/.test(newPassword) ? 'met' : ''}>✓ Contain lowercase letter</li>
-                <li className={/(?=.*[A-Z])/.test(newPassword) ? 'met' : ''}>✓ Contain uppercase letter</li>
-                <li className={/(?=.*\d)/.test(newPassword) ? 'met' : ''}>✓ Contain number</li>
-                <li className={/(?=.*[!@#$%^&*])/.test(newPassword) ? 'met' : ''}>✓ Contain special character</li>
-              </ul>
-            </div>
-
-            <button 
-              type="submit" 
-              className="forgot-password-btn"
-              disabled={loading}
-            >
-              {loading ? 'UPDATING...' : 'RESET PASSWORD'}
-            </button>
-          </form>
-        )}
       </div>
     </div>
   );

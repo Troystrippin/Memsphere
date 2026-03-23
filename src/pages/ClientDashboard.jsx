@@ -1,8 +1,11 @@
+// src/pages/ClientDashboard.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
 import { useTheme } from "../contexts/ThemeContext";
+import { useMembershipExpirationChecker } from "../hooks/useMembershipExpirationChecker";
+import RenewMembershipModal from "./RenewMembershipModal";
 import { motion } from "framer-motion";
 import {
   ChevronRight,
@@ -33,9 +36,18 @@ const ClientDashboard = () => {
   const [recommendedBusinesses, setRecommendedBusinesses] = useState([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [sortBy, setSortBy] = useState("expiry");
+  const [renewModal, setRenewModal] = useState({
+    isOpen: false,
+    membershipId: null,
+    businessId: null,
+    businessName: null
+  });
 
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
+
+  // Use the expiration checker hook
+  useMembershipExpirationChecker(user);
 
   useEffect(() => {
     console.log("ClientDashboard mounted");
@@ -912,6 +924,21 @@ const ClientDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Renew Membership Modal */}
+      <RenewMembershipModal
+        isOpen={renewModal.isOpen}
+        onClose={() => setRenewModal({ isOpen: false, membershipId: null, businessId: null, businessName: null })}
+        membershipId={renewModal.membershipId}
+        businessId={renewModal.businessId}
+        businessName={renewModal.businessName}
+        onSuccess={() => {
+          // Refresh memberships after successful renewal
+          if (user?.id) {
+            fetchMemberships(user.id);
+          }
+        }}
+      />
     </div>
   );
 };

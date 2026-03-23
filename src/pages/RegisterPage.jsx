@@ -1,7 +1,29 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import "../styles/Register.css";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  AlertCircle,
+  Users,
+  TrendingUp,
+  Sparkles,
+  Shield,
+  Crown,
+  CheckCircle,
+  XCircle,
+  User,
+  Phone,
+  Building,
+  MapPin,
+  Briefcase,
+  Star,
+} from "lucide-react";
+import logo from "../assets/logo3.png";
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -38,14 +60,26 @@ const RegisterPage = () => {
 
   const [passwordStrength, setPasswordStrength] = useState("");
 
-  // Business categories
   const businessCategories = [
     { id: "gym", label: "Gym / Fitness Center", icon: "🏋️" },
     { id: "cafe", label: "Cafe / Coffee Shop", icon: "☕" },
     { id: "bakery", label: "Bakery / Pastry Shop", icon: "🥐" },
   ];
 
-  // Password strength checker
+  const features = [
+    { icon: Shield, text: "Secure Data", value: "Encrypted", color: "from-blue-500 to-cyan-500" },
+    { icon: Users, text: "Easy to Use", value: "Simple", color: "from-green-500 to-emerald-500" },
+    { icon: Star, text: "Support", value: "24/7", color: "from-purple-500 to-pink-500" },
+    { icon: Crown, text: "Trial", value: "30 Days", color: "from-yellow-500 to-orange-500" },
+  ];
+
+  const benefits = [
+    "Secure and encrypted data",
+    "Easy to use platform",
+    "24/7 customer support",
+    "Free 30-day trial",
+  ];
+
   useEffect(() => {
     if (formData.password) {
       const hasLowerCase = /[a-z]/.test(formData.password);
@@ -67,7 +101,6 @@ const RegisterPage = () => {
     }
   }, [formData.password]);
 
-  // Validate individual fields
   useEffect(() => {
     validateField("firstName");
     validateField("lastName");
@@ -195,9 +228,7 @@ const RegisterPage = () => {
   };
 
   const handleTabChange = (tab) => {
-    console.log("Changing tab to:", tab);
     setActiveTab(tab);
-    // Reset owner fields when switching to client
     if (tab === 'client') {
       setFormData(prev => ({
         ...prev,
@@ -210,29 +241,22 @@ const RegisterPage = () => {
   };
 
   const validateForm = () => {
-    // First Name validation
     if (!formData.firstName.trim()) {
       alert("First name is required");
       return false;
     } else if (!/^[A-Za-z\s.-]+$/.test(formData.firstName)) {
-      alert(
-        "First name can only contain letters, spaces, dots (.) and hyphens (-)",
-      );
+      alert("First name can only contain letters, spaces, dots (.) and hyphens (-)");
       return false;
     }
 
-    // Last Name validation
     if (!formData.lastName.trim()) {
       alert("Last name is required");
       return false;
     } else if (!/^[A-Za-z\s.-]+$/.test(formData.lastName)) {
-      alert(
-        "Last name can only contain letters, spaces, dots (.) and hyphens (-)",
-      );
+      alert("Last name can only contain letters, spaces, dots (.) and hyphens (-)");
       return false;
     }
 
-    // Email validation
     if (!formData.email.trim()) {
       alert("Email is required");
       return false;
@@ -241,7 +265,6 @@ const RegisterPage = () => {
       return false;
     }
 
-    // Mobile validation
     if (!formData.mobile) {
       alert("Mobile number is required");
       return false;
@@ -250,7 +273,6 @@ const RegisterPage = () => {
       return false;
     }
 
-    // Owner fields validation
     if (activeTab === "owner") {
       if (!formData.businessName.trim()) {
         alert("Business name is required");
@@ -270,7 +292,6 @@ const RegisterPage = () => {
       }
     }
 
-    // Password validation
     if (!formData.password) {
       alert("Password is required");
       return false;
@@ -287,13 +308,10 @@ const RegisterPage = () => {
       alert("Password must contain at least one number");
       return false;
     } else if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(formData.password)) {
-      alert(
-        "Password must contain at least one special character (!@#$%^&* etc.)",
-      );
+      alert("Password must contain at least one special character (!@#$%^&* etc.)");
       return false;
     }
 
-    // Confirm Password validation
     if (!formData.confirmPassword) {
       alert("Please confirm your password");
       return false;
@@ -307,25 +325,10 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    console.log("1. Form submission started");
-    console.log("2. Current activeTab:", activeTab);
 
-    const allFields = [
-      "firstName",
-      "lastName",
-      "email",
-      "mobile",
-      "password",
-      "confirmPassword",
-    ];
+    const allFields = ["firstName", "lastName", "email", "mobile", "password", "confirmPassword"];
     if (activeTab === "owner") {
-      allFields.push(
-        "businessName",
-        "businessCategory",
-        "businessAddress",
-        "businessDescription",
-      );
+      allFields.push("businessName", "businessCategory", "businessAddress", "businessDescription");
     }
 
     const touched = {};
@@ -334,24 +337,11 @@ const RegisterPage = () => {
     });
     setTouchedFields(touched);
 
-    if (!validateForm()) {
-      console.log("3. Form validation failed");
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsLoading(true);
-    console.log("4. Loading started");
 
     try {
-      console.log("5. Starting registration with data:", {
-        email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        mobile: formData.mobile,
-        userType: activeTab
-      });
-
-      // Sign up with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -366,38 +356,19 @@ const RegisterPage = () => {
         },
       });
 
-      console.log("6. Signup response:", { authData, authError });
+      if (authError) throw authError;
 
-      if (authError) {
-        console.error("7. Auth error details:", authError);
-        throw authError;
-      }
+      if (!authData.user) throw new Error("No user data returned from signup");
 
-      if (!authData.user) {
-        console.error("8. No user data returned");
-        throw new Error("No user data returned from signup");
-      }
-
-      console.log("9. User created successfully:", authData.user.id);
-      console.log("10. User metadata:", authData.user.user_metadata);
-
-      // Wait a moment for the trigger to create the profile
-      console.log("11. Waiting for trigger...");
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Check if profile was created
-      console.log("12. Checking for profile...");
       const { data: profile, error: profileCheckError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", authData.user.id)
         .maybeSingle();
 
-      console.log("13. Profile check result:", { profile, profileCheckError });
-
       if (!profile) {
-        console.log("14. No profile found, creating manually...");
-        
         const { error: insertError } = await supabase
           .from("profiles")
           .insert({
@@ -412,33 +383,12 @@ const RegisterPage = () => {
             updated_at: new Date().toISOString()
           });
 
-        if (insertError) {
-          console.error("15. Manual profile creation failed:", insertError);
-          throw insertError;
-        }
-
-        console.log("16. Profile created manually");
-      } else {
-        console.log("17. Profile found from trigger");
-        
-        // Double-check and fix role if needed
-        if (profile.role !== activeTab) {
-          console.log(`18. Fixing role from ${profile.role} to ${activeTab}`);
-          await supabase
-            .from("profiles")
-            .update({ role: activeTab })
-            .eq("id", authData.user.id);
-        }
+        if (insertError) throw insertError;
       }
 
-      // For OWNER registration - create business
       if (activeTab === "owner") {
-        console.log("19. Creating business for owner...");
-        
-        // Extract location from address
         const location = formData.businessAddress.split(",").pop().trim() || "Downtown";
 
-        // Create business entry with pending verification status
         const { error: businessError, data: businessData } = await supabase
           .from("businesses")
           .insert([
@@ -451,84 +401,55 @@ const RegisterPage = () => {
               price: 0,
               location: location,
               address: formData.businessAddress,
-              emoji:
-                formData.businessCategory === "gym"
-                  ? "🏋️"
-                  : formData.businessCategory === "cafe"
-                    ? "☕"
-                    : "🥐",
+              emoji: formData.businessCategory === "gym" ? "🏋️" : formData.businessCategory === "cafe" ? "☕" : "🥐",
               rating: 0,
               members_count: 0,
               status: "active",
-              verification_status: "pending", // Business needs permit verification
+              verification_status: "pending",
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             },
           ])
           .select();
 
-        if (businessError) {
-          console.error("20. Business creation error:", businessError);
-          console.error("21. Error details:", {
-            code: businessError.code,
-            message: businessError.message,
-            details: businessError.details
-          });
-          throw businessError;
-        }
-
-        console.log("22. Business created successfully:", businessData);
+        if (businessError) throw businessError;
       }
 
-      console.log("23. Registration successful!");
       setShowSuccess(true);
 
-      // Navigate to appropriate dashboard after a short delay
       setTimeout(() => {
-        console.log("24. Redirecting to dashboard");
         setShowSuccess(false);
-        
-        // Redirect based on user role
         if (activeTab === "owner") {
           navigate("/owner-dashboard");
         } else {
           navigate("/ClientDashboard");
         }
-      }, 2000); // 2 second delay to show success message
+      }, 2000);
 
     } catch (error) {
-      console.error("25. Registration failed with error:", error);
-      console.error("26. Error details:", {
-        message: error.message,
-        code: error.code,
-        details: error.details
-      });
+      console.error("Registration failed:", error);
       alert(error.message || "Registration failed. Please try again.");
       setIsLoading(false);
     }
   };
 
-  const handleSignInClick = (e) => {
-    e.preventDefault();
-    navigate("/login");
-  };
-
   const getInputClassName = (fieldName) => {
-    let className = "input-group";
-    if (focusedField === fieldName) className += " focused";
-
+    let className = "w-full";
+    
+    if (focusedField === fieldName) className += " scale-[1.01]";
+    
     if (touchedFields[fieldName] && fieldErrors[fieldName]) {
-      className += " error";
-    } else if (
-      touchedFields[fieldName] &&
-      formData[fieldName] &&
-      !fieldErrors[fieldName]
-    ) {
+      className += " border-red-500 focus:ring-red-500";
+    } else if (touchedFields[fieldName] && formData[fieldName] && !fieldErrors[fieldName]) {
       if (fieldName !== "password" && fieldName !== "confirmPassword") {
-        className += " valid";
+        className += " border-green-500 focus:ring-green-500";
+      } else {
+        className += " border-gray-300 focus:ring-blue-500";
       }
+    } else {
+      className += " border-gray-300 focus:ring-blue-500";
     }
-
+    
     return className;
   };
 
@@ -540,458 +461,464 @@ const RegisterPage = () => {
     if (!/(?=.*[a-z])/.test(formData.password)) missingCriteria.push("lowercase");
     if (!/(?=.*[A-Z])/.test(formData.password)) missingCriteria.push("uppercase");
     if (!/(?=.*\d)/.test(formData.password)) missingCriteria.push("number");
-    if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(formData.password))
-      missingCriteria.push("special character");
+    if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(formData.password)) missingCriteria.push("special character");
 
     if (missingCriteria.length === 0) return "✓ Strong password";
     return `Missing: ${missingCriteria.join(", ")}`;
   };
 
   return (
-    <div className="register-container">
-      {/* Left Side - Branding */}
-      <div className="register-brand">
-        <div className="brand-content">
-          <div className="brand-title">
-            <span className="logo-icon">
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
+    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100">
+      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
+
+      <div className="h-full w-full overflow-y-auto">
+        <div className="min-h-full flex items-center justify-center p-4">
+          <div className="max-w-6xl w-full mx-auto">
+            <div className="grid lg:grid-cols-2 gap-12">
+              {/* Left Side - Branding */}
+              <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6 }}
+                className="hidden lg:block"
               >
-                <path
-                  d="M12 2L2 7L12 12L22 7L12 2Z"
-                  stroke="white"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M2 17L12 22L22 17"
-                  stroke="white"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M2 12L12 17L22 12"
-                  stroke="white"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="12" cy="12" r="2" fill="white" />
-              </svg>
-            </span>
-            <span>Memsphere</span>
-          </div>
-          <h2>Welcome to Memsphere</h2>
-          <p>Join our community and start your journey with us today.</p>
+                <div className="space-y-8">
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center overflow-hidden">
+                        <img src={logo} alt="Memsphere Logo" className="w-full h-full object-contain" />
+                      </div>
+                      <div>
+                        <h1 className="text-3xl font-bold text-gray-900">Memsphere</h1>
+                        <p className="text-gray-500 text-sm">Membership Management Platform</p>
+                      </div>
+                    </div>
+                    <p className="text-gray-600 text-lg">
+                      Join our community and start your journey with us today.
+                    </p>
+                  </div>
 
-          <div className="brand-features">
-            <div className="brand-feature">
-              <span className="feature-icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M20 6L9 17L4 12"
-                    stroke="white"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-              <span className="feature-text">Secure and encrypted data</span>
-            </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {features.map((feature, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 + index * 0.1 }}
+                        className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                      >
+                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${feature.color} flex items-center justify-center mb-3`}>
+                          <feature.icon className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">{feature.value}</div>
+                        <div className="text-xs text-gray-600">{feature.text}</div>
+                      </motion.div>
+                    ))}
+                  </div>
 
-            <div className="brand-feature">
-              <span className="feature-icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M20 6L9 17L4 12"
-                    stroke="white"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-              <span className="feature-text">Easy to use platform</span>
-            </div>
-
-            <div className="brand-feature">
-              <span className="feature-icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M20 6L9 17L4 12"
-                    stroke="white"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-              <span className="feature-text">24/7 customer support</span>
-            </div>
-
-            <div className="brand-feature">
-              <span className="feature-icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M20 6L9 17L4 12"
-                    stroke="white"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-              <span className="feature-text">Free 30-day trial</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right Side - Registration Form */}
-      <div className="register-form-container">
-        <div className="app-header">
-          <div className="logo-container">
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="logo-svg"
-            >
-              <path
-                d="M12 2L2 7L12 12L22 7L12 2Z"
-                stroke="#00b4ff"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M2 17L12 22L22 17"
-                stroke="#00b4ff"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M2 12L12 17L22 12"
-                stroke="#00b4ff"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle cx="12" cy="12" r="2" fill="#00b4ff" />
-            </svg>
-            <h1 className="logo">Memsphere</h1>
-          </div>
-          <h2 className="register-title">Register</h2>
-        </div>
-
-        {showSuccess && (
-          <div className="success-message">
-            ✨ Registration successful! Redirecting to dashboard...
-          </div>
-        )}
-
-        <div className="tab-selector">
-          <button
-            className={`tab-btn ${activeTab === "client" ? "active" : ""}`}
-            onClick={() => handleTabChange("client")}
-          >
-            Client
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "owner" ? "active" : ""}`}
-            onClick={() => handleTabChange("owner")}
-          >
-            Business Owner
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="register-form">
-          {/* First Name and Last Name */}
-          <div className="name-row">
-            <div className={getInputClassName("firstName")}>
-              <label>FIRST NAME</label>
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                onFocus={() => setFocusedField("firstName")}
-                onBlur={() => handleBlur("firstName")}
-                placeholder="John"
-                disabled={isLoading}
-                maxLength={50}
-              />
-              {touchedFields.firstName && fieldErrors.firstName && (
-                <span className="error-hint">{fieldErrors.firstName}</span>
-              )}
-            </div>
-
-            <div className={getInputClassName("lastName")}>
-              <label>LAST NAME</label>
-              <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                onFocus={() => setFocusedField("lastName")}
-                onBlur={() => handleBlur("lastName")}
-                placeholder="Doe"
-                disabled={isLoading}
-                maxLength={50}
-              />
-              {touchedFields.lastName && fieldErrors.lastName && (
-                <span className="error-hint">{fieldErrors.lastName}</span>
-              )}
-            </div>
-          </div>
-
-          {/* Email Address */}
-          <div className={getInputClassName("email")}>
-            <label>EMAIL ADDRESS</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              onFocus={() => setFocusedField("email")}
-              onBlur={() => handleBlur("email")}
-              placeholder="example@gmail.com"
-              disabled={isLoading}
-            />
-            {touchedFields.email && fieldErrors.email && (
-              <span className="error-hint">{fieldErrors.email}</span>
-            )}
-            {touchedFields.email && formData.email && !fieldErrors.email && (
-              <span className="valid-hint">✓ Valid Gmail address</span>
-            )}
-          </div>
-
-          {/* Mobile Number */}
-          <div className={getInputClassName("mobile")}>
-            <label>MOBILE NUMBER (PH Format)</label>
-            <input
-              type="tel"
-              name="mobile"
-              value={formData.mobile}
-              onChange={handleInputChange}
-              onFocus={() => setFocusedField("mobile")}
-              onBlur={() => handleBlur("mobile")}
-              placeholder="09171234567"
-              disabled={isLoading}
-              maxLength={11}
-            />
-            {touchedFields.mobile && fieldErrors.mobile && (
-              <span className="error-hint">{fieldErrors.mobile}</span>
-            )}
-            {formData.mobile &&
-              formData.mobile.length > 0 &&
-              !fieldErrors.mobile && (
-                <span className="hint-text">
-                  Format: 09xxxxxxxxx (11 digits)
-                </span>
-              )}
-          </div>
-
-          {/* Owner-only fields */}
-          {activeTab === "owner" && (
-            <>
-              <div className={getInputClassName("businessName")}>
-                <label>BUSINESS NAME</label>
-                <input
-                  type="text"
-                  name="businessName"
-                  value={formData.businessName}
-                  onChange={handleInputChange}
-                  onFocus={() => setFocusedField("businessName")}
-                  onBlur={() => handleBlur("businessName")}
-                  placeholder="My Awesome Business"
-                  disabled={isLoading}
-                />
-                {touchedFields.businessName && fieldErrors.businessName && (
-                  <span className="error-hint">{fieldErrors.businessName}</span>
-                )}
-              </div>
-
-              <div className={getInputClassName("businessCategory")}>
-                <label>BUSINESS CATEGORY</label>
-                <select
-                  name="businessCategory"
-                  value={formData.businessCategory}
-                  onChange={handleInputChange}
-                  onFocus={() => setFocusedField("businessCategory")}
-                  onBlur={() => handleBlur("businessCategory")}
-                  disabled={isLoading}
-                  className="select-input"
-                >
-                  <option value="">Select a category</option>
-                  {businessCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.icon} {cat.label}
-                    </option>
-                  ))}
-                </select>
-                {touchedFields.businessCategory &&
-                  fieldErrors.businessCategory && (
-                    <span className="error-hint">
-                      {fieldErrors.businessCategory}
-                    </span>
-                  )}
-              </div>
-
-              <div className={getInputClassName("businessAddress")}>
-                <label>BUSINESS ADDRESS</label>
-                <input
-                  type="text"
-                  name="businessAddress"
-                  value={formData.businessAddress}
-                  onChange={handleInputChange}
-                  onFocus={() => setFocusedField("businessAddress")}
-                  onBlur={() => handleBlur("businessAddress")}
-                  placeholder="123 Main St, Downtown, City"
-                  disabled={isLoading}
-                />
-                {touchedFields.businessAddress &&
-                  fieldErrors.businessAddress && (
-                    <span className="error-hint">
-                      {fieldErrors.businessAddress}
-                    </span>
-                  )}
-              </div>
-
-              <div className={getInputClassName("businessDescription")}>
-                <label>BUSINESS DESCRIPTION</label>
-                <textarea
-                  name="businessDescription"
-                  value={formData.businessDescription}
-                  onChange={handleInputChange}
-                  onFocus={() => setFocusedField("businessDescription")}
-                  onBlur={() => handleBlur("businessDescription")}
-                  placeholder="Describe your business, services, and what makes it special..."
-                  disabled={isLoading}
-                  rows="3"
-                  className="textarea-input"
-                />
-                {touchedFields.businessDescription &&
-                  fieldErrors.businessDescription && (
-                    <span className="error-hint">
-                      {fieldErrors.businessDescription}
-                    </span>
-                  )}
-              </div>
-            </>
-          )}
-
-          {/* Password */}
-          <div className={getInputClassName("password")}>
-            <label>PASSWORD</label>
-            <div className="password-input-wrapper">
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                onFocus={() => setFocusedField("password")}
-                onBlur={() => handleBlur("password")}
-                placeholder="••••••••"
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => togglePasswordVisibility("password")}
-                tabIndex="-1"
-              >
-                {showPassword ? "👁️" : "👁️‍🗨️"}
-              </button>
-            </div>
-            {formData.password && (
-              <>
-                <div className="password-strength">
-                  <div className={`strength-bar ${passwordStrength}`}></div>
+                  <div className="space-y-3">
+                    <p className="text-gray-800 text-sm font-semibold">Why choose Memsphere?</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {benefits.map((benefit, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.6 + index * 0.1 }}
+                          className="flex items-center gap-2"
+                        >
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <span className="text-sm text-gray-700 font-medium">{benefit}</span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <div className={`strength-text ${passwordStrength}`}>
-                  {getPasswordStrengthMessage()}
-                </div>
-              </>
-            )}
-          </div>
+              </motion.div>
 
-          {/* Confirm Password */}
-          <div className={getInputClassName("confirmPassword")}>
-            <label>CONFIRM PASSWORD</label>
-            <div className="password-input-wrapper">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                onFocus={() => setFocusedField("confirmPassword")}
-                onBlur={() => handleBlur("confirmPassword")}
-                placeholder="••••••••"
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => togglePasswordVisibility("confirm")}
-                tabIndex="-1"
+              {/* Right Side - Registration Form */}
+              <motion.div
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6 }}
+                className="bg-white rounded-2xl shadow-xl p-8"
               >
-                {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
-              </button>
+                <div className="text-center mb-8">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full mb-4">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs text-blue-600 font-medium">Join Us</span>
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Create Account</h2>
+                  <p className="text-gray-500 text-sm">Start your journey with Memsphere today</p>
+                </div>
+
+                <AnimatePresence>
+                  {showSuccess && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3"
+                    >
+                      <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                      <p className="text-sm text-green-600">✨ Registration successful! Redirecting to dashboard...</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="flex gap-3 mb-6">
+                  <button
+                    className={`flex-1 py-2.5 rounded-xl font-semibold transition-all ${
+                      activeTab === "client"
+                        ? "bg-blue-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                    onClick={() => handleTabChange("client")}
+                  >
+                    Client
+                  </button>
+                  <button
+                    className={`flex-1 py-2.5 rounded-xl font-semibold transition-all ${
+                      activeTab === "owner"
+                        ? "bg-blue-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                    onClick={() => handleTabChange("owner")}
+                  >
+                    Business Owner
+                  </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="text"
+                          name="firstName"
+                          value={formData.firstName}
+                          onChange={handleInputChange}
+                          onFocus={() => setFocusedField("firstName")}
+                          onBlur={() => handleBlur("firstName")}
+                          placeholder="John"
+                          disabled={isLoading}
+                          className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("firstName")}`}
+                        />
+                      </div>
+                      <AnimatePresence>
+                        {touchedFields.firstName && fieldErrors.firstName && (
+                          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> {fieldErrors.firstName}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="text"
+                          name="lastName"
+                          value={formData.lastName}
+                          onChange={handleInputChange}
+                          onFocus={() => setFocusedField("lastName")}
+                          onBlur={() => handleBlur("lastName")}
+                          placeholder="Doe"
+                          disabled={isLoading}
+                          className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("lastName")}`}
+                        />
+                      </div>
+                      <AnimatePresence>
+                        {touchedFields.lastName && fieldErrors.lastName && (
+                          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> {fieldErrors.lastName}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        onFocus={() => setFocusedField("email")}
+                        onBlur={() => handleBlur("email")}
+                        placeholder="example@gmail.com"
+                        disabled={isLoading}
+                        className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("email")}`}
+                      />
+                    </div>
+                    <AnimatePresence>
+                      {touchedFields.email && fieldErrors.email && (
+                        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {fieldErrors.email}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
+                    {touchedFields.email && formData.email && !fieldErrors.email && (
+                      <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" /> ✓ Valid Gmail address
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number (PH Format)</label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="tel"
+                        name="mobile"
+                        value={formData.mobile}
+                        onChange={handleInputChange}
+                        onFocus={() => setFocusedField("mobile")}
+                        onBlur={() => handleBlur("mobile")}
+                        placeholder="09171234567"
+                        disabled={isLoading}
+                        maxLength={11}
+                        className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("mobile")}`}
+                      />
+                    </div>
+                    <AnimatePresence>
+                      {touchedFields.mobile && fieldErrors.mobile && (
+                        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {fieldErrors.mobile}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
+                    {formData.mobile && formData.mobile.length > 0 && !fieldErrors.mobile && (
+                      <p className="text-xs text-gray-500 mt-1">Format: 09xxxxxxxxx (11 digits)</p>
+                    )}
+                  </div>
+
+                  {activeTab === "owner" && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Business Name</label>
+                        <div className="relative">
+                          <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          <input
+                            type="text"
+                            name="businessName"
+                            value={formData.businessName}
+                            onChange={handleInputChange}
+                            onFocus={() => setFocusedField("businessName")}
+                            onBlur={() => handleBlur("businessName")}
+                            placeholder="My Awesome Business"
+                            disabled={isLoading}
+                            className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("businessName")}`}
+                          />
+                        </div>
+                        <AnimatePresence>
+                          {touchedFields.businessName && fieldErrors.businessName && (
+                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" /> {fieldErrors.businessName}
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Business Category</label>
+                        <div className="relative">
+                          <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          <select
+                            name="businessCategory"
+                            value={formData.businessCategory}
+                            onChange={handleInputChange}
+                            onFocus={() => setFocusedField("businessCategory")}
+                            onBlur={() => handleBlur("businessCategory")}
+                            disabled={isLoading}
+                            className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all appearance-none bg-white ${getInputClassName("businessCategory")}`}
+                          >
+                            <option value="">Select a category</option>
+                            {businessCategories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.icon} {cat.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <AnimatePresence>
+                          {touchedFields.businessCategory && fieldErrors.businessCategory && (
+                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" /> {fieldErrors.businessCategory}
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Business Address</label>
+                        <div className="relative">
+                          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          <input
+                            type="text"
+                            name="businessAddress"
+                            value={formData.businessAddress}
+                            onChange={handleInputChange}
+                            onFocus={() => setFocusedField("businessAddress")}
+                            onBlur={() => handleBlur("businessAddress")}
+                            placeholder="123 Main St, Downtown, City"
+                            disabled={isLoading}
+                            className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("businessAddress")}`}
+                          />
+                        </div>
+                        <AnimatePresence>
+                          {touchedFields.businessAddress && fieldErrors.businessAddress && (
+                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" /> {fieldErrors.businessAddress}
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Business Description</label>
+                        <textarea
+                          name="businessDescription"
+                          value={formData.businessDescription}
+                          onChange={handleInputChange}
+                          onFocus={() => setFocusedField("businessDescription")}
+                          onBlur={() => handleBlur("businessDescription")}
+                          placeholder="Describe your business, services, and what makes it special..."
+                          disabled={isLoading}
+                          rows="3"
+                          className={`w-full px-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all resize-none ${getInputClassName("businessDescription")}`}
+                        />
+                        <AnimatePresence>
+                          {touchedFields.businessDescription && fieldErrors.businessDescription && (
+                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" /> {fieldErrors.businessDescription}
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        onFocus={() => setFocusedField("password")}
+                        onBlur={() => handleBlur("password")}
+                        placeholder="Enter your password"
+                        disabled={isLoading}
+                        className={`w-full pl-12 pr-12 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("password")}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => togglePasswordVisibility("password")}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    {formData.password && (
+                      <div className="mt-2">
+                        <div className="flex gap-1 h-1 mb-1">
+                          <div className={`flex-1 rounded-full ${passwordStrength === "strong" ? "bg-green-500" : "bg-gray-200"}`}></div>
+                          <div className={`flex-1 rounded-full ${passwordStrength === "medium" || passwordStrength === "strong" ? "bg-yellow-500" : "bg-gray-200"}`}></div>
+                          <div className={`flex-1 rounded-full ${passwordStrength === "strong" ? "bg-green-500" : "bg-gray-200"}`}></div>
+                        </div>
+                        <p className={`text-xs ${passwordStrength === "strong" ? "text-green-600" : passwordStrength === "medium" ? "text-yellow-600" : "text-gray-500"}`}>
+                          {getPasswordStrengthMessage()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        name="confirmPassword"
+                        value={formData.confirmPassword}
+                        onChange={handleInputChange}
+                        onFocus={() => setFocusedField("confirmPassword")}
+                        onBlur={() => handleBlur("confirmPassword")}
+                        placeholder="Confirm your password"
+                        disabled={isLoading}
+                        className={`w-full pl-12 pr-12 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("confirmPassword")}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => togglePasswordVisibility("confirm")}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    <AnimatePresence>
+                      {touchedFields.confirmPassword && formData.password !== formData.confirmPassword && (
+                        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> Passwords do not match
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        REGISTERING...
+                      </>
+                    ) : (
+                      <>
+                        {activeTab === "owner" ? "REGISTER AS OWNER" : "REGISTER AS CLIENT"}
+                        <ArrowRight className="w-5 h-5" />
+                      </>
+                    )}
+                  </motion.button>
+                </form>
+
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-200"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-4 bg-white text-gray-500">Already have an account?</span>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <Link
+                    to="/login"
+                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium transition-colors group"
+                  >
+                    Sign in
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+              </motion.div>
             </div>
-            {touchedFields.confirmPassword &&
-              formData.password !== formData.confirmPassword && (
-                <span className="error-hint">Passwords do not match</span>
-              )}
           </div>
-
-          {/* Register Button */}
-          <button type="submit" className="register-btn" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <span className="btn-spinner"></span>
-                REGISTERING...
-              </>
-            ) : activeTab === "owner" ? (
-              "REGISTER AS OWNER"
-            ) : (
-              "REGISTER AS CLIENT"
-            )}
-          </button>
-        </form>
-
-        {/* Login Redirect */}
-        <div className="login-redirect">
-          Already have an account?{" "}
-          <a href="/login" onClick={handleSignInClick}>
-            Sign in
-          </a>
         </div>
       </div>
     </div>

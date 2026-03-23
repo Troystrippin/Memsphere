@@ -1,8 +1,9 @@
-// pages/Notifications.jsx - FIXED with correct column names
+// pages/Notifications.jsx - UPDATED with plan name in expiration notifications
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
+import RenewMembershipModal from "./RenewMembershipModal";
 import "../styles/Notifications.css";
 
 const Notifications = () => {
@@ -13,6 +14,13 @@ const Notifications = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [highlightedId, setHighlightedId] = useState(null);
+  const [renewModal, setRenewModal] = useState({
+    isOpen: false,
+    membershipId: null,
+    businessId: null,
+    businessName: null,
+    planName: null
+  });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -138,9 +146,9 @@ const Notifications = () => {
         .order("created_at", { ascending: false });
 
       if (filter === "unread") {
-        query = query.eq("is_read", false);  // FIXED: changed 'read' to 'is_read'
+        query = query.eq("is_read", false);
       } else if (filter === "read") {
-        query = query.eq("is_read", true);   // FIXED: changed 'read' to 'is_read'
+        query = query.eq("is_read", true);
       }
 
       const { data, error } = await query;
@@ -228,7 +236,7 @@ const Notifications = () => {
       const { error } = await supabase
         .from("notifications")
         .update({
-          is_read: true,  // FIXED: changed 'read' to 'is_read'
+          is_read: true,
           read_at: new Date().toISOString(),
         })
         .eq("id", notificationId);
@@ -261,11 +269,11 @@ const Notifications = () => {
       const { error } = await supabase
         .from("notifications")
         .update({
-          is_read: true,  // FIXED: changed 'read' to 'is_read'
+          is_read: true,
           read_at: new Date().toISOString(),
         })
         .eq("user_id", user.id)
-        .eq("is_read", false);  // FIXED: changed 'read' to 'is_read'
+        .eq("is_read", false);
 
       if (error) throw error;
 
@@ -292,6 +300,19 @@ const Notifications = () => {
       ? JSON.parse(notification.data)
       : notification.data || {};
 
+    // Handle renewal notifications - open modal
+    if (notification.type === "membership_expiring" || notification.type === "membership_expired") {
+      setRenewModal({
+        isOpen: true,
+        membershipId: notificationData.membershipId,
+        businessId: notificationData.businessId,
+        businessName: notificationData.businessName,
+        planName: notificationData.planName
+      });
+      return;
+    }
+
+    // Navigation based on notification type
     if (notification.type === "membership_approved") {
       navigate("/ClientDashboard");
     } else if (notification.type === "membership_rejected") {
@@ -306,6 +327,8 @@ const Notifications = () => {
       navigate("/browse");
     } else if (notification.type === "welcome") {
       navigate("/browse");
+    } else if (notification.type === "application_submitted") {
+      navigate("/ClientDashboard");
     } else {
       navigate("/ClientDashboard");
     }
@@ -321,8 +344,14 @@ const Notifications = () => {
         return "✅";
       case "membership_rejected":
         return "❌";
+      case "membership_expiring":
+        return "⏰";
+      case "membership_expired":
+        return "⚠️";
       case "promo":
         return "🏷️";
+      case "application_submitted":
+        return "📋";
       default:
         return "📋";
     }
@@ -339,9 +368,13 @@ const Notifications = () => {
       case "welcome":
         return "Welcome to Memsphere!";
       case "membership_approved":
-        return "Membership Approved! 🎉";
+        return data.planName ? `${data.planName} Membership Approved! 🎉` : "Membership Approved! 🎉";
       case "membership_rejected":
         return "Membership Update";
+      case "membership_expiring":
+        return data.planName ? `⚠️ ${data.planName} Membership Expiring Soon!` : "⚠️ Membership Expiring Soon!";
+      case "membership_expired":
+        return data.planName ? `⏰ ${data.planName} Membership Expired` : "⏰ Membership Expired";
       case "announcement":
         return data.business_name
           ? `Announcement from ${data.business_name}`
@@ -350,6 +383,8 @@ const Notifications = () => {
         return data.business_name
           ? `Promo from ${data.business_name}`
           : "Special Offer";
+      case "application_submitted":
+        return "Application Submitted! 📋";
       default:
         return "Notification";
     }
@@ -367,16 +402,28 @@ const Notifications = () => {
         return "Welcome to Memsphere! Start exploring businesses near you.";
       case "membership_approved":
         return data.business_name
-          ? `Your membership at ${data.business_name} has been approved! You can now access all member benefits.`
+          ? `Your ${data.planName || 'membership'} at ${data.business_name} has been approved! You can now access all member benefits.`
           : "Your membership has been approved!";
       case "membership_rejected":
         return data.business_name
           ? `Your application for ${data.business_name} was not approved at this time.`
           : "Your membership application was not approved.";
+      case "membership_expiring":
+        return data.business_name
+          ? `Your ${data.planName || 'membership'} at ${data.business_name} will expire in ${data.daysLeft} day${data.daysLeft > 1 ? 's' : ''}. Renew now to continue enjoying benefits!`
+          : "Your membership is expiring soon!";
+      case "membership_expired":
+        return data.business_name
+          ? `Your ${data.planName || 'membership'} at ${data.business_name} has expired. Click here to renew and continue enjoying benefits!`
+          : "Your membership has expired. Renew now!";
       case "announcement":
         return data.message || "You have a new announcement";
       case "promo":
         return data.message || "Check out our latest promotions!";
+      case "application_submitted":
+        return data.business_name
+          ? `Your membership application for ${data.business_name} has been submitted and is pending approval.`
+          : "Your membership application has been submitted!";
       default:
         return "You have a new notification";
     }
@@ -476,12 +523,18 @@ const Notifications = () => {
                 navigateTo = "Go to Dashboard";
               else if (notification.type === "membership_rejected")
                 navigateTo = "Browse Businesses";
+              else if (notification.type === "membership_expiring")
+                navigateTo = "Renew Now";
+              else if (notification.type === "membership_expired")
+                navigateTo = "Renew Now";
               else if (notification.type === "announcement")
                 navigateTo = "View Business";
               else if (notification.type === "promo")
                 navigateTo = "Browse Deals";
               else if (notification.type === "welcome")
                 navigateTo = "Start Exploring";
+              else if (notification.type === "application_submitted")
+                navigateTo = "Go to Dashboard";
               else navigateTo = "View";
 
               return (
@@ -542,6 +595,19 @@ const Notifications = () => {
           </div>
         )}
       </div>
+
+      {/* Renew Membership Modal */}
+      <RenewMembershipModal
+        isOpen={renewModal.isOpen}
+        onClose={() => setRenewModal({ isOpen: false, membershipId: null, businessId: null, businessName: null, planName: null })}
+        membershipId={renewModal.membershipId}
+        businessId={renewModal.businessId}
+        businessName={renewModal.businessName}
+        planName={renewModal.planName}
+        onSuccess={() => {
+          fetchNotifications();
+        }}
+      />
     </div>
   );
 };
