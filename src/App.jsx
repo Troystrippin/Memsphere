@@ -5,7 +5,7 @@ import {
   isSupabaseConfigured,
   testSupabaseConnection,
 } from "./lib/supabase";
-import { DarkModeProvider } from "./contexts/DarkModeContext";
+import { DarkModeProvider } from "./contexts/DarkModeContext"; // Changed to contexts (with 's')
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -30,7 +30,6 @@ import AdminSettings from "./pages/AdminSettings";
 import AdminProfile from "./components/admin/AdminProfile";
 import OwnerNotifications from "./pages/OwnerNotifications";
 import OwnerSettings from "./pages/OwnerSettings";
-import { useTheme } from "./contexts/ThemeContext";
 import "./App.css";
 
 function App() {
@@ -41,7 +40,6 @@ function App() {
   const [initialRedirectDone, setInitialRedirectDone] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const { isDarkMode } = useTheme();
 
   const hasProcessedSignIn = useRef(false);
   const authInitialized = useRef(false);
@@ -342,8 +340,8 @@ function App() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="loading-spinner mx-auto"></div>
-          <p className="mt-4">Loading application...</p>
+          <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2"></div>
+          <p className="text-gray-500">Loading application...</p>
         </div>
       </div>
     );
@@ -393,12 +391,12 @@ function App() {
       return <Navigate to="/login" replace />;
     }
 
-    if (userRole === null) {
+    if (userRole === null || userRole === undefined) {
       return (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <div className="loading-spinner mx-auto"></div>
-            <p className="mt-4">Loading your profile...</p>
+            <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+            <p className="mt-4 text-gray-500">Loading your profile...</p>
           </div>
         </div>
       );
@@ -472,6 +470,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["owner"]}>
               <OwnerDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/owner-profile"
+          element={
+            <ProtectedRoute allowedRoles={["owner"]}>
+              <OwnerProfile />
             </ProtectedRoute>
           }
         />

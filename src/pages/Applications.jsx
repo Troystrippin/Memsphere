@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import OwnerNavbar from '../components/owner/OwnerNavbar';
 import { toast, Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { notificationService } from '../services/notificationService';
 import { 
   CheckCircle, XCircle, Clock, Eye, Download, 
   ChevronDown, ChevronUp, User, Mail, Phone, 
@@ -267,6 +268,16 @@ const Applications = () => {
   const handleApprove = async (membershipId) => {
     try {
       setProcessing(prev => ({ ...prev, [membershipId]: true }));
+      
+      // Get membership details before updating to get business and plan info
+      const { data: membership, error: fetchError } = await supabase
+        .from('memberships')
+        .select('*, business:business_id(*), plan:plan_id(*)')
+        .eq('id', membershipId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
       const { error } = await supabase
         .from('memberships')
         .update({ 
@@ -278,6 +289,15 @@ const Applications = () => {
         .eq('id', membershipId);
 
       if (error) throw error;
+      
+      // Send notification to client
+      await notificationService.sendMembershipApproval(
+        membership.user_id,
+        membership.id,
+        membership.business?.name,
+        membership.plan?.name
+      );
+      
       toast.success('Application approved successfully!');
       fetchApplications();
     } catch (err) {
@@ -291,6 +311,16 @@ const Applications = () => {
   const handleReject = async (membershipId) => {
     try {
       setProcessing(prev => ({ ...prev, [membershipId]: true }));
+      
+      // Get membership details before updating
+      const { data: membership, error: fetchError } = await supabase
+        .from('memberships')
+        .select('*, business:business_id(*), plan:plan_id(*)')
+        .eq('id', membershipId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
       const { error } = await supabase
         .from('memberships')
         .update({ 
@@ -301,6 +331,15 @@ const Applications = () => {
         .eq('id', membershipId);
 
       if (error) throw error;
+      
+      // Send notification to client
+      await notificationService.sendMembershipRejection(
+        membership.user_id,
+        membership.id,
+        membership.business?.name,
+        'Your application was not approved at this time.'
+      );
+      
       toast.success('Application rejected successfully!');
       fetchApplications();
     } catch (err) {

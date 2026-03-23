@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import OwnerNavbar from '../components/owner/OwnerNavbar';
 import { toast, Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { notificationService } from '../services/notificationService';
 import { 
   Users, Search, Filter, Mail, Trash2, Eye, 
   CheckCircle, XCircle, Clock, Calendar, DollarSign,
@@ -401,6 +402,15 @@ const OwnerMemberManagement = () => {
     if (!memberToRemove) return;
 
     try {
+      // Get membership details before updating
+      const { data: membership, error: fetchError } = await supabase
+        .from('memberships')
+        .select('*, business:business_id(*)')
+        .eq('id', memberToRemove.membershipId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
       const { error } = await supabase
         .from('memberships')
         .update({ 
@@ -410,6 +420,14 @@ const OwnerMemberManagement = () => {
         .eq('id', memberToRemove.membershipId);
 
       if (error) throw error;
+      
+      // Send notification to the member
+      await notificationService.sendMembershipRemoval(
+        memberToRemove.userId,
+        memberToRemove.membershipId,
+        membership.business?.name || memberToRemove.businessName,
+        'removed'
+      );
       
       setMembers(members.filter(m => m.membershipId !== memberToRemove.membershipId));
       setFilteredMembers(filteredMembers.filter(m => m.membershipId !== memberToRemove.membershipId));
@@ -455,7 +473,6 @@ const OwnerMemberManagement = () => {
     }
   };
 
-  // Fixed stats - based on ALL members, not filtered ones
   const getStats = () => {
     const total = members.length;
     const active = members.filter(m => m.membershipStatus === 'active').length;
@@ -522,7 +539,7 @@ const OwnerMemberManagement = () => {
             </div>
           </motion.div>
 
-          {/* Stats Cards - Fixed to show ALL members, not filtered */}
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
               <div className="flex items-center justify-between">
@@ -570,7 +587,7 @@ const OwnerMemberManagement = () => {
             </div>
           </div>
 
-          {/* Action Bar - Removed All Businesses dropdown */}
+          {/* Action Bar */}
           <div className="flex flex-col lg:flex-row gap-4 mb-6">
             <div className="flex gap-2">
               <button 

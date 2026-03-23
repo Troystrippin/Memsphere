@@ -1,10 +1,8 @@
-// pages/Notifications.jsx - FIXED
-import React, { useState, useEffect, useCallback, useRef } from "react";
+// pages/Notifications.jsx - FIXED with correct column names
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
-import OwnerNavbar from "../components/owner/OwnerNavbar";
-import AdminSidebarNav from "../components/admin/AdminSidebarNav";
 import "../styles/Notifications.css";
 
 const Notifications = () => {
@@ -15,36 +13,38 @@ const Notifications = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [highlightedId, setHighlightedId] = useState(null);
-  const [userRole, setUserRole] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Use refs to track if we've already set up subscriptions
   const subscriptionRef = useRef(null);
   const initialFetchDone = useRef(false);
   const notificationIdsRef = useRef(new Set());
+  const isMounted = useRef(true);
+  const fetchInProgress = useRef(false);
 
   useEffect(() => {
-    // Check for highlighted notification ID from URL
+    isMounted.current = true;
+    
     const params = new URLSearchParams(location.search);
     const highlightId = params.get("highlight");
     if (highlightId) {
       setHighlightedId(highlightId);
-      // Mark the notification as read when highlighted
       markAsRead(highlightId);
-
-      // Remove highlight from URL after 3 seconds
       setTimeout(() => {
-        setHighlightedId(null);
-        navigate("/notifications", { replace: true });
+        if (isMounted.current) {
+          setHighlightedId(null);
+          navigate("/notifications", { replace: true });
+        }
       }, 3000);
     }
+
+    return () => {
+      isMounted.current = false;
+    };
   }, [location, navigate]);
 
   useEffect(() => {
     checkUser();
-
-    // Cleanup subscription on unmount
     return () => {
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe();
@@ -52,33 +52,24 @@ const Notifications = () => {
     };
   }, []);
 
-  // Fetch notifications when user OR filter changes, but prevent duplicate initial fetch
   useEffect(() => {
-    if (user) {
-      // Only fetch if this is the initial load OR filter changed
-      // But reset the initialFetchDone when user changes
-      if (!initialFetchDone.current || filter !== "all") {
-        fetchNotifications();
-      }
+    if (user && isMounted.current) {
+      fetchNotifications();
     }
-  }, [user, filter]); // Keep filter in dependencies
+  }, [user, filter]);
 
   const checkUser = async () => {
     try {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-
+      const { data: { user }, error } = await supabase.auth.getUser();
       if (error) throw error;
-
       if (!user) {
         navigate("/login");
         return;
       }
-
-      setUser(user);
-      await getUserProfile(user);
+      if (isMounted.current) {
+        setUser(user);
+        await getUserProfile(user);
+      }
     } catch (error) {
       console.error("Error checking user:", error);
       navigate("/login");
@@ -97,8 +88,9 @@ const Notifications = () => {
         console.error("Error fetching profile:", profileError);
       }
 
-      setProfile(profile);
-      setUserRole(profile?.role || "client");
+      if (isMounted.current) {
+        setProfile(profile);
+      }
 
       if (profile?.avatar_url) {
         downloadAvatar(profile.avatar_url);
@@ -113,26 +105,27 @@ const Notifications = () => {
       const { data, error } = await supabase.storage
         .from("avatars")
         .download(path);
-
       if (error) throw error;
-
       const url = URL.createObjectURL(data);
-      setAvatarUrl(url);
+      if (isMounted.current) {
+        setAvatarUrl(url);
+      }
     } catch (error) {
       console.error("Error downloading avatar:", error);
     }
   };
 
   const fetchNotifications = async () => {
-    if (!user) return;
-
+    if (!user || !isMounted.current) return;
+    if (fetchInProgress.current) return;
+    
     try {
+      fetchInProgress.current = true;
       setLoading(true);
 
       let query = supabase
         .from("notifications")
-        .select(
-          `
+        .select(`
           *,
           business:business_id (
             id,
@@ -140,47 +133,45 @@ const Notifications = () => {
             emoji,
             business_type
           )
-        `,
-        )
+        `)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (filter === "unread") {
-        query = query.eq("read", false);
+        query = query.eq("is_read", false);  // FIXED: changed 'read' to 'is_read'
       } else if (filter === "read") {
-        query = query.eq("read", true);
+        query = query.eq("is_read", true);   // FIXED: changed 'read' to 'is_read'
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
 
-      // Update the ref with current notification IDs
-      if (data) {
-        notificationIdsRef.current = new Set(data.map((n) => n.id));
+      if (isMounted.current && data) {
+        notificationIdsRef.current.clear();
+        data.forEach(n => notificationIdsRef.current.add(n.id));
         setNotifications(data);
+        initialFetchDone.current = true;
       }
-
-      initialFetchDone.current = true;
     } catch (error) {
       console.error("Error fetching notifications:", error);
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
+      fetchInProgress.current = false;
     }
   };
 
-  // Set up real-time subscription AFTER initial fetch
   useEffect(() => {
-    if (!user || !initialFetchDone.current) return;
+    if (!user || !initialFetchDone.current || !isMounted.current) return;
 
-    // Clean up existing subscription
     if (subscriptionRef.current) {
       subscriptionRef.current.unsubscribe();
+      subscriptionRef.current = null;
     }
 
-    // Real-time subscription for new notifications
     const subscription = supabase
-      .channel("notifications-channel")
+      .channel(`notifications-channel-${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -190,19 +181,14 @@ const Notifications = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log("New notification:", payload.new);
-
-          // Check if this notification is already in our state (prevent duplicates)
-          if (!notificationIdsRef.current.has(payload.new.id)) {
-            // Add to the ref
+          if (isMounted.current && !notificationIdsRef.current.has(payload.new.id)) {
             notificationIdsRef.current.add(payload.new.id);
-
-            // Add to state only if filter is 'all' or if it's unread and filter is 'unread'
-            if (
-              filter === "all" ||
-              (filter === "unread" && !payload.new.read)
-            ) {
-              setNotifications((prev) => [payload.new, ...prev]);
+            if (filter === "all" || (filter === "unread" && !payload.new.is_read)) {
+              setNotifications((prev) => {
+                const exists = prev.some(n => n.id === payload.new.id);
+                if (exists) return prev;
+                return [payload.new, ...prev];
+              });
             }
           }
         },
@@ -216,10 +202,13 @@ const Notifications = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          // Handle updates (like marking as read)
-          setNotifications((prev) =>
-            prev.map((n) => (n.id === payload.new.id ? payload.new : n)),
-          );
+          if (isMounted.current) {
+            setNotifications((prev) => {
+              const exists = prev.some(n => n.id === payload.new.id);
+              if (!exists) return prev;
+              return prev.map((n) => (n.id === payload.new.id ? payload.new : n));
+            });
+          }
         },
       )
       .subscribe();
@@ -229,297 +218,167 @@ const Notifications = () => {
     return () => {
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
       }
     };
-  }, [user, filter]); // Re-subscribe when filter changes
+  }, [user, filter]);
 
   const markAsRead = async (notificationId) => {
     try {
       const { error } = await supabase
         .from("notifications")
         .update({
-          read: true,
+          is_read: true,  // FIXED: changed 'read' to 'is_read'
           read_at: new Date().toISOString(),
         })
         .eq("id", notificationId);
 
       if (error) throw error;
 
-      setNotifications(
-        notifications.map((n) =>
-          n.id === notificationId ? { ...n, read: true } : n,
-        ),
-      );
+      if (isMounted.current) {
+        setNotifications(prev =>
+          prev.map(n =>
+            n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
+          )
+        );
+      }
     } catch (error) {
       console.error("Error marking notification as read:", error);
     }
   };
 
   const markAllAsRead = async () => {
+    if (!user) return;
+    
     try {
+      const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+      
+      if (unreadIds.length === 0) {
+        console.log("No unread notifications to mark");
+        return;
+      }
+
       const { error } = await supabase
         .from("notifications")
         .update({
-          read: true,
+          is_read: true,  // FIXED: changed 'read' to 'is_read'
           read_at: new Date().toISOString(),
         })
         .eq("user_id", user.id)
-        .eq("read", false);
+        .eq("is_read", false);  // FIXED: changed 'read' to 'is_read'
 
       if (error) throw error;
 
-      setNotifications(notifications.map((n) => ({ ...n, read: true })));
+      if (isMounted.current) {
+        setNotifications(prev =>
+          prev.map(notification => ({
+            ...notification,
+            is_read: true,
+            read_at: new Date().toISOString()
+          }))
+        );
+      }
     } catch (error) {
       console.error("Error marking all as read:", error);
     }
   };
 
-  // Rest of your component remains the same...
   const handleNotificationClick = async (notification) => {
-    // Mark as read if unread
-    if (!notification.read) {
+    if (!notification.is_read) {
       await markAsRead(notification.id);
     }
 
-    // Parse data if it's a string
-    const notificationData =
-      typeof notification.data === "string"
-        ? JSON.parse(notification.data)
-        : notification.data || {};
+    const notificationData = typeof notification.data === "string"
+      ? JSON.parse(notification.data)
+      : notification.data || {};
 
-    // Different navigation based on user role and notification type
-    if (userRole === "admin") {
-      // ADMIN NAVIGATION
-      if (notification.type === "new_owner_application") {
-        navigate("/admin/users?tab=pending");
-      } else if (notification.type === "new_business") {
-        navigate("/admin/businesses");
-      } else if (notification.type === "system_alert") {
-        navigate("/admin/settings");
-      } else if (notification.type === "new_user_registered") {
-        navigate("/admin/users");
+    if (notification.type === "membership_approved") {
+      navigate("/ClientDashboard");
+    } else if (notification.type === "membership_rejected") {
+      navigate("/browse");
+    } else if (notification.type === "announcement") {
+      if (notification.business_id) {
+        navigate(`/browse?business=${notification.business_id}`);
       } else {
-        navigate("/admin-dashboard");
+        navigate("/browse");
       }
-    } else if (userRole === "owner") {
-      // OWNER NAVIGATION
-      if (notification.type === "announcement") {
-        if (notificationData.membership_id) {
-          // New membership application - go to applications
-          navigate("/applications");
-        } else if (notificationData.payment_id) {
-          // New payment - go to applications with payment tab
-          navigate("/applications?tab=payments");
-        } else if (notificationData.member_name) {
-          // Member joined/removed - go to members page
-          navigate("/members");
-        } else {
-          // General announcement - stay on notifications or go to dashboard
-          navigate("/owner-dashboard");
-        }
-      } else if (notification.type === "membership_approved") {
-        // Member approved - go to member management
-        navigate("/members");
-      } else if (notification.type === "promo") {
-        // Promo related - go to my business
-        navigate("/my-business");
-      } else {
-        navigate("/owner-dashboard");
-      }
+    } else if (notification.type === "promo") {
+      navigate("/browse");
+    } else if (notification.type === "welcome") {
+      navigate("/browse");
     } else {
-      // CLIENT NAVIGATION
-      if (notification.type === "membership_approved") {
-        // Membership approved - go to dashboard to see their membership
-        navigate("/ClientDashboard");
-      } else if (notification.type === "membership_rejected") {
-        // Membership rejected - go browse other businesses
-        navigate("/browse");
-      } else if (notification.type === "announcement") {
-        // Announcement from a business
-        if (notification.business_id) {
-          // Go to that specific business page
-          navigate(`/browse?business=${notification.business_id}`);
-        } else {
-          navigate("/browse");
-        }
-      } else if (notification.type === "promo") {
-        // Promo notification - go to browse
-        navigate("/browse");
-      } else if (notification.type === "welcome") {
-        // Welcome notification - go to browse
-        navigate("/browse");
-      } else {
-        navigate("/ClientDashboard");
-      }
+      navigate("/ClientDashboard");
     }
   };
 
-  const getNotificationIcon = (type, role) => {
-    if (role === "admin") {
-      switch (type) {
-        case "new_owner_application":
-          return "📝";
-        case "new_business":
-          return "🏢";
-        case "system_alert":
-          return "⚠️";
-        case "new_user_registered":
-          return "👤";
-        default:
-          return "📋";
-      }
-    } else if (role === "owner") {
-      switch (type) {
-        case "announcement":
-          return "📢";
-        case "membership_approved":
-          return "✅";
-        case "promo":
-          return "🏷️";
-        default:
-          return "📋";
-      }
-    } else {
-      switch (type) {
-        case "welcome":
-          return "🎉";
-        case "announcement":
-          return "📢";
-        case "membership_approved":
-          return "✅";
-        case "membership_rejected":
-          return "❌";
-        case "promo":
-          return "🏷️";
-        default:
-          return "📋";
-      }
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case "welcome":
+        return "🎉";
+      case "announcement":
+        return "📢";
+      case "membership_approved":
+        return "✅";
+      case "membership_rejected":
+        return "❌";
+      case "promo":
+        return "🏷️";
+      default:
+        return "📋";
     }
   };
 
   const getNotificationTitle = (notification) => {
     if (notification.title) return notification.title;
 
-    const data =
-      typeof notification.data === "string"
-        ? JSON.parse(notification.data)
-        : notification.data || {};
+    const data = typeof notification.data === "string"
+      ? JSON.parse(notification.data)
+      : notification.data || {};
 
-    if (userRole === "admin") {
-      switch (notification.type) {
-        case "new_owner_application":
-          return "New Owner Application";
-        case "new_business":
-          return data.business_name
-            ? `New Business: ${data.business_name}`
-            : "New Business Registered";
-        case "system_alert":
-          return "⚠️ System Alert";
-        case "new_user_registered":
-          return "New User Registered";
-        default:
-          return "Admin Notification";
-      }
-    } else if (userRole === "owner") {
-      switch (notification.type) {
-        case "announcement":
-          if (data.applicant_name) {
-            return `New Application from ${data.applicant_name}`;
-          } else if (data.member_name) {
-            return `Member Update: ${data.member_name}`;
-          } else if (data.payment_id) {
-            return "New Payment Received";
-          }
-          return "New Notification";
-        case "membership_approved":
-          return "Member Approved";
-        default:
-          return "Notification";
-      }
-    } else {
-      switch (notification.type) {
-        case "welcome":
-          return "Welcome to Memsphere!";
-        case "membership_approved":
-          return "Membership Approved! 🎉";
-        case "membership_rejected":
-          return "Membership Update";
-        case "announcement":
-          return data.business_name
-            ? `Announcement from ${data.business_name}`
-            : "New Announcement";
-        case "promo":
-          return data.business_name
-            ? `Promo from ${data.business_name}`
-            : "Special Offer";
-        default:
-          return "Notification";
-      }
+    switch (notification.type) {
+      case "welcome":
+        return "Welcome to Memsphere!";
+      case "membership_approved":
+        return "Membership Approved! 🎉";
+      case "membership_rejected":
+        return "Membership Update";
+      case "announcement":
+        return data.business_name
+          ? `Announcement from ${data.business_name}`
+          : "New Announcement";
+      case "promo":
+        return data.business_name
+          ? `Promo from ${data.business_name}`
+          : "Special Offer";
+      default:
+        return "Notification";
     }
   };
 
   const getNotificationMessage = (notification) => {
     if (notification.message) return notification.message;
 
-    const data =
-      typeof notification.data === "string"
-        ? JSON.parse(notification.data)
-        : notification.data || {};
+    const data = typeof notification.data === "string"
+      ? JSON.parse(notification.data)
+      : notification.data || {};
 
-    if (userRole === "admin") {
-      switch (notification.type) {
-        case "new_owner_application":
-          return data.applicant_name
-            ? `${data.applicant_name} has applied to become a business owner`
-            : "New owner application received";
-        case "new_business":
-          return data.owner_name
-            ? `${data.owner_name} registered a new business: ${data.business_name}`
-            : "New business registered";
-        case "system_alert":
-          return data.message || "System requires attention";
-        case "new_user_registered":
-          return data.user_name
-            ? `${data.user_name} just joined Memsphere`
-            : "New user registered";
-        default:
-          return "You have a new notification";
-      }
-    } else if (userRole === "owner") {
-      switch (notification.type) {
-        case "announcement":
-          if (data.applicant_name && data.plan_name) {
-            return `${data.applicant_name} applied for ${data.plan_name} plan`;
-          } else if (data.member_name) {
-            return `${data.member_name} has been ${data.status || "updated"}`;
-          } else if (data.payment_id) {
-            return `Payment received for membership`;
-          }
-          return "New application received";
-        case "membership_approved":
-          return "A member has been approved";
-        default:
-          return "You have a new notification";
-      }
-    } else {
-      switch (notification.type) {
-        case "welcome":
-          return "Welcome to Memsphere! Start exploring businesses near you.";
-        case "membership_approved":
-          return data.business_name
-            ? `Your membership at ${data.business_name} has been approved! You can now access all member benefits.`
-            : "Your membership has been approved!";
-        case "membership_rejected":
-          return data.business_name
-            ? `Your application for ${data.business_name} was not approved at this time.`
-            : "Your membership application was not approved.";
-        case "announcement":
-          return data.message || "You have a new announcement";
-        case "promo":
-          return data.message || "Check out our latest promotions!";
-        default:
-          return "You have a new notification";
-      }
+    switch (notification.type) {
+      case "welcome":
+        return "Welcome to Memsphere! Start exploring businesses near you.";
+      case "membership_approved":
+        return data.business_name
+          ? `Your membership at ${data.business_name} has been approved! You can now access all member benefits.`
+          : "Your membership has been approved!";
+      case "membership_rejected":
+        return data.business_name
+          ? `Your application for ${data.business_name} was not approved at this time.`
+          : "Your membership application was not approved.";
+      case "announcement":
+        return data.message || "You have a new announcement";
+      case "promo":
+        return data.message || "Check out our latest promotions!";
+      default:
+        return "You have a new notification";
     }
   };
 
@@ -533,26 +392,12 @@ const Notifications = () => {
 
     if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
-    if (diffHours < 24)
-      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
     if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
-
     return date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
-      year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
     });
-  };
-
-  const getFirstName = () => {
-    if (profile?.first_name) {
-      return profile.first_name;
-    }
-    if (user?.email) {
-      const username = user.email.split("@")[0];
-      return username.charAt(0).toUpperCase() + username.slice(1);
-    }
-    return "User";
   };
 
   if (loading && notifications.length === 0) {
@@ -564,42 +409,13 @@ const Notifications = () => {
     );
   }
 
-  const firstName = getFirstName();
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  // Render appropriate navbar based on role
-  const renderNavbar = () => {
-    if (userRole === "owner") {
-      return (
-        <OwnerNavbar
-          profile={profile}
-          avatarUrl={avatarUrl}
-          unreadCount={unreadCount} // Pass unread count to navbar
-        />
-      );
-    } else if (userRole === "admin") {
-      return <AdminSidebarNav />;
-    } else {
-      return (
-        <ClientNavbar
-          profile={profile}
-          avatarUrl={avatarUrl}
-          unreadCount={unreadCount} // Pass unread count to navbar
-        />
-      );
-    }
-  };
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
     <div className="notifications-container-page">
-      {renderNavbar()}
+      <ClientNavbar profile={profile} avatarUrl={avatarUrl} unreadCount={unreadCount} />
 
-      <div
-        className="notifications-main"
-        style={{
-          paddingTop: userRole === "admin" ? "80px" : "calc(70px + 2rem)",
-        }}
-      >
+      <div className="notifications-main" style={{ paddingTop: "calc(70px + 2rem)" }}>
         <div className="notifications-header">
           <div className="header-left">
             <h1 className="page-title">
@@ -609,13 +425,6 @@ const Notifications = () => {
               )}
             </h1>
             <div className="header-decoration"></div>
-          </div>
-          <div className="header-right">
-            <div className="user-greeting">
-              <span className="greeting-wave">👋</span>
-              <span className="greeting-text">Hello,</span>
-              <span className="greeting-name">{firstName}</span>
-            </div>
           </div>
         </div>
 
@@ -651,84 +460,39 @@ const Notifications = () => {
             <div className="no-notifications-icon">🔔</div>
             <h3>No notifications</h3>
             <p>You don't have any notifications at the moment.</p>
-            <button
-              className="browse-btn"
-              onClick={() => {
-                if (userRole === "admin") {
-                  navigate("/admin-dashboard");
-                } else if (userRole === "owner") {
-                  navigate("/owner-dashboard");
-                } else {
-                  navigate("/browse");
-                }
-              }}
-            >
-              {userRole === "admin"
-                ? "Go to Dashboard"
-                : userRole === "owner"
-                  ? "Go to Dashboard"
-                  : "Browse Businesses"}
+            <button className="browse-btn" onClick={() => navigate("/browse")}>
+              Browse Businesses
             </button>
           </div>
         ) : (
           <div className="notifications-list">
             {notifications.map((notification) => {
-              const notificationData =
-                typeof notification.data === "string"
-                  ? JSON.parse(notification.data)
-                  : notification.data || {};
+              const notificationData = typeof notification.data === "string"
+                ? JSON.parse(notification.data)
+                : notification.data || {};
 
-              // Determine where this notification will take the user
               let navigateTo = "";
-              if (userRole === "admin") {
-                if (notification.type === "new_owner_application")
-                  navigateTo = "Review Application";
-                else if (notification.type === "new_business")
-                  navigateTo = "View Business";
-                else if (notification.type === "system_alert")
-                  navigateTo = "Check System";
-                else if (notification.type === "new_user_registered")
-                  navigateTo = "View User";
-                else navigateTo = "View Details";
-              } else if (userRole === "owner") {
-                if (notification.type === "announcement") {
-                  if (notificationData.membership_id)
-                    navigateTo = "Go to Applications";
-                  else if (notificationData.payment_id)
-                    navigateTo = "Go to Payments";
-                  else if (notificationData.member_name)
-                    navigateTo = "Go to Members";
-                  else navigateTo = "Go to Dashboard";
-                } else if (notification.type === "membership_approved") {
-                  navigateTo = "Go to Members";
-                } else if (notification.type === "promo") {
-                  navigateTo = "Go to My Business";
-                } else {
-                  navigateTo = "Go to Dashboard";
-                }
-              } else {
-                if (notification.type === "membership_approved")
-                  navigateTo = "Go to Dashboard";
-                else if (notification.type === "membership_rejected")
-                  navigateTo = "Browse Businesses";
-                else if (notification.type === "announcement")
-                  navigateTo = "View Business";
-                else if (notification.type === "promo")
-                  navigateTo = "Browse Deals";
-                else if (notification.type === "welcome")
-                  navigateTo = "Start Exploring";
-                else navigateTo = "View";
-              }
+              if (notification.type === "membership_approved")
+                navigateTo = "Go to Dashboard";
+              else if (notification.type === "membership_rejected")
+                navigateTo = "Browse Businesses";
+              else if (notification.type === "announcement")
+                navigateTo = "View Business";
+              else if (notification.type === "promo")
+                navigateTo = "Browse Deals";
+              else if (notification.type === "welcome")
+                navigateTo = "Start Exploring";
+              else navigateTo = "View";
 
               return (
                 <div
                   key={notification.id}
-                  className={`notification-card ${!notification.read ? "unread" : ""} ${highlightedId === notification.id ? "highlighted" : ""}`}
+                  className={`notification-card ${!notification.is_read ? "unread" : ""} ${highlightedId === notification.id ? "highlighted" : ""}`}
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="notification-icon-wrapper">
                     <span className="notification-icon-large">
-                      {getNotificationIcon(notification.type, userRole)}
+                      {getNotificationIcon(notification.type)}
                     </span>
                   </div>
 
@@ -746,7 +510,6 @@ const Notifications = () => {
                       {getNotificationMessage(notification)}
                     </p>
 
-                    {/* Business info - SHOW ONLY ONCE */}
                     {notification.business && (
                       <div className="notification-meta">
                         <span className="meta-label">
@@ -758,30 +521,7 @@ const Notifications = () => {
                       </div>
                     )}
 
-                    {/* REMOVED the duplicate business_name display for clients */}
-                    {/* Only show other metadata, not business name again */}
-                    {userRole === "admin" &&
-                      notificationData.applicant_name && (
-                        <div className="notification-meta">
-                          <span className="meta-label">👤</span>
-                          <span className="meta-value">
-                            Applicant: {notificationData.applicant_name}
-                          </span>
-                        </div>
-                      )}
-
-                    {/* Owner-specific metadata */}
-                    {userRole === "owner" &&
-                      notificationData.applicant_name && (
-                        <div className="notification-meta">
-                          <span className="meta-label">👤</span>
-                          <span className="meta-value">
-                            Applicant: {notificationData.applicant_name}
-                          </span>
-                        </div>
-                      )}
-
-                    {userRole === "owner" && notificationData.plan_name && (
+                    {notificationData.plan_name && (
                       <div className="notification-meta">
                         <span className="meta-label">📋</span>
                         <span className="meta-value">
@@ -790,32 +530,12 @@ const Notifications = () => {
                       </div>
                     )}
 
-                    {userRole === "owner" && notificationData.member_name && (
-                      <div className="notification-meta">
-                        <span className="meta-label">👥</span>
-                        <span className="meta-value">
-                          Member: {notificationData.member_name}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Client-specific metadata */}
-                    {userRole === "client" && notificationData.plan_name && (
-                      <div className="notification-meta">
-                        <span className="meta-label">📋</span>
-                        <span className="meta-value">
-                          Plan: {notificationData.plan_name}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Click indicator */}
                     <div className="notification-click-indicator">
                       Click to {navigateTo}
                     </div>
                   </div>
 
-                  {!notification.read && <span className="unread-dot"></span>}
+                  {!notification.is_read && <span className="unread-dot"></span>}
                 </div>
               );
             })}

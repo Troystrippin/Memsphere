@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 
 const LoginPage = () => {
+  const navigate = useNavigate();
+  const authCheckPerformed = useRef(false);
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -27,6 +29,51 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState(null);
+
+  // Check if user is already logged in
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkExistingSession = async () => {
+      // Prevent multiple checks
+      if (authCheckPerformed.current) return;
+      authCheckPerformed.current = true;
+
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session check error:', sessionError);
+          return;
+        }
+
+        if (session && isMounted) {
+          // User is already logged in, redirect based on role
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profile?.role === 'owner') {
+            navigate('/owner-dashboard');
+          } else if (profile?.role === 'admin') {
+            navigate('/admin-dashboard');
+          } else {
+            navigate('/ClientDashboard');
+          }
+        }
+      } catch (error) {
+        console.error('Session check error:', error);
+      }
+    };
+
+    checkExistingSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
 
   const validateEmail = (email) => {
     if (!email.trim()) return 'Email is required';
@@ -61,29 +108,70 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Prevent multiple submissions
+    if (loading) return;
+    
     if (!validateForm()) return;
 
     setLoading(true);
     setError('');
     
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
+      // Sign in with password
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email.trim(),
         password: formData.password,
       });
       
-      if (error) throw error;
+      if (signInError) throw signInError;
+      
+      if (!data.user) {
+        throw new Error('No user data returned');
+      }
+
+      // Small delay to ensure session is established
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Get user role after successful login
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        // Even if profile fetch fails, user is authenticated, redirect to default
+        navigate('/ClientDashboard');
+        return;
+      }
+
+      console.log('Login successful! User role:', profile?.role);
+
+      // Navigate based on user role
+      if (profile?.role === 'owner') {
+        navigate('/owner-dashboard');
+      } else if (profile?.role === 'admin') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/ClientDashboard');
+      }
       
     } catch (error) {
       console.error('Login error:', error);
       
+      // Handle specific error messages
       if (error.message?.includes('Invalid login credentials')) {
         setError('Invalid email or password. Please check your credentials and try again.');
       } else if (error.message?.includes('Email not confirmed')) {
-        setError('Please verify your email address before logging in.');
+        setError('Please verify your email address before logging in. Check your inbox for the confirmation link.');
+      } else if (error.message?.includes('Lock')) {
+        setError('Authentication service is busy. Please wait a moment and try again.');
       } else {
         setError('Login failed. Please check your internet connection and try again.');
       }
+    } finally {
       setLoading(false);
     }
   };

@@ -1,11 +1,10 @@
-// src/components/ClientNavbar/ClientNavbar.jsx
+// src/components/client/ClientNavbar.jsx - FIXED with correct column names
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import { useTheme } from "../../contexts/ThemeContext"; // Add this import
+import { useTheme } from "../../contexts/ThemeContext";
 import logo from "../../assets/logo.png";
 import logo2 from "../../assets/logo2.png";
-import "./ClientNavbar.css";
 import {
   Bell,
   User,
@@ -45,103 +44,120 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(propUnreadCount || 0);
   const [user, setUser] = useState(null);
-  const [subscription, setSubscription] = useState(null);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const subscriptionRef = useRef(null);
 
-  // Use the global theme context instead of local state
   const { isDarkMode, toggleTheme } = useTheme();
 
   const dropdownRef = useRef(null);
   const notificationRef = useRef(null);
   const mobileMenuRef = useRef(null);
 
-  // Remove the local dark mode useEffect hooks - they're now handled by ThemeProvider
-
+  // Get current user on mount
   useEffect(() => {
     const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
     };
     getUser();
   }, []);
 
+  // Fetch notifications and setup real-time subscription when user is available
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Initial fetch of notifications
+    fetchNotifications();
+
+    // Setup real-time subscription
+    const setupSubscription = async () => {
+      // Clean up existing subscription
+      if (subscriptionRef.current) {
+        await subscriptionRef.current.unsubscribe();
+      }
+
+      // Create new subscription
+      const subscription = supabase
+        .channel(`navbar-notifications-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log("New notification received:", payload);
+            // Add new notification to the list
+            setNotifications(prev => {
+              const exists = prev.some(n => n.id === payload.new.id);
+              if (exists) return prev;
+              return [payload.new, ...prev].slice(0, 10);
+            });
+            setUnreadCount(prev => prev + 1);
+            
+            // Browser notification
+            if (Notification.permission === "granted") {
+              new Notification("New Notification", {
+                body: payload.new.title || "You have a new notification",
+                icon: isDarkMode ? logo2 : logo,
+              });
+            }
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log("Notification updated:", payload);
+            // Update notification read status
+            setNotifications(prev =>
+              prev.map(n => 
+                n.id === payload.new.id ? { ...n, ...payload.new } : n
+              )
+            );
+            if (payload.new.is_read === true && payload.old.is_read === false) {
+              setUnreadCount(prev => Math.max(0, prev - 1));
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log("Subscription status:", status);
+        });
+
+      subscriptionRef.current = subscription;
+    };
+
+    setupSubscription();
+
+    // Request notification permission
+    if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+      }
+    };
+  }, [user?.id]);
+
+  // Update unread count when prop changes
   useEffect(() => {
     if (propUnreadCount !== undefined) {
       setUnreadCount(propUnreadCount);
     }
   }, [propUnreadCount]);
 
-  useEffect(() => {
-    if (!user) return;
-
-    fetchUnreadCount();
-    fetchRecentNotifications();
-
-    if (subscription) {
-      subscription.unsubscribe();
-    }
-
-    const newSubscription = supabase
-      .channel(`navbar-notifications-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          setUnreadCount((prev) => prev + 1);
-          setNotifications((prev) => {
-            const exists = prev.some((n) => n.id === payload.new.id);
-            if (exists) return prev;
-            const newList = [payload.new, ...prev].slice(0, 5);
-            return newList;
-          });
-
-          if (Notification.permission === "granted") {
-            new Notification("New Notification", {
-              body: payload.new.title || "You have a new notification",
-              icon: isDarkMode ? logo2 : logo,
-            });
-          }
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          if (payload.new.is_read === true && payload.old.is_read === false) {
-            setUnreadCount((prev) => Math.max(0, prev - 1));
-          }
-          setNotifications((prev) =>
-            prev.map((n) => (n.id === payload.new.id ? payload.new : n)),
-          );
-        },
-      )
-      .subscribe();
-
-    setSubscription(newSubscription);
-
-    if (Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-
-    return () => {
-      if (newSubscription) {
-        newSubscription.unsubscribe();
-      }
-    };
-  }, [user]);
-
+  // Handle click outside to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -166,31 +182,16 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
-  const fetchUnreadCount = async () => {
-    if (!user) return;
-
+  const fetchNotifications = async () => {
+    if (!user?.id) return;
+    
     try {
-      const { count, error } = await supabase
-        .from("notifications")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("is_read", false);
-
-      if (error) throw error;
-      setUnreadCount(count || 0);
-    } catch (error) {
-      console.error("Error fetching unread count:", error);
-    }
-  };
-
-  const fetchRecentNotifications = async () => {
-    if (!user) return;
-
-    try {
+      setLoadingNotifications(true);
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
@@ -201,35 +202,45 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
       if (error) throw error;
 
       setNotifications(data || []);
-      const unread = data?.filter((n) => !n.is_read).length || 0;
+      const unread = data?.filter((n) => !n.is_read).length || 0; // FIXED: changed read to is_read
       setUnreadCount(unread);
     } catch (error) {
-      console.error("Error fetching recent notifications:", error);
+      console.error("Error fetching notifications:", error);
+    } finally {
+      setLoadingNotifications(false);
     }
   };
 
   const handleNotificationClick = async (notification) => {
-    if (!notification.is_read) {
+    // Mark as read if not already
+    if (!notification.is_read) { // FIXED: changed read to is_read
       try {
-        await supabase
+        const { error } = await supabase
           .from("notifications")
           .update({
-            is_read: true,
+            is_read: true, // FIXED: changed read to is_read
             read_at: new Date().toISOString(),
           })
           .eq("id", notification.id);
 
+        if (error) throw error;
+
+        // Update local state
         setUnreadCount((prev) => Math.max(0, prev - 1));
         setNotifications((prev) =>
           prev.map((n) =>
-            n.id === notification.id ? { ...n, is_read: true } : n,
-          ),
+            n.id === notification.id ? { ...n, is_read: true } : n // FIXED: changed read to is_read
+          )
         );
       } catch (error) {
         console.error("Error marking notification as read:", error);
       }
     }
 
+    // Close notification dropdown
+    setShowNotifications(false);
+
+    // Navigate based on notification type
     const navigationMap = {
       membership_pending: "/ClientDashboard",
       membership_approved: "/ClientDashboard",
@@ -238,30 +249,46 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
       welcome: "/profile",
       announcement: "/announcements",
       promo: "/offers",
+      application_received: "/applications",
+      payment_received: "/ClientDashboard",
+      business_verified: "/ClientDashboard",
     };
 
-    const path =
-      navigationMap[notification.type] ||
-      `/notifications?highlight=${notification.id}`;
-    navigate(path);
-    setShowNotifications(false);
+    const path = navigationMap[notification.type] || "/ClientDashboard";
+    
+    // Check if notification has a specific business ID or membership ID
+    let finalPath = path;
+    if (notification.data) {
+      const data = typeof notification.data === 'string' 
+        ? JSON.parse(notification.data) 
+        : notification.data;
+      if (data.businessId) {
+        finalPath = `/business/${data.businessId}`;
+      } else if (data.membershipId) {
+        finalPath = `/membership/${data.membershipId}`;
+      }
+    }
+    
+    navigate(finalPath);
   };
 
   const markAllAsRead = async () => {
-    if (!user) return;
+    if (!user?.id) return;
 
     try {
-      await supabase
+      const { error } = await supabase
         .from("notifications")
         .update({
-          is_read: true,
+          is_read: true, // FIXED: changed read to is_read
           read_at: new Date().toISOString(),
         })
         .eq("user_id", user.id)
-        .eq("is_read", false);
+        .eq("is_read", false); // FIXED: changed read to is_read
+
+      if (error) throw error;
 
       setUnreadCount(0);
-      setNotifications(notifications.map((n) => ({ ...n, is_read: true })));
+      setNotifications(notifications.map((n) => ({ ...n, is_read: true }))); // FIXED: changed read to is_read
     } catch (error) {
       console.error("Error marking all as read:", error);
     }
@@ -300,18 +327,22 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   const getUserRole = () => {
     if (profile?.role === "client") return "Client";
     if (profile?.role === "admin") return "Administrator";
-    if (profile?.role === "Owner") return "Business Owner";
+    if (profile?.role === "owner") return "Business Owner";
     return "Member";
   };
 
   const formatTime = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffMins = Math.floor((now - date) / (1000 * 60));
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)} hour ago`;
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
@@ -326,17 +357,17 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
       membership_cancelled: <AlertCircle className="w-5 h-5 text-gray-500" />,
       promo: <Gift className="w-5 h-5 text-pink-500" />,
       subscription_renewed: <RefreshCw className="w-5 h-5 text-blue-500" />,
+      application_received: <Mail className="w-5 h-5 text-blue-500" />,
+      payment_received: <CheckCircle className="w-5 h-5 text-green-500" />,
+      business_verified: <Shield className="w-5 h-5 text-green-500" />,
     };
     return iconMap[type] || <Bell className="w-5 h-5 text-blue-500" />;
   };
 
-  // Function to determine which logo to show based on dark mode and current page
   const getCurrentLogo = () => {
-    // Use logo2.png for dark mode across all pages
     if (isDarkMode) {
       return logo2;
     }
-    // Default light mode logo
     return logo;
   };
 
@@ -345,7 +376,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
   const userRole = getUserRole();
   const initials = getInitials();
 
-  // Nav items - Dashboard, Browse, About, and Contact
   const navItems = [
     { path: "/ClientDashboard", label: "Dashboard", icon: LayoutDashboard },
     { path: "/browse", label: "Browse", icon: Compass },
@@ -374,18 +404,12 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                 src={getCurrentLogo()}
                 alt="Memsphere Logo"
                 className="h-12 w-auto transition-all duration-300"
-                style={{
-                  transition: "opacity 0.3s ease-in-out",
-                }}
                 onError={(e) => {
-                  // Fallback if logo2.png doesn't exist
                   e.target.src = logo;
                 }}
               />
               <span
-                className={`text-2xl font-bold tracking-wider transition-colors duration-300 ${
-                  isDarkMode ? "text-white" : "text-white"
-                }`}
+                className={`text-2xl font-bold tracking-wider transition-colors duration-300 text-white`}
               >
                 MEMSPHERE
               </span>
@@ -427,7 +451,7 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
           <div className="flex items-center space-x-2 flex-shrink-0">
             {/* Dark Mode Toggle */}
             <button
-              onClick={toggleTheme} // Use global toggleTheme
+              onClick={toggleTheme}
               className="hidden sm:block p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-all duration-300 group"
               aria-label="Toggle dark mode"
             >
@@ -449,7 +473,7 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
               >
                 <Bell className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 border-2 border-blue-600 animate-bounce">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 border-2 border-blue-600 animate-pulse">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -481,6 +505,13 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                         >
                           Notifications
                         </h3>
+                        {unreadCount > 0 && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            isDarkMode ? "bg-blue-900/50 text-blue-300" : "bg-blue-100 text-blue-600"
+                          }`}>
+                            {unreadCount} unread
+                          </span>
+                        )}
                       </div>
                       {unreadCount > 0 && (
                         <button
@@ -498,8 +529,15 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                     </div>
                   </div>
 
-                  <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-                    {notifications.length > 0 ? (
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {loadingNotifications ? (
+                      <div className="p-8 text-center">
+                        <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2"></div>
+                        <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          Loading notifications...
+                        </p>
+                      </div>
+                    ) : notifications.length > 0 ? (
                       notifications.map((notification) => (
                         <div
                           key={notification.id}
@@ -510,8 +548,8 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                             ${
                               !notification.is_read
                                 ? isDarkMode
-                                  ? "bg-gray-700/50"
-                                  : "bg-blue-50/30"
+                                  ? "bg-blue-900/30"
+                                  : "bg-blue-50/50"
                                 : ""
                             }
                             ${isDarkMode ? "border-gray-700 hover:bg-gray-700" : "border-gray-50 hover:bg-gray-50"}
@@ -519,7 +557,7 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                         >
                           <div
                             className={`flex-shrink-0 w-10 h-10 rounded-xl shadow-sm flex items-center justify-center ${
-                              isDarkMode ? "bg-gray-600" : "bg-white"
+                              isDarkMode ? "bg-gray-700" : "bg-white"
                             }`}
                           >
                             {getNotificationIcon(notification.type)}
@@ -530,7 +568,7 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                                 isDarkMode ? "text-white" : "text-gray-800"
                               }`}
                             >
-                              {notification.title || notification.type}
+                              {notification.title || notification.type?.replace(/_/g, ' ').toUpperCase() || "New Notification"}
                             </p>
                             {notification.message && (
                               <p
@@ -551,7 +589,7 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                             </p>
                           </div>
                           {!notification.is_read && (
-                            <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
+                            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
                           )}
                         </div>
                       ))
@@ -701,7 +739,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
 
                   {/* Menu Items */}
                   <div className="p-2">
-                    {/* Profile */}
                     <button
                       onClick={() => handleNavigation("/profile")}
                       className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
@@ -735,7 +772,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                       </div>
                     </button>
 
-                    {/* Notifications */}
                     <button
                       onClick={() => handleNavigation("/notifications")}
                       className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
@@ -774,7 +810,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                       )}
                     </button>
 
-                    {/* Settings */}
                     <button
                       onClick={() => handleNavigation("/settings")}
                       className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
@@ -808,7 +843,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                       </div>
                     </button>
 
-                    {/* Help & Support */}
                     <button
                       onClick={() => handleNavigation("/help")}
                       className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
@@ -848,7 +882,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                       className={`my-2 border-t ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}
                     ></div>
 
-                    {/* Logout */}
                     <button
                       onClick={handleSignOut}
                       className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
@@ -952,7 +985,7 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
               className={`border-t my-2 pt-2 ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}
             >
               <button
-                onClick={toggleTheme} // Use global toggleTheme
+                onClick={toggleTheme}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
                   isDarkMode
                     ? "text-gray-300 hover:bg-gray-700"

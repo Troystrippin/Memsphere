@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
 import { useTheme } from "../contexts/ThemeContext";
+import { notificationService } from "../services/notificationService";
 import "../styles/Browse.css";
 import {
-  // Navigation & Actions
   ChevronRight,
   Compass,
   Search,
@@ -19,8 +19,6 @@ import {
   Settings,
   HelpCircle,
   LogOut,
-
-  // User & Profile
   User,
   Mail,
   Phone,
@@ -29,8 +27,6 @@ import {
   Medal,
   Target,
   Flag,
-
-  // Business & Memberships
   Briefcase,
   GraduationCap,
   Coffee,
@@ -43,15 +39,11 @@ import {
   Palette,
   Code,
   PenTool,
-
-  // Health & Wellness
   Heart,
   HeartPulse,
   Activity,
   Shield,
   Zap,
-
-  // Status & Indicators
   CheckCircle,
   XCircle,
   AlertCircle,
@@ -63,30 +55,20 @@ import {
   Bell,
   Gift,
   CreditCard,
-
-  // Time & Date
   Clock,
   Calendar,
   Play,
-
-  // Location
   MapPin,
   Map,
   PhoneCall,
   MessageCircle,
-
-  // Social
   Users,
-
-  // Actions
   Plus,
   Minus,
   Edit,
   Trash2,
   Copy,
   Check,
-
-  // Misc
   MoreHorizontal,
   Lock,
   Unlock,
@@ -126,12 +108,9 @@ const Browse = () => {
   });
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
-
-  // Review State
   const [businessReviews, setBusinessReviews] = useState({});
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [selectedBusinessForReview, setSelectedBusinessForReview] =
-    useState(null);
+  const [selectedBusinessForReview, setSelectedBusinessForReview] = useState(null);
   const [reviewFormData, setReviewFormData] = useState({
     rating: 0,
     comment: "",
@@ -290,7 +269,7 @@ const Browse = () => {
             last_name,
             avatar_url
           )
-        `,
+        `
         )
         .eq("business_id", businessId)
         .order("created_at", { ascending: false });
@@ -302,7 +281,6 @@ const Browse = () => {
         [businessId]: data || [],
       }));
 
-      // Update business rating
       if (data && data.length > 0) {
         const avgRating =
           data.reduce((sum, r) => sum + r.rating, 0) / data.length;
@@ -335,10 +313,8 @@ const Browse = () => {
 
       if (businessesError) throw businessesError;
 
-      // Fetch REAL member counts for each business
       if (businessesData && businessesData.length > 0) {
         for (let business of businessesData) {
-          // Get count of APPROVED memberships for this business
           const { count, error } = await supabase
             .from("memberships")
             .select("*", { count: "exact", head: true })
@@ -349,7 +325,6 @@ const Browse = () => {
             business.members_count = count || 0;
           }
 
-          // Get reviews count
           const { count: reviewCount, error: reviewError } = await supabase
             .from("reviews")
             .select("*", { count: "exact", head: true })
@@ -560,8 +535,33 @@ const Browse = () => {
       console.log("Membership created successfully:", data);
 
       const business = businesses.find(
-        (b) => b.id === selectedPlanForPayment.businessId,
+        (b) => b.id === selectedPlanForPayment.businessId
       );
+
+      // Send notifications
+      if (data && data[0]) {
+        const newMembership = data[0];
+
+        // Send notification to client (applicant)
+        await notificationService.sendPaymentConfirmation(
+          user.id,
+          newMembership.id,
+          business.name,
+          selectedPlanForPayment.price
+        );
+
+        // Send notification to business owner about new application
+        const applicantName = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || user.email;
+
+        await notificationService.sendApplicationReceivedToOwner(
+          business.owner_id,
+          business.id,
+          business.name,
+          applicantName,
+          selectedPlanForPayment.name,
+          selectedPlanForPayment.price
+        );
+      }
 
       const selectedPaymentMethod = paymentFormData.paymentMethod;
 
@@ -585,7 +585,7 @@ const Browse = () => {
       console.error("Error message:", error.message);
       console.error("Error details:", error.details);
       alert(
-        `Failed to submit payment: ${error.message || "Please try again."}`,
+        `Failed to submit payment: ${error.message || "Please try again."}`
       );
     } finally {
       setSubmittingPayment(false);
@@ -596,8 +596,6 @@ const Browse = () => {
     setSelectedPaymentMethod(method);
     setShowPaymentModal(true);
   };
-
-  // ========== REVIEW HANDLERS ==========
 
   const checkExistingReview = async (businessId) => {
     try {
@@ -617,7 +615,6 @@ const Browse = () => {
   };
 
   const handleOpenReviewModal = async (business) => {
-    // Check if user already has a review for this business
     const existingReview = await checkExistingReview(business.id);
 
     setSelectedBusinessForReview(business);
@@ -664,15 +661,13 @@ const Browse = () => {
     try {
       setSubmittingReview(true);
 
-      // Check if user already reviewed this business
       const existingReview = await checkExistingReview(
-        selectedBusinessForReview.id,
+        selectedBusinessForReview.id
       );
 
       let result;
 
       if (existingReview) {
-        // Update existing review
         const { data, error } = await supabase
           .from("reviews")
           .update({
@@ -680,7 +675,8 @@ const Browse = () => {
             comment: reviewFormData.comment.trim(),
             updated_at: new Date().toISOString(),
           })
-          .eq("id", existingReview.id).select(`
+          .eq("id", existingReview.id)
+          .select(`
             *,
             profiles:user_id (
               first_name,
@@ -693,17 +689,19 @@ const Browse = () => {
         result = data[0];
         alert("Your review has been updated!");
       } else {
-        // Insert new review
-        const { data, error } = await supabase.from("reviews").insert([
-          {
-            business_id: selectedBusinessForReview.id,
-            user_id: user.id,
-            rating: reviewFormData.rating,
-            comment: reviewFormData.comment.trim(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]).select(`
+        const { data, error } = await supabase
+          .from("reviews")
+          .insert([
+            {
+              business_id: selectedBusinessForReview.id,
+              user_id: user.id,
+              rating: reviewFormData.rating,
+              comment: reviewFormData.comment.trim(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ])
+          .select(`
             *,
             profiles:user_id (
               first_name,
@@ -717,18 +715,16 @@ const Browse = () => {
         alert("Review submitted successfully!");
       }
 
-      // Update reviews state
       setBusinessReviews((prev) => ({
         ...prev,
         [selectedBusinessForReview.id]: [
           result,
           ...(prev[selectedBusinessForReview.id]?.filter(
-            (r) => r.id !== result.id,
+            (r) => r.id !== result.id
           ) || []),
         ],
       }));
 
-      // Update business rating
       const allReviews = businessReviews[selectedBusinessForReview.id] || [];
       const newReviews = [
         result,
@@ -742,13 +738,12 @@ const Browse = () => {
         .update({ rating: avgRating })
         .eq("id", selectedBusinessForReview.id);
 
-      // Update businesses list with new rating
       setBusinesses((prev) =>
         prev.map((b) =>
           b.id === selectedBusinessForReview.id
             ? { ...b, rating: avgRating, review_count: newReviews.length }
-            : b,
-        ),
+            : b
+        )
       );
 
       setShowReviewModal(false);
@@ -879,19 +874,19 @@ const Browse = () => {
         stars.push(
           <span key={i} className={`star full ${isYellow ? "yellow" : ""}`}>
             ★
-          </span>,
+          </span>
         );
       } else if (i === fullStars + 1 && hasHalfStar) {
         stars.push(
           <span key={i} className={`star half ${isYellow ? "yellow" : ""}`}>
             ★
-          </span>,
+          </span>
         );
       } else {
         stars.push(
           <span key={i} className={`star empty ${isYellow ? "yellow" : ""}`}>
             ☆
-          </span>,
+          </span>
         );
       }
     }
@@ -945,9 +940,8 @@ const Browse = () => {
           </div>
         </div>
 
-        {/* Filters Bar - Switched order: Price first, then Location */}
+        {/* Filters Bar */}
         <div className={`filters-bar ${isDarkMode ? "dark-mode" : ""}`}>
-          {/* Search Input */}
           <div className="search-container">
             <Search
               className={`search-icon ${isDarkMode ? "dark-mode" : ""}`}
@@ -970,7 +964,6 @@ const Browse = () => {
             )}
           </div>
 
-          {/* Price Range - Now first */}
           <div className={`filter-group ${isDarkMode ? "dark-mode" : ""}`}>
             <span className={`filter-label ${isDarkMode ? "dark-mode" : ""}`}>
               Price:
@@ -994,7 +987,6 @@ const Browse = () => {
             </div>
           </div>
 
-          {/* Location - Now second */}
           <div className={`filter-group ${isDarkMode ? "dark-mode" : ""}`}>
             <MapPin
               size={16}
@@ -1026,7 +1018,7 @@ const Browse = () => {
           </div>
         </div>
 
-        {/* Business Grid - Wider Cards */}
+        {/* Business Grid */}
         <div className="business-grid">
           {filteredBusinesses.length > 0 ? (
             filteredBusinesses.map((business, index) => (
@@ -1037,7 +1029,6 @@ const Browse = () => {
               >
                 <div className="card-gradient-bg"></div>
                 <div className="card-content">
-                  {/* Card Header with Image/Icon */}
                   <div className="card-header">
                     <div className="business-image-wrapper">
                       {business.image_url ? (
@@ -1069,7 +1060,6 @@ const Browse = () => {
                     </div>
                   </div>
 
-                  {/* Business Details */}
                   <div className="business-details">
                     <h3
                       className={`business-title ${isDarkMode ? "dark-mode" : ""}`}
@@ -1124,7 +1114,6 @@ const Browse = () => {
                     </div>
                   </div>
 
-                  {/* Card Footer */}
                   <div
                     className={`card-footer ${isDarkMode ? "dark-mode" : ""}`}
                   >
@@ -1329,7 +1318,7 @@ const Browse = () => {
                             <CheckCircle size={14} />
                             {amenity}
                           </div>
-                        ),
+                        )
                       )}
                     </div>
                   </div>
@@ -1457,7 +1446,7 @@ const Browse = () => {
                                   className={`review-date ${isDarkMode ? "dark-mode" : ""}`}
                                 >
                                   {new Date(
-                                    review.created_at,
+                                    review.created_at
                                   ).toLocaleDateString("en-US", {
                                     year: "numeric",
                                     month: "short",
@@ -1632,9 +1621,7 @@ const Browse = () => {
                         </ul>
                         <button
                           className={`join-plan-btn-enhanced ${isDarkMode ? "dark-mode" : ""}`}
-                          onClick={() =>
-                            handleJoinNow(selectedBusiness.id, plan)
-                          }
+                          onClick={() => handleJoinNow(selectedBusiness.id, plan)}
                           disabled={joiningPlan === plan.id}
                         >
                           {joiningPlan === plan.id ? (
@@ -1717,7 +1704,6 @@ const Browse = () => {
             </div>
 
             <div className={`review-form ${isDarkMode ? "dark-mode" : ""}`}>
-              {/* Rating Stars */}
               <div
                 className={`rating-section ${isDarkMode ? "dark-mode" : ""}`}
               >
@@ -1755,7 +1741,6 @@ const Browse = () => {
                 </div>
               </div>
 
-              {/* Comment */}
               <div
                 className={`comment-section ${isDarkMode ? "dark-mode" : ""}`}
               >
@@ -1786,7 +1771,6 @@ const Browse = () => {
                 </div>
               </div>
 
-              {/* Guidelines */}
               <div
                 className={`review-guidelines ${isDarkMode ? "dark-mode" : ""}`}
               >
@@ -1862,7 +1846,6 @@ const Browse = () => {
             <div
               className={`payment-form-content ${isDarkMode ? "dark-mode" : ""}`}
             >
-              {/* Summary Cards */}
               <div className={`summary-cards ${isDarkMode ? "dark-mode" : ""}`}>
                 <div
                   className={`summary-card ${isDarkMode ? "dark-mode" : ""}`}
@@ -1940,7 +1923,6 @@ const Browse = () => {
                 </div>
               </div>
 
-              {/* Payment Method Selection */}
               <div
                 className={`payment-method-section ${isDarkMode ? "dark-mode" : ""}`}
               >
@@ -2014,7 +1996,6 @@ const Browse = () => {
                 </div>
               </div>
 
-              {/* Receipt Upload for GCash */}
               {paymentFormData.paymentMethod === "gcash" && (
                 <div
                   className={`receipt-upload-section ${isDarkMode ? "dark-mode" : ""}`}
@@ -2078,7 +2059,6 @@ const Browse = () => {
                 </div>
               )}
 
-              {/* Terms Agreement */}
               <div className={`terms-section ${isDarkMode ? "dark-mode" : ""}`}>
                 <label
                   className={`terms-checkbox ${isDarkMode ? "dark-mode" : ""}`}
