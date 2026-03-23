@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
 import { useTheme } from "../contexts/ThemeContext";
@@ -121,6 +121,7 @@ const Browse = () => {
   const [hasMembership, setHasMembership] = useState({});
 
   const navigate = useNavigate();
+  const location = useLocation(); // ADDED: for receiving navigation state
   const { isDarkMode } = useTheme();
 
   const locations = [
@@ -160,6 +161,47 @@ const Browse = () => {
       fetchBusinessReviews(selectedBusiness.id);
     }
   }, [selectedBusiness]);
+
+  // ADDED: Auto-open business modal when coming from dashboard
+  useEffect(() => {
+    const state = location.state;
+    
+    if (state?.businessToOpen) {
+      console.log("Opening business modal for:", state.businessToOpen.name);
+      
+      const openModal = () => {
+        // Check if the business is already loaded
+        const businessExists = businesses.some(b => b.id === state.businessToOpen.id);
+        
+        if (businessExists) {
+          // If business exists in list, open with that business
+          const business = businesses.find(b => b.id === state.businessToOpen.id);
+          if (business) {
+            handleViewDetails(business);
+          } else {
+            handleViewDetails(state.businessToOpen);
+          }
+        } else {
+          // If not loaded yet, wait a bit and try again
+          setTimeout(() => {
+            const business = businesses.find(b => b.id === state.businessToOpen.id);
+            if (business) {
+              handleViewDetails(business);
+            } else {
+              // If still not found, just use the provided business data
+              handleViewDetails(state.businessToOpen);
+            }
+          }, 500);
+        }
+        
+        // Clear the state to prevent reopening on refresh
+        navigate("/browse", { replace: true, state: {} });
+      };
+      
+      // Small delay to ensure businesses array is populated
+      setTimeout(openModal, 100);
+    }
+  }, [location.state, businesses]);
 
   const checkUser = async () => {
     try {
@@ -895,13 +937,11 @@ const Browse = () => {
 
   if (loading) {
     return (
-      <div className={`browse-loading ${isDarkMode ? "dark-mode" : ""}`}>
-        <div
-          className={`loading-spinner ${isDarkMode ? "dark-mode" : ""}`}
-        ></div>
-        <p className={`loading-text ${isDarkMode ? "dark-mode" : ""}`}>
-          Loading amazing businesses for you...
-        </p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
+        <div className="text-center select-none">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4 select-none"></div>
+          <p className="text-gray-600 font-medium select-none">Loading Businesses...</p>
+        </div>
       </div>
     );
   }

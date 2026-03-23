@@ -5,7 +5,7 @@ import {
   isSupabaseConfigured,
   testSupabaseConnection,
 } from "./lib/supabase";
-import { DarkModeProvider } from "./contexts/DarkModeContext"; // Changed to contexts (with 's')
+import { ThemeProvider } from "./contexts/ThemeContext";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -35,6 +35,7 @@ import "./App.css";
 function App() {
   const [session, setSession] = useState(null);
   const [userRole, setUserRole] = useState(undefined);
+  const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
   const [initialRedirectDone, setInitialRedirectDone] = useState(false);
@@ -59,9 +60,9 @@ function App() {
       return;
     }
 
-    const initializeAuth = async () => {
+    const initializeAuthAndFetchData = async () => {
       try {
-        console.log("🔍 Initializing auth...");
+        console.log("🔍 Initializing auth and fetching data...");
 
         const isConnected = await testSupabaseConnection();
         if (!isConnected) {
@@ -106,7 +107,8 @@ function App() {
 
           setSession(session);
           console.log("👤 Valid session found for:", session.user.email);
-          await fetchUserRole(session.user.id);
+
+          await fetchUserData(session.user.id);
         } else {
           console.log("👤 No valid session");
           localStorage.removeItem("sb-session");
@@ -124,7 +126,7 @@ function App() {
       }
     };
 
-    initializeAuth();
+    initializeAuthAndFetchData();
 
     const {
       data: { subscription },
@@ -146,7 +148,7 @@ function App() {
         setLoading(true);
         setUserRole(undefined);
         try {
-          await fetchUserRole(session.user.id);
+          await fetchUserData(session.user.id);
         } catch (error) {
           console.error("Error in sign in flow:", error);
           setLoading(false);
@@ -156,7 +158,7 @@ function App() {
         console.log("🔄 Token refreshed");
         if (session?.user) {
           try {
-            await fetchUserRole(session.user.id);
+            await fetchUserData(session.user.id);
           } catch (error) {
             console.error("Error in token refresh:", error);
             setLoading(false);
@@ -166,6 +168,7 @@ function App() {
         console.log("👤 User signed out");
         localStorage.removeItem("sb-session");
         setUserRole(undefined);
+        setUserData(null);
         setSession(null);
         setAuthError(null);
         setLoading(false);
@@ -178,7 +181,7 @@ function App() {
       } else if (event === "USER_UPDATED") {
         console.log("👤 User updated");
         if (session?.user) {
-          await fetchUserRole(session.user.id);
+          await fetchUserData(session.user.id);
         }
       }
     });
@@ -189,11 +192,11 @@ function App() {
     };
   }, [navigate]);
 
-  const fetchUserRole = async (userId) => {
+  const fetchUserData = async (userId) => {
     fetchRetryCount.current = 0;
 
     try {
-      console.log("🔍 Fetching role for user ID:", userId);
+      console.log("🔍 Fetching user data for ID:", userId);
 
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Fetch timeout")), 5000),
@@ -201,7 +204,7 @@ function App() {
 
       const fetchPromise = supabase
         .from("profiles")
-        .select("id, email, role, first_name, last_name")
+        .select("*")
         .eq("id", userId)
         .maybeSingle();
 
@@ -211,14 +214,16 @@ function App() {
       ]);
 
       if (error) {
-        console.error("❌ Error fetching user role:", error);
+        console.error("❌ Error fetching user data:", error);
         if (error.code === "PGRST301" || error.message?.includes("JWT")) {
           console.log("❌ JWT error - session may be invalid");
           localStorage.removeItem("sb-session");
           setSession(null);
           setUserRole(undefined);
+          setUserData(null);
         } else {
           setUserRole("client");
+          setUserData({ role: "client" });
         }
         setAuthError("Error loading user profile");
         setLoading(false);
@@ -227,30 +232,33 @@ function App() {
       }
 
       if (data) {
-        console.log("✅ User role from database:", data?.role);
+        console.log("✅ User data loaded:", data);
         setUserRole(data?.role || "client");
+        setUserData(data);
         setAuthError(null);
       } else {
         console.log("⚠️ No profile found, defaulting to client role");
         setUserRole("client");
+        setUserData({ role: "client" });
       }
     } catch (error) {
-      console.error("❌ Error in fetchUserRole:", error);
+      console.error("❌ Error in fetchUserData:", error);
       setUserRole("client");
+      setUserData({ role: "client" });
       setAuthError(error.message);
 
       if (fetchRetryCount.current < 2) {
         fetchRetryCount.current++;
         console.log(
-          `🔄 Retrying fetchUserRole (attempt ${fetchRetryCount.current + 1}/3)...`,
+          `🔄 Retrying fetchUserData (attempt ${fetchRetryCount.current + 1}/3)...`,
         );
         setTimeout(() => {
-          fetchUserRole(userId);
+          fetchUserData(userId);
         }, 1000);
         return;
       }
     } finally {
-      console.log("✅ Role fetch complete");
+      console.log("✅ User data fetch complete");
       setLoading(false);
       setAuthChecked(true);
     }
@@ -264,6 +272,7 @@ function App() {
         setAuthChecked(true);
         setLoading(false);
         setUserRole("client");
+        setUserData({ role: "client" });
       }
     }, 8000);
 
@@ -335,13 +344,13 @@ function App() {
     });
   }, [loading, authChecked, session, userRole, initialRedirectDone, authError]);
 
-  // Don't render anything until auth is checked
-  if (!authChecked) {
+  // Show minimal loading screen only during auth initialization
+  if (!authChecked || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-gray-500">Loading application...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
+        <div className="text-center select-none">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4 select-none"></div>
+          <p className="text-gray-600 font-medium select-none">Loading...</p>
         </div>
       </div>
     );
@@ -365,17 +374,6 @@ function App() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center select-none">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading your dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
   const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     console.log(
       "🛡️ ProtectedRoute - Session:",
@@ -386,20 +384,18 @@ function App() {
       authChecked,
     );
 
+    // Don't render anything while checking auth
+    if (!authChecked) {
+      return null;
+    }
+
     if (!session) {
       console.log("🔒 No session, redirecting to login");
       return <Navigate to="/login" replace />;
     }
 
     if (userRole === null || userRole === undefined) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-            <p className="mt-4 text-gray-500">Loading your profile...</p>
-          </div>
-        </div>
-      );
+      return null;
     }
 
     if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
@@ -419,7 +415,6 @@ function App() {
     return children;
   };
 
-  // Dynamic Profile Component - redirects based on role
   const DynamicProfile = () => {
     if (userRole === "owner") {
       return <Navigate to="/owner-profile" replace />;
@@ -428,7 +423,7 @@ function App() {
   };
 
   return (
-    <DarkModeProvider>
+    <ThemeProvider>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
@@ -443,7 +438,7 @@ function App() {
           path="/ClientDashboard"
           element={
             <ProtectedRoute allowedRoles={["client"]}>
-              <ClientDashboard />
+              <ClientDashboard initialUserData={userData} />
             </ProtectedRoute>
           }
         />
@@ -601,7 +596,7 @@ function App() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </DarkModeProvider>
+    </ThemeProvider>
   );
 }
 

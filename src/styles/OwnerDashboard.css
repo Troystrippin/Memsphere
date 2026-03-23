@@ -32,7 +32,9 @@
   box-sizing: border-box;
 }
 
-body, html, #root {
+body,
+html,
+#root {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
@@ -41,7 +43,13 @@ body, html, #root {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
   background: var(--gray-50);
 }
 
@@ -85,18 +93,25 @@ body {
 }
 
 .welcome-banner::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
   animation: shine 3s infinite;
 }
 
 @keyframes shine {
-  100% { left: 100%; }
+  100% {
+    left: 100%;
+  }
 }
 
 .welcome-icon {
@@ -185,13 +200,23 @@ body {
 }
 
 @keyframes bounce {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.2); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 /* Header Section */
@@ -211,7 +236,11 @@ body {
 .page-title {
   font-size: 2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -221,7 +250,11 @@ body {
 .title-glow {
   width: 80px;
   height: 4px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
   border-radius: 4px;
   margin-top: 0.5rem;
   transition: width 0.3s;
@@ -237,7 +270,11 @@ body {
   align-items: center;
   gap: 0.75rem;
   padding: 0.625rem 1.5rem;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
   border-radius: 2.5rem;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
   transition: all 0.3s;
@@ -256,13 +293,28 @@ body {
 }
 
 @keyframes wave {
-  0%, 100% { transform: rotate(0deg); }
-  10% { transform: rotate(14deg); }
-  20% { transform: rotate(-8deg); }
-  30% { transform: rotate(14deg); }
-  40% { transform: rotate(-4deg); }
-  50% { transform: rotate(10deg); }
-  60% { transform: rotate(0deg); }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(14deg);
+  }
+  20% {
+    transform: rotate(-8deg);
+  }
+  30% {
+    transform: rotate(14deg);
+  }
+  40% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+  60% {
+    transform: rotate(0deg);
+  }
 }
 
 .greeting-text {
@@ -374,8 +426,15 @@ body {
 }
 
 @keyframes pulseBadge {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(0.98); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(0.98);
+  }
 }
 
 /* Applications Section */
@@ -535,7 +594,11 @@ body {
 .applicant-avatar {
   width: 2.75rem;
   height: 2.75rem;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
   border-radius: 0.75rem;
   display: flex;
   align-items: center;
@@ -566,7 +629,8 @@ body {
 }
 
 /* Badges */
-.plan-badge, .amount-badge {
+.plan-badge,
+.amount-badge {
   display: inline-block;
   padding: 0.3125rem 0.875rem;
   border-radius: 2rem;
@@ -695,7 +759,11 @@ body {
 
 .btn-primary {
   padding: 0.625rem 1.75rem;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
   color: white;
   border: none;
   border-radius: 2rem;
@@ -854,7 +922,9 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Error State */
@@ -906,11 +976,11 @@ body {
   .dashboard-main {
     padding: 1rem 1.5rem;
   }
-  
+
   .stats-grid {
     gap: 1rem;
   }
-  
+
   .stat-value {
     font-size: 1.75rem;
   }
@@ -920,16 +990,16 @@ body {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .businesses-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .dashboard-header {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .user-greeting {
     align-self: flex-end;
   }
@@ -939,38 +1009,38 @@ body {
   .dashboard-main {
     padding: 1rem;
   }
-  
+
   .content-wrapper {
     padding-top: calc(var(--navbar-height) + 0.75rem);
   }
-  
+
   .page-title {
     font-size: 1.5rem;
   }
-  
+
   .section-header {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .view-all-btn {
     width: 100%;
     justify-content: center;
   }
-  
+
   .applications-table {
     min-width: 800px;
   }
-  
+
   .stat-value {
     font-size: 1.5rem;
   }
-  
+
   .stat-icon {
     width: 3rem;
     height: 3rem;
   }
-  
+
   .stat-icon svg {
     width: 1.5rem;
     height: 1.5rem;
@@ -981,36 +1051,36 @@ body {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .business-card {
     flex-direction: column;
     text-align: center;
   }
-  
+
   .business-emoji {
     margin-bottom: 0.5rem;
   }
-  
+
   .business-location {
     justify-content: center;
   }
-  
+
   .business-tags {
     justify-content: center;
   }
-  
+
   .greeting-text {
     display: none;
   }
-  
+
   .user-greeting {
     padding: 0.5rem 1rem;
   }
-  
+
   .greeting-wave {
     font-size: 1.125rem;
   }
-  
+
   .greeting-name {
     font-size: 0.8125rem;
     padding: 0.125rem 0.5rem;
@@ -1021,15 +1091,15 @@ body {
   .dashboard-main {
     padding: 0.75rem;
   }
-  
+
   .page-title {
     font-size: 1.25rem;
   }
-  
+
   .stat-value {
     font-size: 1.25rem;
   }
-  
+
   .view-btn {
     width: 100%;
   }

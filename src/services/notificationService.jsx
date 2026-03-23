@@ -27,6 +27,78 @@ export const notificationService = {
   },
 
   /**
+   * Send business permit approved notification to owner
+   */
+  async sendBusinessPermitApproved(ownerId, businessId, businessName, permitNumber) {
+    return this.sendNotification(
+      ownerId,
+      "business_permit_approved",
+      "✅ Business Permit Approved!",
+      `Your business permit (${permitNumber}) for ${businessName} has been approved. Your business is now visible to customers!`,
+      {
+        businessId: businessId,
+        businessName: businessName,
+        permitNumber: permitNumber,
+        action: "view_business",
+      },
+    );
+  },
+
+  /**
+   * Send business permit rejected notification to owner
+   */
+  async sendBusinessPermitRejected(ownerId, businessId, businessName, permitNumber, reason) {
+    return this.sendNotification(
+      ownerId,
+      "business_permit_rejected",
+      "❌ Business Permit Not Approved",
+      `Your business permit (${permitNumber}) for ${businessName} was not approved. Reason: ${reason || "Please upload a valid business permit."} Please upload a new permit for verification.`,
+      {
+        businessId: businessId,
+        businessName: businessName,
+        permitNumber: permitNumber,
+        reason: reason,
+        action: "upload_permit",
+      },
+    );
+  },
+
+  /**
+   * Send business suspended notification to owner
+   */
+  async sendBusinessSuspended(ownerId, businessId, businessName, reason) {
+    return this.sendNotification(
+      ownerId,
+      "business_suspended",
+      "⚠️ Business Suspended",
+      `Your business "${businessName}" has been suspended. Reason: ${reason || "Violation of terms."} Please contact support for more information.`,
+      {
+        businessId: businessId,
+        businessName: businessName,
+        reason: reason,
+        action: "contact_support",
+      },
+    );
+  },
+
+  /**
+   * Send business unsuspended notification to owner
+   */
+  async sendBusinessUnsuspended(ownerId, businessId, businessName) {
+    return this.sendNotification(
+      ownerId,
+      "business_unsuspended",
+      "✅ Business Restored",
+      `Your business "${businessName}" has been restored and is now visible to customers.`,
+      {
+        businessId: businessId,
+        businessName: businessName,
+        action: "view_business",
+      },
+    );
+  },
+
+  /**
    * Send payment confirmation notification to client
    */
   async sendPaymentConfirmation(userId, membershipId, businessName, amount) {

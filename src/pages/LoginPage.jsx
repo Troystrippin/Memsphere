@@ -200,8 +200,8 @@ const LoginPage = () => {
                 <div className="space-y-8">
                   <div>
                     <div className="flex items-center gap-3 mb-4">
-                      {/* Logo image without shadow, background, or effects */}
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center overflow-hidden">
+                      {/* Logo image - made slightly bigger */}
+                      <div className="w-24 h-24 rounded-2xl flex items-center justify-center overflow-hidden">
                         <img
                           src={logo}
                           alt="Memsphere Logo"
@@ -222,7 +222,6 @@ const LoginPage = () => {
                       memberships and business.
                     </p>
                   </div>
-
                   {/* Stats Cards */}
                   <div className="grid grid-cols-2 gap-4">
                     {features.map((feature, index) => (

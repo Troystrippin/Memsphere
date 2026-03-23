@@ -246,17 +246,11 @@ const About = () => {
 
   if (loading) {
     return (
-      <div
-        className={`min-h-screen flex items-center justify-center ${isDarkMode ? "dark-mode" : ""}`}
-      >
-        <div className="text-center">
-          <div
-            className={`loading-spinner ${isDarkMode ? "dark-mode" : ""}`}
-          ></div>
-          <p
-            className={`mt-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
-          >
-            Loading amazing content...
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
+        <div className="text-center select-none">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4 select-none"></div>
+          <p className="text-gray-600 font-medium select-none">
+            Please wait for a minute...
           </p>
         </div>
       </div>

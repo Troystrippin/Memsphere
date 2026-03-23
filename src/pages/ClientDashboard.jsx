@@ -1,4 +1,3 @@
-// src/pages/ClientDashboard.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
@@ -23,12 +22,15 @@ import {
   Users,
   MapPin,
   Plus,
+  ChevronLeft,
+  RefreshCw,
+  MessageCircle,
 } from "lucide-react";
 
-const ClientDashboard = () => {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+const ClientDashboard = ({ initialUserData = null }) => {
+  const [user, setUser] = useState(initialUserData || null);
+  const [profile, setProfile] = useState(initialUserData || null);
+  const [loading, setLoading] = useState(!initialUserData);
   const [memberships, setMemberships] = useState([]);
   const [loadingMemberships, setLoadingMemberships] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -51,8 +53,23 @@ const ClientDashboard = () => {
 
   useEffect(() => {
     console.log("ClientDashboard mounted");
-    checkUser();
-  }, []);
+    
+    if (initialUserData) {
+      console.log("Using initial user data from App");
+      setUser(initialUserData);
+      setProfile(initialUserData);
+      setLoading(false);
+      
+      if (initialUserData.avatar_url) {
+        downloadAvatar(initialUserData.avatar_url);
+      }
+      
+      fetchMemberships(initialUserData.id);
+      fetchRecommendedBusinesses();
+    } else {
+      checkUser();
+    }
+  }, [initialUserData]);
 
   useEffect(() => {
     if (memberships.length > 0) {
@@ -182,9 +199,9 @@ const ClientDashboard = () => {
   const fetchRecommendedBusinesses = async () => {
     try {
       setLoadingRecommendations(true);
-      console.log("Fetching recommended businesses");
+      console.log("Fetching recommended businesses by rating with member counts");
 
-      const { data, error } = await supabase
+      const { data: businessesData, error: businessesError } = await supabase
         .from("businesses")
         .select(
           `
@@ -203,34 +220,63 @@ const ClientDashboard = () => {
           rating,
           members_count,
           amenities,
-          status
+          status,
+          verification_status
         `,
         )
         .eq("status", "active")
         .eq("verification_status", "approved")
-        .order("members_count", { ascending: false })
         .order("rating", { ascending: false })
+        .order("members_count", { ascending: false })
         .limit(10);
 
-      if (error) {
-        console.error("Error fetching recommended businesses:", error);
-        throw error;
+      if (businessesError) {
+        console.error("Error fetching businesses:", businessesError);
+        throw businessesError;
       }
 
-      const businessesWithRatings = data?.filter((b) => b.rating != null) || [];
-      const businessesWithoutRatings =
-        data?.filter((b) => b.rating == null) || [];
+      if (!businessesData || businessesData.length === 0) {
+        setRecommendedBusinesses([]);
+        setLoadingRecommendations(false);
+        return;
+      }
 
-      const sortedWithRatings = businessesWithRatings.sort(
-        (a, b) => b.rating - a.rating,
+      const businessesWithDetails = await Promise.all(
+        businessesData.map(async (business) => {
+          const { count: reviewCount, error: reviewError } = await supabase
+            .from("reviews")
+            .select("*", { count: "exact", head: true })
+            .eq("business_id", business.id);
+
+          if (reviewError) {
+            console.error(`Error counting reviews for business ${business.id}:`, reviewError);
+          }
+
+          return {
+            ...business,
+            review_count: reviewCount || 0,
+            members_count: business.members_count || 0
+          };
+        })
       );
 
-      const sortedBusinesses = [
-        ...sortedWithRatings,
-        ...businessesWithoutRatings,
-      ];
+      const sortedBusinesses = businessesWithDetails.sort((a, b) => {
+        if (a.rating !== b.rating) {
+          return (b.rating || 0) - (a.rating || 0);
+        }
+        return (b.members_count || 0) - (a.members_count || 0);
+      });
 
-      setRecommendedBusinesses(sortedBusinesses.slice(0, 5));
+      const topRecommendations = sortedBusinesses.slice(0, 5);
+      
+      console.log("Top recommended businesses:", topRecommendations.map(b => ({
+        name: b.name,
+        rating: b.rating,
+        members: b.members_count,
+        reviews: b.review_count
+      })));
+      
+      setRecommendedBusinesses(topRecommendations);
     } catch (error) {
       console.error("Error in fetchRecommendedBusinesses:", error);
     } finally {
@@ -395,7 +441,7 @@ const ClientDashboard = () => {
     if (!timeData) return null;
     if (timeData.expired) {
       return (
-        <div className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-600 rounded-lg text-sm">
+        <div className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-600 rounded-lg text-sm select-none">
           <XCircle size={16} />
           <span>Expired</span>
         </div>
@@ -413,7 +459,7 @@ const ClientDashboard = () => {
 
     if (timeData.days > 30) {
       return (
-        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm ${colorClass}`}>
+        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm ${colorClass} select-none`}>
           <Clock size={16} />
           <span>{timeData.days} days remaining</span>
         </div>
@@ -421,7 +467,7 @@ const ClientDashboard = () => {
     }
 
     return (
-      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm ${colorClass}`}>
+      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-sm ${colorClass} select-none`}>
         <Clock size={16} />
         <span>
           {timeData.days}d {timeData.hours}h remaining
@@ -430,21 +476,35 @@ const ClientDashboard = () => {
     );
   };
 
-  const handleViewBusiness = (businessId) => {
-    navigate(`/business/${businessId}`);
+  const getBusinessIcon = (business) => {
+    switch (business.business_type) {
+      case "gym":
+        return business.emoji || "🏋️";
+      case "cafe":
+        return business.emoji || "☕";
+      case "bakery":
+        return business.emoji || "🥐";
+      default:
+        return business.emoji || "🏢";
+    }
   };
 
+  const handleBusinessClick = (business) => {
+    navigate("/browse", { state: { businessToOpen: business } });
+  };
+
+  // Loading screen with navbar
   if (loading) {
     return (
-      <div className={`min-h-screen w-full ${isDarkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
+      <>
         <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Loading your dashboard...</p>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
+          <div className="text-center select-none">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4 select-none"></div>
+            <p className="text-gray-600 font-medium select-none">Loading your Dashboard...</p>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -454,49 +514,49 @@ const ClientDashboard = () => {
   const sortedMemberships = getSortedMemberships();
 
   return (
-    <div className={`min-h-screen w-full transition-colors duration-300 ${isDarkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
+    <div className={`min-h-screen w-full transition-colors duration-300 select-none ${isDarkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
       <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
 
       <div className="w-full px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         {/* Header Section - Greeting on Right */}
         <div className="flex justify-end mb-8">
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-sm transition-colors duration-300 ${
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-sm transition-colors duration-300 select-none ${
             isDarkMode ? 'bg-gray-800' : 'bg-white'
           }`}>
-            <span className="text-xl">👋</span>
-            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Good to see you,</span>
-            <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            <span className="text-xl select-none">👋</span>
+            <span className={`select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Good to see you,</span>
+            <span className={`font-semibold select-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               {firstName}
             </span>
           </div>
         </div>
 
-        {/* Stats Cards with Animations */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             whileHover={{ scale: 1.02, y: -5 }}
-            className={`rounded-2xl shadow-lg p-6 border transition-all duration-300 ${
+            className={`rounded-2xl shadow-lg p-6 border transition-all duration-300 select-none ${
               isDarkMode 
                 ? 'bg-gray-800 border-gray-700 hover:shadow-xl' 
                 : 'bg-white border-gray-100 hover:shadow-xl'
             }`}
           >
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
-                <Award className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md select-none">
+                <Award className="w-6 h-6 text-white select-none" />
               </div>
-              <div className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+              <div className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full select-none">
                 Active
               </div>
             </div>
-            <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Active Memberships</p>
-            <p className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{membershipCount}</p>
-            <div className={`flex items-center gap-1 text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-              <TrendingUp size={12} />
-              <span>Currently active</span>
+            <p className={`text-sm mb-1 select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Active Memberships</p>
+            <p className={`text-3xl font-bold mb-2 select-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{membershipCount}</p>
+            <div className={`flex items-center gap-1 text-xs select-none ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              <TrendingUp size={12} className="select-none" />
+              <span className="select-none">Currently active</span>
             </div>
           </motion.div>
 
@@ -505,19 +565,19 @@ const ClientDashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             whileHover={{ scale: 1.02, y: -5 }}
-            className={`rounded-2xl shadow-lg p-6 border transition-all duration-300 ${
+            className={`rounded-2xl shadow-lg p-6 border transition-all duration-300 select-none ${
               isDarkMode 
                 ? 'bg-gray-800 border-gray-700 hover:shadow-xl' 
                 : 'bg-white border-gray-100 hover:shadow-xl'
             }`}
           >
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
-                <Calendar className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md select-none">
+                <Calendar className="w-6 h-6 text-white select-none" />
               </div>
             </div>
-            <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Member Since</p>
-            <p className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            <p className={`text-sm mb-1 select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Member Since</p>
+            <p className={`text-3xl font-bold mb-2 select-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               {profile?.created_at
                 ? new Date(profile.created_at).toLocaleDateString("en-US", {
                     month: "short",
@@ -525,9 +585,9 @@ const ClientDashboard = () => {
                   })
                 : "N/A"}
             </p>
-            <div className={`flex items-center gap-1 text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-              <Calendar size={12} />
-              <span>Join date</span>
+            <div className={`flex items-center gap-1 text-xs select-none ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              <Calendar size={12} className="select-none" />
+              <span className="select-none">Join date</span>
             </div>
           </motion.div>
 
@@ -536,37 +596,37 @@ const ClientDashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
             whileHover={{ scale: 1.02, y: -5 }}
-            className={`rounded-2xl shadow-lg p-6 border transition-all duration-300 ${
+            className={`rounded-2xl shadow-lg p-6 border transition-all duration-300 select-none ${
               isDarkMode 
                 ? 'bg-gray-800 border-gray-700 hover:shadow-xl' 
                 : 'bg-white border-gray-100 hover:shadow-xl'
             }`}
           >
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md">
-                <Heart className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md select-none">
+                <Heart className="w-6 h-6 text-white select-none" />
               </div>
             </div>
-            <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Saved Businesses</p>
-            <p className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>0</p>
-            <div className={`flex items-center gap-1 text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-              <Bookmark size={12} />
-              <span>Your favorites</span>
+            <p className={`text-sm mb-1 select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Saved Businesses</p>
+            <p className={`text-3xl font-bold mb-2 select-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>0</p>
+            <div className={`flex items-center gap-1 text-xs select-none ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              <Bookmark size={12} className="select-none" />
+              <span className="select-none">Your favorites</span>
             </div>
           </motion.div>
         </div>
 
         {/* Membership Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 select-none">
+          <div className="flex items-center gap-2 select-none">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse select-none"></div>
+            <span className={`text-sm font-medium select-none ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
               My Memberships
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 select-none">
             <button
-              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-all select-none ${
                 sortBy === "expiry"
                   ? "bg-blue-600 text-white shadow-md"
                   : isDarkMode 
@@ -575,11 +635,11 @@ const ClientDashboard = () => {
               }`}
               onClick={() => setSortBy("expiry")}
             >
-              <Clock size={14} />
-              <span>Closest to Expiry</span>
+              <Clock size={14} className="select-none" />
+              <span className="select-none">Closest to Expiry</span>
             </button>
             <button
-              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-all select-none ${
                 sortBy === "recent"
                   ? "bg-blue-600 text-white shadow-md"
                   : isDarkMode 
@@ -588,8 +648,8 @@ const ClientDashboard = () => {
               }`}
               onClick={() => setSortBy("recent")}
             >
-              <Calendar size={14} />
-              <span>Most Recent</span>
+              <Calendar size={14} className="select-none" />
+              <span className="select-none">Most Recent</span>
             </button>
           </div>
         </div>
@@ -599,26 +659,26 @@ const ClientDashboard = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`rounded-2xl shadow-lg p-6 mb-8 border transition-colors duration-300 ${
+            className={`rounded-2xl shadow-lg p-6 mb-8 border transition-colors duration-300 select-none ${
               isDarkMode 
                 ? 'bg-gradient-to-r from-gray-800 to-gray-900 border-gray-700' 
                 : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100'
             }`}
           >
             <div className="flex items-start gap-4 mb-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl shadow-lg">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl shadow-lg select-none">
                 {activeMembership.emoji}
               </div>
               <div className="flex-1">
-                <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                <h2 className={`text-xl font-bold select-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   {activeMembership.businessName}
                 </h2>
                 <div className="flex items-center gap-2 mt-1">
-                  <Crown size={16} className="text-yellow-500" />
-                  <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <Crown size={16} className="text-yellow-500 select-none" />
+                  <span className={`text-sm select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                     {activeMembership.planName}
                   </span>
-                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full select-none">
                     Active
                   </span>
                 </div>
@@ -632,19 +692,19 @@ const ClientDashboard = () => {
 
             <div className="space-y-3 mb-4">
               <div className="flex items-center gap-3 text-sm">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className={`w-20 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Applied:</span>
-                <span className={isDarkMode ? 'text-gray-300' : 'text-gray-900'}>{activeMembership.applied}</span>
+                <div className="w-2 h-2 bg-blue-500 rounded-full select-none"></div>
+                <span className={`w-20 select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Applied:</span>
+                <span className={`select-none ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>{activeMembership.applied}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className={`w-20 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Started:</span>
-                <span className={isDarkMode ? 'text-gray-300' : 'text-gray-900'}>{activeMembership.startDate}</span>
+                <div className="w-2 h-2 bg-blue-500 rounded-full select-none"></div>
+                <span className={`w-20 select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Started:</span>
+                <span className={`select-none ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>{activeMembership.startDate}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className={`w-20 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Valid Until:</span>
-                <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                <div className="w-2 h-2 bg-blue-500 rounded-full select-none"></div>
+                <span className={`w-20 select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Valid Until:</span>
+                <span className={`font-medium select-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   {activeMembership.validUntil}
                 </span>
               </div>
@@ -652,27 +712,27 @@ const ClientDashboard = () => {
 
             {activeMembership.features && activeMembership.features.length > 0 && (
               <div>
-                <h4 className={`text-sm font-semibold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <h4 className={`text-sm font-semibold mb-2 select-none ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Membership Benefits
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {activeMembership.features.slice(0, 4).map((feature, idx) => (
                     <div
                       key={idx}
-                      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs shadow-sm ${
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs shadow-sm select-none ${
                         isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-600'
                       }`}
                     >
-                      <CheckCircle size={12} className="text-green-500" />
-                      <span>{feature}</span>
+                      <CheckCircle size={12} className="text-green-500 select-none" />
+                      <span className="select-none">{feature}</span>
                     </div>
                   ))}
                   {activeMembership.features.length > 4 && (
-                    <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs shadow-sm ${
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs shadow-sm select-none ${
                       isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-600'
                     }`}>
-                      <Plus size={12} />
-                      <span>{activeMembership.features.length - 4} more</span>
+                      <Plus size={12} className="select-none" />
+                      <span className="select-none">{activeMembership.features.length - 4} more</span>
                     </div>
                   )}
                 </div>
@@ -685,25 +745,25 @@ const ClientDashboard = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`rounded-2xl shadow-lg p-12 text-center mb-8 border transition-colors duration-300 ${
+              className={`rounded-2xl shadow-lg p-12 text-center mb-8 border transition-colors duration-300 select-none ${
                 isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
               }`}
             >
-              <div className="text-6xl mb-4">📋</div>
-              <h3 className={`text-xl font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+              <div className="text-6xl mb-4 select-none">📋</div>
+              <h3 className={`text-xl font-semibold mb-2 select-none ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                 No Active Membership
               </h3>
-              <p className={`mb-6 max-w-md mx-auto ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <p className={`mb-6 max-w-md mx-auto select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 You haven't joined any businesses yet. Explore our recommended
                 businesses below and find the perfect membership for you!
               </p>
               <button
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto select-none"
                 onClick={() => navigate("/browse")}
               >
-                <Compass size={20} />
-                <span>Browse Businesses</span>
-                <ChevronRight size={20} />
+                <Compass size={20} className="select-none" />
+                <span className="select-none">Browse Businesses</span>
+                <ChevronRight size={20} className="select-none" />
               </button>
             </motion.div>
           )
@@ -715,35 +775,35 @@ const ClientDashboard = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className={`rounded-2xl shadow-lg overflow-hidden mb-8 transition-colors duration-300 ${
+            className={`rounded-2xl shadow-lg overflow-hidden mb-8 transition-colors duration-300 select-none ${
               isDarkMode ? 'bg-gray-800' : 'bg-white'
             }`}
           >
-            <div className={`px-6 py-4 border-b flex justify-between items-center ${
+            <div className={`px-6 py-4 border-b flex justify-between items-center select-none ${
               isDarkMode ? 'border-gray-700' : 'border-gray-200'
             }`}>
-              <h3 className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>All Memberships</h3>
+              <h3 className={`font-semibold select-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>All Memberships</h3>
               <button
-                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 select-none"
                 onClick={() => navigate("/memberships")}
               >
-                <span>View All</span>
-                <ChevronRight size={16} />
+                <span className="select-none">View All</span>
+                <ChevronRight size={16} className="select-none" />
               </button>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className={`border-b ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-                  <tr>
-                    <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Business</th>
-                    <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Plan</th>
-                    <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Applied</th>
-                    <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Valid Until</th>
-                    <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Status</th>
+                <thead className={`border-b select-none ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                  <tr className="select-none">
+                    <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Business</th>
+                    <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Plan</th>
+                    <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Applied</th>
+                    <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Valid Until</th>
+                    <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Status</th>
                   </tr>
                 </thead>
-                <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-100'}`}>
+                <tbody className={`divide-y select-none ${isDarkMode ? 'divide-gray-700' : 'divide-gray-100'}`}>
                   {sortedMemberships.map((membership, index) => {
                     const timeData = timeRemaining[membership.id];
                     const expiryStatus = getExpiryStatus(timeData);
@@ -760,39 +820,39 @@ const ClientDashboard = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className={`hover:bg-gray-50 transition-colors ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}
+                        className={`hover:bg-gray-50 transition-colors select-none ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}
                       >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">{membership.businesses?.emoji || "🏢"}</span>
-                            <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        <td className="px-6 py-4 select-none">
+                          <div className="flex items-center gap-2 select-none">
+                            <span className="text-xl select-none">{membership.businesses?.emoji || "🏢"}</span>
+                            <span className={`font-medium select-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                               {membership.businesses?.name}
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
+                        <td className="px-6 py-4 select-none">
+                          <span className={`px-2 py-1 text-xs rounded-full select-none ${
                             isDarkMode ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-700'
                           }`}>
                             {membership.membership_plans?.name || "Membership"}
                           </span>
                         </td>
-                        <td className={`px-6 py-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <td className={`px-6 py-4 select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           {formatDate(membership.created_at)}
                         </td>
-                        <td className={`px-6 py-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <td className={`px-6 py-4 select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           {formatDate(membership.end_date)}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 select-none">
                           {timeData && !timeData.expired ? (
-                            <div className={`flex items-center gap-1 text-sm ${statusColor}`}>
-                              <Clock size={14} />
-                              <span>{timeData.days}d left</span>
+                            <div className={`flex items-center gap-1 text-sm select-none ${statusColor}`}>
+                              <Clock size={14} className="select-none" />
+                              <span className="select-none">{timeData.days}d left</span>
                             </div>
                           ) : (
-                            <div className={`flex items-center gap-1 text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                              <XCircle size={14} />
-                              <span>Expired</span>
+                            <div className={`flex items-center gap-1 text-sm select-none ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                              <XCircle size={14} className="select-none" />
+                              <span className="select-none">Expired</span>
                             </div>
                           )}
                         </td>
@@ -806,119 +866,165 @@ const ClientDashboard = () => {
         )}
 
         {/* Recommended Section */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-2">
-              <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+        <div className="mb-8 select-none">
+          <div className="flex justify-between items-center mb-6 select-none">
+            <div className="flex items-center gap-2 select-none">
+              <h3 className={`text-lg font-semibold select-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                 Recommended for You
               </h3>
-              <span className="text-xl animate-pulse">🔥</span>
+              <span className="text-xl animate-pulse select-none">🔥</span>
             </div>
             <button
-              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 select-none"
               onClick={() => navigate("/browse")}
             >
-              <span>View All</span>
-              <ChevronRight size={16} />
+              <span className="select-none">View All</span>
+              <ChevronRight size={16} className="select-none" />
             </button>
           </div>
 
           {loadingRecommendations ? (
-            <div className="text-center py-12">
-              <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2"></div>
-              <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Finding recommendations for you...</p>
+            <div className="text-center py-12 select-none">
+              <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2 select-none"></div>
+              <p className={`select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Finding recommendations for you...</p>
             </div>
-          ) : (
+          ) : recommendedBusinesses.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
               {recommendedBusinesses.map((business, index) => (
-                <motion.div
+                <div
                   key={business.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -8, scale: 1.02 }}
-                  className={`rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all cursor-pointer group ${
-                    isDarkMode ? 'bg-gray-800' : 'bg-white'
-                  }`}
-                  onClick={() => handleViewBusiness(business.id)}
+                  className={`business-card-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+                  style={{ animationDelay: `${index * 0.1}s` }}
                 >
-                  <div className={`p-4 relative ${
-                    isDarkMode ? 'bg-gradient-to-br from-gray-700 to-gray-800' : 'bg-gradient-to-br from-blue-50 to-purple-50'
-                  }`}>
-                    <div className="text-5xl text-center py-4">
-                      {business.emoji || "🏢"}
-                    </div>
-                    <div className="absolute top-2 right-2 flex gap-1">
-                      <div className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-md">
-                        <Star size={10} fill="currentColor" />
-                        <span>
-                          {business.rating !== null && business.rating !== undefined
-                            ? Number(business.rating).toFixed(1)
-                            : "New"}
+                  <div className="card-gradient-bg"></div>
+                  <div className="card-content">
+                    <div className="card-header">
+                      <div className="business-image-wrapper">
+                        {business.image_url ? (
+                          <img
+                            src={business.image_url}
+                            alt={business.name}
+                            className="business-image"
+                          />
+                        ) : (
+                          <span className="business-emoji-large">
+                            {getBusinessIcon(business)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="business-tags">
+                        <span
+                          className={`business-type-badge ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          {business.business_type}
+                        </span>
+                        <span
+                          className={`rating-badge ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          <Star size={12} fill="currentColor" />
+                          <span>
+                            {business.rating ? business.rating.toFixed(1) : "0.0"}
+                          </span>
                         </span>
                       </div>
-                      {business.members_count > 0 && (
-                        <div className="bg-gray-800/80 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-md">
-                          <Users size={10} />
-                          <span>{business.members_count}</span>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                  <div className="p-4">
-                    <h4 className={`font-semibold mb-1 truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {business.name}
-                    </h4>
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                      <Crown size={12} className="text-yellow-500" />
-                      <span className="truncate">{business.owner_name}</span>
-                    </div>
-                    {business.short_description && (
-                      <p className={`text-xs mb-3 line-clamp-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {business.short_description}
+
+                    <div className="business-details">
+                      <h3
+                        className={`business-title ${isDarkMode ? "dark-mode" : ""}`}
+                      >
+                        {business.name}
+                      </h3>
+
+                      <div
+                        className={`owner-highlight ${isDarkMode ? "dark-mode" : ""}`}
+                      >
+                        <Crown size={14} className="owner-icon" />
+                        <span
+                          className={`owner-name ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          {business.owner_name}
+                        </span>
+                        <span className="owner-badge">Owner</span>
+                      </div>
+
+                      <p
+                        className={`business-description ${isDarkMode ? "dark-mode" : ""}`}
+                      >
+                        {business.short_description ||
+                          business.description?.substring(0, 80)}
+                        {!business.short_description &&
+                        business.description?.length > 80
+                          ? "..."
+                          : ""}
                       </p>
-                    )}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <MapPin size={12} />
-                        <span className="truncate">{business.city || business.location || "Location"}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-sm font-bold text-blue-600">
-                          ₱{business.price}
-                        </span>
-                        <span className="text-xs text-gray-500">/{business.price_unit}</span>
+
+                      <div
+                        className={`business-stats ${isDarkMode ? "dark-mode" : ""}`}
+                      >
+                        <div
+                          className={`stat-item ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          <MapPin size={14} />
+                          <span>{business.location}</span>
+                        </div>
+                        <div
+                          className={`stat-item ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          <Users size={14} />
+                          <span>{business.members_count || 0} members</span>
+                        </div>
+                        <div
+                          className={`stat-item ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          <MessageCircle size={14} />
+                          <span>{business.review_count || 0} reviews</span>
+                        </div>
                       </div>
                     </div>
-                    <button className={`w-full py-2 text-sm rounded-lg transition-colors flex items-center justify-center gap-1 ${
-                      isDarkMode 
-                        ? 'text-blue-400 border border-blue-500/50 hover:bg-blue-500/20' 
-                        : 'text-blue-600 border border-blue-200 hover:bg-blue-50'
-                    }`}>
-                      <span>View Details</span>
-                      <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                    </button>
+
+                    <div
+                      className={`card-footer ${isDarkMode ? "dark-mode" : ""}`}
+                    >
+                      <div className="price-tag">
+                        <span
+                          className={`price-amount ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          ₱{business.price?.toLocaleString()}
+                        </span>
+                        <span
+                          className={`price-period ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          /mo
+                        </span>
+                      </div>
+                      <button
+                        className={`view-details-btn-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+                        onClick={() => handleBusinessClick(business)}
+                      >
+                        <span>View</span>
+                        <ChevronRight size={16} className="btn-icon" />
+                      </button>
+                    </div>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
-          )}
-
-          {!loadingRecommendations && recommendedBusinesses.length === 0 && (
+          ) : (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className={`text-center py-12 rounded-2xl shadow-lg ${
+              className={`text-center py-12 rounded-2xl shadow-lg select-none ${
                 isDarkMode ? 'bg-gray-800' : 'bg-white'
               }`}
             >
-              <p className={`mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No recommendations available at the moment.</p>
+              <p className={`mb-4 select-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No recommendations available at the moment.</p>
               <button
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto select-none"
                 onClick={() => navigate("/browse")}
               >
-                <Compass size={20} />
-                <span>Browse All Businesses</span>
+                <Compass size={20} className="select-none" />
+                <span className="select-none">Browse All Businesses</span>
               </button>
             </motion.div>
           )}
@@ -933,7 +1039,6 @@ const ClientDashboard = () => {
         businessId={renewModal.businessId}
         businessName={renewModal.businessName}
         onSuccess={() => {
-          // Refresh memberships after successful renewal
           if (user?.id) {
             fetchMemberships(user.id);
           }

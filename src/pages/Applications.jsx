@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import OwnerNavbar from '../components/owner/OwnerNavbar';
+import { useTheme } from '../contexts/ThemeContext';
 import { toast, Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { notificationService } from '../services/notificationService';
@@ -15,6 +16,7 @@ import {
 
 const Applications = () => {
   const navigate = useNavigate();
+  const { isDarkMode, toggleTheme: toggleDarkMode } = useTheme();
   const [profile, setProfile] = useState(null);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -431,10 +433,14 @@ const Applications = () => {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center select-none">
+      <div className={`fixed inset-0 flex items-center justify-center select-none ${
+        isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50'
+      }`}>
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600 font-medium">Loading applications...</p>
+          <p className={`mt-4 font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+            Loading applications...
+          </p>
         </div>
       </div>
     );
@@ -443,9 +449,16 @@ const Applications = () => {
   const firstName = getFirstName();
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 overflow-hidden select-none">
+    <div className={`fixed inset-0 overflow-hidden select-none ${
+      isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50'
+    }`}>
       <Toaster position="top-right" />
-      <OwnerNavbar profile={profile} avatarUrl={avatarUrl} />
+      <OwnerNavbar 
+        profile={profile} 
+        avatarUrl={avatarUrl} 
+        isDarkMode={isDarkMode}
+        toggleDarkMode={toggleDarkMode}
+      />
       
       <div className="h-full pt-20 overflow-y-auto">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-12">
@@ -455,25 +468,25 @@ const Applications = () => {
               <div>
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                    <h1 className={`text-4xl font-bold ${isDarkMode ? 'text-white' : 'bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent'}`}>
                       Membership Applications
                     </h1>
                     <div className="absolute -bottom-2 left-0 w-20 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-width-pulse"></div>
                   </div>
                 </div>
-                <p className="text-gray-500 mt-2 flex items-center gap-2">
+                <p className={`mt-2 flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   <Users className="w-4 h-4" />
                   Review and manage customer membership applications
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-200">
-                  <p className="text-xs text-gray-500">Total Applications</p>
+                <div className={`rounded-xl px-4 py-2 shadow-sm border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                  <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Applications</p>
                   <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
                 </div>
                 {stats.renewals > 0 && (
-                  <div className="bg-purple-50 rounded-xl px-4 py-2 shadow-sm border border-purple-200">
-                    <p className="text-xs text-purple-600">Renewals</p>
+                  <div className={`rounded-xl px-4 py-2 shadow-sm border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-purple-50 border-purple-200'}`}>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-purple-600'}`}>Renewals</p>
                     <p className="text-2xl font-bold text-purple-600">{stats.renewals}</p>
                   </div>
                 )}
@@ -483,10 +496,10 @@ const Applications = () => {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <div className={`rounded-xl p-4 border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Pending</p>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pending</p>
                   <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
                 </div>
                 <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
@@ -494,10 +507,10 @@ const Applications = () => {
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <div className={`rounded-xl p-4 border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Approved</p>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Approved</p>
                   <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
                 </div>
                 <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
@@ -505,10 +518,10 @@ const Applications = () => {
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <div className={`rounded-xl p-4 border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Rejected</p>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Rejected</p>
                   <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
                 </div>
                 <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
@@ -516,10 +529,10 @@ const Applications = () => {
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <div className={`rounded-xl p-4 border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Total Revenue</p>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Revenue</p>
                   <p className="text-2xl font-bold text-purple-600">
                     ₱{applications.filter(a => a.status === 'approved').reduce((sum, a) => sum + (a.price_paid || 0), 0).toLocaleString()}
                   </p>
@@ -534,13 +547,17 @@ const Applications = () => {
           {/* Search and Filter */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
               <input
                 type="text"
                 placeholder="Search by name, email, business, or plan..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full pl-10 pr-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  isDarkMode 
+                    ? 'bg-gray-800 border-gray-700 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                }`}
               />
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
@@ -560,13 +577,15 @@ const Applications = () => {
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
                       isActive
                         ? `bg-${tab.color}-500 text-white shadow-md`
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                        : isDarkMode
+                          ? 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
+                          : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span>{tab.label}</span>
                     <span className={`px-2 py-0.5 rounded-full text-xs ${
-                      isActive ? 'bg-white/20' : 'bg-gray-100'
+                      isActive ? 'bg-white/20' : isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
                     }`}>
                       {count}
                     </span>
@@ -578,14 +597,14 @@ const Applications = () => {
 
           {/* Error/Success Messages */}
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
-              <p className="text-red-700">{error}</p>
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 rounded-r-lg">
+              <p className="text-red-700 dark:text-red-300">{error}</p>
             </div>
           )}
 
           {successMessage && (
-            <div className="mb-4 p-4 bg-green-50 border-l-4 border-green-500 rounded-r-lg">
-              <p className="text-green-700">{successMessage}</p>
+            <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/30 border-l-4 border-green-500 rounded-r-lg">
+              <p className="text-green-700 dark:text-green-300">{successMessage}</p>
             </div>
           )}
 
@@ -604,15 +623,19 @@ const Applications = () => {
                     key={app.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`bg-white rounded-2xl shadow-lg border overflow-hidden transition-all ${
+                    className={`rounded-2xl shadow-lg border overflow-hidden transition-all ${
                       isExpanded ? 'shadow-xl' : ''
-                    } ${isRenewal ? 'border-l-4 border-l-purple-500' : 'border-gray-200'}`}
+                    } ${isRenewal ? 'border-l-4 border-l-purple-500' : isDarkMode ? 'border-gray-700' : 'border-gray-200'} ${
+                      isDarkMode ? 'bg-gray-800' : 'bg-white'
+                    }`}
                   >
                     {/* Card Header */}
                     <div className="p-5 cursor-pointer" onClick={() => toggleExpand(app.id)}>
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center flex-shrink-0">
+                          <div className={`w-14 h-14 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${
+                            isDarkMode ? 'bg-gray-700' : 'bg-gradient-to-br from-blue-100 to-purple-100'
+                          }`}>
                             {app.client_avatar_display ? (
                               <img 
                                 src={app.client_avatar_display} 
@@ -631,7 +654,7 @@ const Applications = () => {
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <h3 className="text-lg font-semibold text-gray-800">
+                              <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                                 {app.applicant?.first_name} {app.applicant?.last_name}
                               </h3>
                               {isRenewal && (
@@ -642,12 +665,12 @@ const Applications = () => {
                               )}
                             </div>
                             <div className="flex flex-wrap gap-3 mt-1">
-                              <span className="text-sm text-gray-500 flex items-center gap-1">
+                              <span className={`text-sm flex items-center gap-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                                 <Mail className="w-3 h-3" />
                                 {app.applicant?.email}
                               </span>
                               {app.applicant?.mobile && (
-                                <span className="text-sm text-gray-500 flex items-center gap-1">
+                                <span className={`text-sm flex items-center gap-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                                   <Phone className="w-3 h-3" />
                                   {app.applicant.mobile}
                                 </span>
@@ -667,33 +690,35 @@ const Applications = () => {
                             {app.status === 'rejected' && <XCircle className="w-3 h-3" />}
                             <span className="capitalize">{app.status}</span>
                           </div>
-                          <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                          <button className={`p-2 rounded-lg transition-colors ${
+                            isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                          }`}>
                             {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                           </button>
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-100">
+                      <div className={`grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`}>
                         <div>
-                          <p className="text-xs text-gray-500">Business</p>
-                          <p className="text-sm font-medium text-gray-800 truncate">{app.business?.name}</p>
+                          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Business</p>
+                          <p className={`text-sm font-medium truncate ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{app.business?.name}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Plan</p>
-                          <p className="text-sm font-medium text-gray-800">{app.plan?.name}</p>
+                          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Plan</p>
+                          <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{app.plan?.name}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Amount</p>
+                          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Amount</p>
                           <p className="text-sm font-bold text-blue-600">₱{app.price_paid?.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Applied</p>
-                          <p className="text-sm text-gray-600">{formatDate(app.created_at)}</p>
+                          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Applied</p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{formatDate(app.created_at)}</p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Expanded Content - Rest remains the same */}
+                    {/* Expanded Content */}
                     <AnimatePresence>
                       {isExpanded && (
                         <motion.div
@@ -701,17 +726,17 @@ const Applications = () => {
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.3 }}
-                          className="border-t border-gray-100"
+                          className={`border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`}
                         >
-                          <div className="p-5 bg-gray-50/30">
+                          <div className={`p-5 ${isDarkMode ? 'bg-gray-700/30' : 'bg-gray-50/30'}`}>
                             {/* Add Renewal Info Badge at the top of expanded content */}
                             {isRenewal && (
-                              <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                              <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-800">
                                 <div className="flex items-center gap-2">
-                                  <RefreshCw className="w-4 h-4 text-purple-600" />
-                                  <span className="text-sm font-medium text-purple-700">Renewal Application</span>
+                                  <RefreshCw className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                  <span className="text-sm font-medium text-purple-700 dark:text-purple-300">Renewal Application</span>
                                 </div>
-                                <p className="text-xs text-purple-600 mt-1">
+                                <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
                                   This is a membership renewal request. The customer wants to continue their existing membership.
                                 </p>
                               </div>
@@ -719,31 +744,31 @@ const Applications = () => {
 
                             {/* Plan Details */}
                             <div className="mb-6">
-                              <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                              <h4 className={`font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                                 <Building className="w-4 h-4 text-blue-500" />
                                 Plan Details
                               </h4>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <div className="bg-white rounded-lg p-3 border border-gray-200">
-                                  <p className="text-xs text-gray-500">Plan Name</p>
-                                  <p className="font-medium">{app.plan?.name}</p>
+                                <div className={`rounded-lg p-3 border ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
+                                  <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Plan Name</p>
+                                  <p className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{app.plan?.name}</p>
                                 </div>
-                                <div className="bg-white rounded-lg p-3 border border-gray-200">
-                                  <p className="text-xs text-gray-500">Price</p>
+                                <div className={`rounded-lg p-3 border ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
+                                  <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Price</p>
                                   <p className="font-medium text-blue-600">₱{app.price_paid?.toLocaleString()}/{app.plan?.duration}</p>
                                 </div>
-                                <div className="bg-white rounded-lg p-3 border border-gray-200">
-                                  <p className="text-xs text-gray-500">Duration</p>
-                                  <p className="font-medium capitalize">{app.plan?.duration}</p>
+                                <div className={`rounded-lg p-3 border ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
+                                  <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Duration</p>
+                                  <p className={`font-medium capitalize ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{app.plan?.duration}</p>
                                 </div>
                               </div>
                               
                               {app.plan?.features && app.plan.features.length > 0 && (
-                                <div className="mt-4 bg-white rounded-lg p-4 border border-gray-200">
+                                <div className={`mt-4 rounded-lg p-4 border ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
                                   <p className="text-sm font-semibold mb-2">Features</p>
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {app.plan.features.map((feature, idx) => (
-                                      <div key={idx} className="flex items-center gap-2 text-sm text-gray-600">
+                                      <div key={idx} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                         <Check className="w-4 h-4 text-green-500" />
                                         <span>{feature}</span>
                                       </div>
@@ -755,58 +780,58 @@ const Applications = () => {
 
                             {/* Timeline */}
                             <div className="mb-6">
-                              <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                              <h4 className={`font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                                 <Calendar className="w-4 h-4 text-blue-500" />
                                 Timeline
                               </h4>
                               <div className="space-y-2">
                                 <div className="flex items-center gap-3 text-sm">
-                                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <FileText className="w-4 h-4 text-blue-600" />
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDarkMode ? 'bg-gray-700' : 'bg-blue-100'}`}>
+                                    <FileText className={`w-4 h-4 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
                                   </div>
                                   <div>
-                                    <p className="font-medium">Application Submitted</p>
-                                    <p className="text-gray-500 text-xs">{formatDate(app.created_at)}</p>
+                                    <p className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>Application Submitted</p>
+                                    <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>{formatDate(app.created_at)}</p>
                                   </div>
                                 </div>
                                 {app.payment_verified_at && (
                                   <div className="flex items-center gap-3 text-sm">
-                                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                      <CheckCircle className="w-4 h-4 text-green-600" />
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDarkMode ? 'bg-gray-700' : 'bg-green-100'}`}>
+                                      <CheckCircle className={`w-4 h-4 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`} />
                                     </div>
                                     <div>
-                                      <p className="font-medium">Payment Verified</p>
-                                      <p className="text-gray-500 text-xs">{formatDate(app.payment_verified_at)}</p>
+                                      <p className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>Payment Verified</p>
+                                      <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>{formatDate(app.payment_verified_at)}</p>
                                     </div>
                                   </div>
                                 )}
                                 {app.reviewed_at && (
                                   <div className="flex items-center gap-3 text-sm">
-                                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                                      <Eye className="w-4 h-4 text-purple-600" />
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDarkMode ? 'bg-gray-700' : 'bg-purple-100'}`}>
+                                      <Eye className={`w-4 h-4 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`} />
                                     </div>
                                     <div>
-                                      <p className="font-medium">Application Reviewed</p>
-                                      <p className="text-gray-500 text-xs">{formatDate(app.reviewed_at)}</p>
+                                      <p className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>Application Reviewed</p>
+                                      <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>{formatDate(app.reviewed_at)}</p>
                                     </div>
                                   </div>
                                 )}
                               </div>
                             </div>
 
-                            {/* Payment Section - Same as before */}
+                            {/* Payment Section */}
                             {isGcash && (
                               <div className="mb-6">
-                                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <h4 className={`font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                                   <CreditCard className="w-4 h-4 text-blue-500" />
                                   Payment Details
                                 </h4>
-                                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                <div className={`rounded-lg p-4 border ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
                                   {hasReceipt ? (
                                     <div>
                                       <div className="mb-3">
-                                        <p className="text-sm text-gray-500 mb-1">Payment Receipt</p>
-                                        <div className="bg-gray-100 rounded-lg p-2 inline-block cursor-pointer" onClick={() => viewReceipt(app.receipt_url_display)}>
+                                        <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Payment Receipt</p>
+                                        <div className={`rounded-lg p-2 inline-block cursor-pointer ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`} onClick={() => viewReceipt(app.receipt_url_display)}>
                                           <img 
                                             src={app.receipt_url_display} 
                                             alt="Receipt"
@@ -815,18 +840,18 @@ const Applications = () => {
                                               e.target.style.display = 'none';
                                             }}
                                           />
-                                          <p className="text-xs text-center text-blue-600 mt-1">Click to enlarge</p>
+                                          <p className="text-xs text-center text-blue-600 dark:text-blue-400 mt-1">Click to enlarge</p>
                                         </div>
                                       </div>
                                       {app.payments && app.payments[0] && (
                                         <div className="grid grid-cols-2 gap-3 text-sm">
                                           <div>
-                                            <p className="text-gray-500">Reference Number</p>
-                                            <p className="font-medium">{app.payments[0].gcash_reference || 'N/A'}</p>
+                                            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Reference Number</p>
+                                            <p className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{app.payments[0].gcash_reference || 'N/A'}</p>
                                           </div>
                                           <div>
-                                            <p className="text-gray-500">GCash Number</p>
-                                            <p className="font-medium">{app.payments[0].gcash_number || 'N/A'}</p>
+                                            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>GCash Number</p>
+                                            <p className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{app.payments[0].gcash_number || 'N/A'}</p>
                                           </div>
                                         </div>
                                       )}
@@ -847,7 +872,7 @@ const Applications = () => {
                                         </button>
                                       )}
                                       {isVerified && (
-                                        <div className="mt-3 p-2 bg-green-50 rounded-lg text-green-700 text-sm flex items-center gap-2">
+                                        <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded-lg text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
                                           <CheckCircle className="w-4 h-4" />
                                           Payment verified - Ready for approval
                                         </div>
@@ -855,8 +880,8 @@ const Applications = () => {
                                     </div>
                                   ) : (
                                     <div className="text-center py-6">
-                                      <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                                      <p className="text-gray-500">No receipt uploaded</p>
+                                      <AlertCircle className={`w-12 h-12 mx-auto mb-2 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'}`} />
+                                      <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No receipt uploaded</p>
                                     </div>
                                   )}
                                 </div>
@@ -866,17 +891,17 @@ const Applications = () => {
                             {/* Onsite Payment Section */}
                             {app.payment_method?.toLowerCase() === 'onsite' && (
                               <div className="mb-6">
-                                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <h4 className={`font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                                   <Building className="w-4 h-4 text-blue-500" />
                                   Onsite Payment
                                 </h4>
-                                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                                <div className={`rounded-lg p-4 border ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
                                   <div className="mb-3">
-                                    <p className="text-sm text-gray-500">Business Location</p>
-                                    <p className="font-medium">{app.business?.address || app.business?.location || 'Address not provided'}</p>
+                                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Business Location</p>
+                                    <p className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{app.business?.address || app.business?.location || 'Address not provided'}</p>
                                   </div>
                                   <div className="mb-3">
-                                    <p className="text-sm text-gray-500">Amount to Collect</p>
+                                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Amount to Collect</p>
                                     <p className="text-xl font-bold text-blue-600">₱{app.price_paid?.toLocaleString()}</p>
                                   </div>
                                   {app.status === 'pending' && app.payment_status === 'pending' && (
@@ -905,7 +930,7 @@ const Applications = () => {
                                 <button
                                   className={`flex-1 py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${
                                     (isGcash && !isVerified) || app.business_verification === 'pending'
-                                      ? 'bg-gray-300 cursor-not-allowed'
+                                      ? 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed'
                                       : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg'
                                   }`}
                                   onClick={() => handleApprove(app.id)}
@@ -945,10 +970,10 @@ const Applications = () => {
               })}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+            <div className={`rounded-2xl shadow-lg p-12 text-center ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <div className="text-6xl mb-4">📋</div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">No Applications Found</h3>
-              <p className="text-gray-500 mb-4">
+              <h3 className={`text-xl font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>No Applications Found</h3>
+              <p className={`mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 There are no {filter !== 'all' ? filter : ''} applications to display.
               </p>
               {filter !== 'pending' && (
@@ -967,21 +992,21 @@ const Applications = () => {
       {/* Receipt Modal */}
       {showReceiptModal && selectedReceipt && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setShowReceiptModal(false)}>
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800">Payment Receipt</h3>
-              <button onClick={() => setShowReceiptModal(false)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Payment Receipt</h3>
+              <button onClick={() => setShowReceiptModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
               <img 
                 src={selectedReceipt} 
                 alt="Payment Receipt"
                 className="max-w-full h-auto mx-auto rounded-lg shadow-lg"
               />
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t border-gray-200">
+            <div className="flex justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
               <a 
                 href={selectedReceipt} 
                 download="payment-receipt.jpg"
@@ -994,7 +1019,7 @@ const Applications = () => {
               </a>
               <button 
                 onClick={() => setShowReceiptModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors dark:text-gray-300"
               >
                 Close
               </button>

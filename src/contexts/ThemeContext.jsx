@@ -22,10 +22,10 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     if (isDarkMode) {
-      document.documentElement.classList.add("dark-mode");
+      document.documentElement.classList.add("dark"); // Changed from "dark-mode" to "dark"
       localStorage.setItem("theme", "dark");
     } else {
-      document.documentElement.classList.remove("dark-mode");
+      document.documentElement.classList.remove("dark"); // Changed from "dark-mode" to "dark"
       localStorage.setItem("theme", "light");
     }
   }, [isDarkMode]);

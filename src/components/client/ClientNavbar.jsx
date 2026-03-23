@@ -1,4 +1,4 @@
-// src/components/client/ClientNavbar.jsx - UPDATED with expiration notification icons and plan name support
+// src/components/client/ClientNavbar.jsx - FIXED duplicate notifications issue
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -9,7 +9,6 @@ import RenewMembershipModal from "../../pages/RenewMembershipModal";
 import {
   Bell,
   User,
-  Settings,
   LogOut,
   ChevronDown,
   LayoutDashboard,
@@ -29,7 +28,6 @@ import {
   Crown,
   Shield,
   Camera,
-  HelpCircle,
   Moon,
   Sun,
   Mail as MailIcon,
@@ -54,7 +52,10 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     businessName: null,
     planName: null
   });
+  
   const subscriptionRef = useRef(null);
+  const initialLoadRef = useRef(false);
+  const processedNotificationIds = useRef(new Set()); // Track processed notification IDs
 
   const { isDarkMode, toggleTheme } = useTheme();
 
@@ -78,13 +79,11 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     // Initial fetch of notifications
     fetchNotifications();
 
+    // Only setup subscription once
+    if (subscriptionRef.current) return;
+
     // Setup real-time subscription
     const setupSubscription = async () => {
-      // Clean up existing subscription
-      if (subscriptionRef.current) {
-        await subscriptionRef.current.unsubscribe();
-      }
-
       // Create new subscription
       const subscription = supabase
         .channel(`navbar-notifications-${user.id}`)
@@ -98,12 +97,30 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
           },
           (payload) => {
             console.log("New notification received:", payload);
+            
+            // Check if we already processed this notification ID
+            if (processedNotificationIds.current.has(payload.new.id)) {
+              console.log("Duplicate notification ignored:", payload.new.id);
+              return;
+            }
+            
+            // Add to processed set
+            processedNotificationIds.current.add(payload.new.id);
+            
+            // Clean up old IDs from set (keep last 50)
+            if (processedNotificationIds.current.size > 50) {
+              const toDelete = [...processedNotificationIds.current].slice(0, 25);
+              toDelete.forEach(id => processedNotificationIds.current.delete(id));
+            }
+            
             // Add new notification to the list
             setNotifications(prev => {
+              // Double-check that we don't have it already
               const exists = prev.some(n => n.id === payload.new.id);
               if (exists) return prev;
               return [payload.new, ...prev].slice(0, 10);
             });
+            
             setUnreadCount(prev => prev + 1);
             
             // Browser notification
@@ -125,12 +142,15 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
           },
           (payload) => {
             console.log("Notification updated:", payload);
+            
             // Update notification read status
             setNotifications(prev =>
               prev.map(n => 
                 n.id === payload.new.id ? { ...n, ...payload.new } : n
               )
             );
+            
+            // Only decrement if it was unread and now is read
             if (payload.new.is_read === true && payload.old.is_read === false) {
               setUnreadCount(prev => Math.max(0, prev - 1));
             }
@@ -154,9 +174,11 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
     return () => {
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
       }
+      processedNotificationIds.current.clear();
     };
-  }, [user?.id]);
+  }, [user?.id]); // Only re-run when user ID changes
 
   // Update unread count when prop changes
   useEffect(() => {
@@ -208,6 +230,14 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
         .limit(10);
 
       if (error) throw error;
+
+      // Clear processed IDs for initial load
+      processedNotificationIds.current.clear();
+      
+      // Add all fetched notification IDs to processed set
+      data?.forEach(notification => {
+        processedNotificationIds.current.add(notification.id);
+      });
 
       setNotifications(data || []);
       const unread = data?.filter((n) => !n.is_read).length || 0;
@@ -777,7 +807,7 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                       </div>
                     </div>
 
-                    {/* Menu Items */}
+                    {/* Menu Items - Settings and Help & Support REMOVED */}
                     <div className="p-2">
                       <button
                         onClick={() => handleNavigation("/profile")}
@@ -848,74 +878,6 @@ const ClientNavbar = ({ profile, avatarUrl, unreadCount: propUnreadCount }) => {
                             {unreadCount}
                           </span>
                         )}
-                      </button>
-
-                      <button
-                        onClick={() => handleNavigation("/settings")}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                          isDarkMode
-                            ? "text-gray-200 hover:bg-gray-700"
-                            : "text-gray-700 hover:bg-gray-100"
-                        }`}
-                      >
-                        <div
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                            isDarkMode
-                              ? "bg-gray-700 group-hover:bg-gray-600"
-                              : "bg-gray-100 group-hover:bg-gray-600"
-                          }`}
-                        >
-                          <Settings
-                            className={`w-4 h-4 ${
-                              isDarkMode
-                                ? "text-gray-400 group-hover:text-white"
-                                : "text-gray-600 group-hover:text-white"
-                            }`}
-                          />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <span className="font-medium block">Settings</span>
-                          <span
-                            className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                          >
-                            Account preferences
-                          </span>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => handleNavigation("/help")}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                          isDarkMode
-                            ? "text-gray-200 hover:bg-gray-700"
-                            : "text-gray-700 hover:bg-purple-50"
-                        }`}
-                      >
-                        <div
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                            isDarkMode
-                              ? "bg-gray-700 group-hover:bg-purple-600"
-                              : "bg-purple-100 group-hover:bg-purple-600"
-                          }`}
-                        >
-                          <HelpCircle
-                            className={`w-4 h-4 ${
-                              isDarkMode
-                                ? "text-gray-400 group-hover:text-white"
-                                : "text-purple-600 group-hover:text-white"
-                            }`}
-                          />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <span className="font-medium block">
-                            Help & Support
-                          </span>
-                          <span
-                            className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                          >
-                            Get assistance
-                          </span>
-                        </div>
                       </button>
 
                       <div

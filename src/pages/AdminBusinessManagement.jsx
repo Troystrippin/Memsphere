@@ -181,37 +181,27 @@ const AdminBusinessManagement = () => {
         }
       }
 
-      // Log verification
-      await supabase
-        .from('verification_logs')
-        .insert({
-          business_id: business.id,
-          owner_id: business.owner_id,
-          action_by: adminProfile?.id || null,
-          action_type: 'approve',
-          created_at: new Date().toISOString()
-        });
-
-      // Notify business owner
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: business.owner_id,
-          type: 'business_approved',
-          title: '✅ Business Approved!',
-          message: `Your business "${business.name}" has been verified and approved with your business permit.`,
-          data: { 
-            businessId: business.id,
-            businessName: business.name
-          },
-          created_at: new Date().toISOString()
-        });
+      // Log verification - wrap in try/catch to avoid breaking if table doesn't exist
+      try {
+        await supabase
+          .from('verification_logs')
+          .insert({
+            business_id: business.id,
+            owner_id: business.owner_id,
+            action_by: adminProfile?.id || null,
+            action_type: 'approve',
+            created_at: new Date().toISOString()
+          });
+      } catch (logError) {
+        console.error('Log error (non-critical):', logError);
+        // Don't throw, just log
+      }
 
       await fetchBusinesses();
       alert('Business approved successfully!');
     } catch (error) {
       console.error('Error approving business:', error);
-      alert('Failed to approve business. Please try again.');
+      alert(`Failed to approve business: ${error.message || 'Please try again.'}`);
     } finally {
       setActionLoading(prev => ({ ...prev, [business.id]: null }));
     }
@@ -227,12 +217,12 @@ const AdminBusinessManagement = () => {
         .eq('role', 'admin')
         .maybeSingle();
 
-      // Update business to rejected
+      // Update business to rejected - use 'inactive' for status since 'rejected' is not allowed
       const { error: businessError } = await supabase
         .from('businesses')
         .update({ 
-          verification_status: 'rejected',
-          status: 'rejected',
+          verification_status: 'rejected',  // This is allowed in verification_status
+          status: 'inactive',               // Changed from 'rejected' to 'inactive' (allowed in status)
           rejection_reason: reason,
           permit_verified: false,
           verified_at: new Date().toISOString(),
@@ -241,41 +231,33 @@ const AdminBusinessManagement = () => {
         })
         .eq('id', business.id);
 
-      if (businessError) throw businessError;
+      if (businessError) {
+        console.error('Business update error:', businessError);
+        throw businessError;
+      }
 
-      // Log rejection
-      await supabase
-        .from('verification_logs')
-        .insert({
-          business_id: business.id,
-          owner_id: business.owner_id,
-          action_by: adminProfile?.id || null,
-          action_type: 'reject',
-          reason: reason,
-          created_at: new Date().toISOString()
-        });
-
-      // Notify business owner
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: business.owner_id,
-          type: 'business_rejected',
-          title: '❌ Business Application Update',
-          message: reason || `Your business "${business.name}" was not approved. Please check your permit and try again.`,
-          data: { 
-            businessId: business.id,
-            businessName: business.name,
-            reason: reason
-          },
-          created_at: new Date().toISOString()
-        });
+      // Log rejection - wrap in try/catch to avoid breaking if table doesn't exist
+      try {
+        await supabase
+          .from('verification_logs')
+          .insert({
+            business_id: business.id,
+            owner_id: business.owner_id,
+            action_by: adminProfile?.id || null,
+            action_type: 'reject',
+            reason: reason,
+            created_at: new Date().toISOString()
+          });
+      } catch (logError) {
+        console.error('Log error (non-critical):', logError);
+        // Don't throw, just log
+      }
 
       await fetchBusinesses();
       alert('Business rejected successfully.');
     } catch (error) {
       console.error('Error rejecting business:', error);
-      alert('Failed to reject business. Please try again.');
+      alert(`Failed to reject business: ${error.message || 'Please try again.'}`);
     } finally {
       setActionLoading(prev => ({ ...prev, [business.id]: null }));
       setShowRejectionModal(false);
@@ -310,11 +292,29 @@ const AdminBusinessManagement = () => {
 
       if (error) throw error;
 
+      // Log verification - wrap in try/catch
+      try {
+        const business = businesses.find(b => b.id === businessId);
+        if (business) {
+          await supabase
+            .from('verification_logs')
+            .insert({
+              business_id: businessId,
+              owner_id: business.owner_id,
+              action_by: adminProfile?.id || null,
+              action_type: 'verify_permit',
+              created_at: new Date().toISOString()
+            });
+        }
+      } catch (logError) {
+        console.error('Log error (non-critical):', logError);
+      }
+
       await fetchBusinesses();
       alert('Permit verified successfully!');
     } catch (error) {
       console.error('Error verifying permit:', error);
-      alert('Failed to verify permit. Please try again.');
+      alert(`Failed to verify permit: ${error.message || 'Please try again.'}`);
     } finally {
       setActionLoading(prev => ({ ...prev, [businessId]: null }));
     }
@@ -336,26 +336,11 @@ const AdminBusinessManagement = () => {
 
       if (error) throw error;
 
-      // Notify owner
-      const business = businesses.find(b => b.id === businessId);
-      if (business) {
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: business.owner_id,
-            type: 'business_suspended',
-            title: '⚠️ Business Suspended',
-            message: `Your business "${business.name}" has been suspended. Please contact admin for more information.`,
-            data: { businessId },
-            created_at: new Date().toISOString()
-          });
-      }
-
       await fetchBusinesses();
       alert('Business suspended successfully!');
     } catch (error) {
       console.error('Error suspending business:', error);
-      alert('Failed to suspend business. Please try again.');
+      alert(`Failed to suspend business: ${error.message || 'Please try again.'}`);
     } finally {
       setActionLoading(prev => ({ ...prev, [businessId]: null }));
     }
@@ -377,26 +362,11 @@ const AdminBusinessManagement = () => {
 
       if (error) throw error;
 
-      // Notify owner
-      const business = businesses.find(b => b.id === businessId);
-      if (business) {
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: business.owner_id,
-            type: 'business_activated',
-            title: '✅ Business Activated',
-            message: `Your business "${business.name}" has been activated and is now visible to customers.`,
-            data: { businessId },
-            created_at: new Date().toISOString()
-          });
-      }
-
       await fetchBusinesses();
       alert('Business activated successfully!');
     } catch (error) {
       console.error('Error activating business:', error);
-      alert('Failed to activate business. Please try again.');
+      alert(`Failed to activate business: ${error.message || 'Please try again.'}`);
     } finally {
       setActionLoading(prev => ({ ...prev, [businessId]: null }));
     }
@@ -419,7 +389,7 @@ const AdminBusinessManagement = () => {
       alert('Business deleted successfully.');
     } catch (error) {
       console.error('Error deleting business:', error);
-      alert('Failed to delete business. Please try again.');
+      alert(`Failed to delete business: ${error.message || 'Please try again.'}`);
     } finally {
       setActionLoading(prev => ({ ...prev, [businessId]: null }));
     }
@@ -469,6 +439,8 @@ const AdminBusinessManagement = () => {
         return <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Pending</span>;
       case 'suspended':
         return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">Suspended</span>;
+      case 'inactive':
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Inactive (Rejected)</span>;
       case 'rejected':
         return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Rejected</span>;
       default:
@@ -610,7 +582,7 @@ const AdminBusinessManagement = () => {
                 <option value="active">Active</option>
                 <option value="pending">Pending</option>
                 <option value="suspended">Suspended</option>
-                <option value="rejected">Rejected</option>
+                <option value="inactive">Inactive (Rejected)</option>
               </select>
 
               <select
@@ -792,7 +764,7 @@ const AdminBusinessManagement = () => {
                           <>✓ Activate</>
                         )}
                       </button>
-                    ) : business.status === 'rejected' && business.permit_document && (
+                    ) : business.status === 'inactive' && business.permit_document && (
                       <button
                         onClick={() => handleApproveBusiness(business)}
                         disabled={actionLoading[business.id]}
@@ -853,7 +825,7 @@ const AdminBusinessManagement = () => {
           </div>
         )}
 
-        {/* Business Details Modal - Tailwind Styled */}
+        {/* Business Details Modal */}
         <AnimatePresence>
           {showDetailsModal && selectedBusiness && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDetailsModal(false)}>

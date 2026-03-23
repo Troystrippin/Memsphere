@@ -278,7 +278,7 @@ const Profile = () => {
       setStats({
         totalSpent,
         activeMemberships: activeCount || 0,
-        totalVisits: activeCount || 0, // Assuming visits = active memberships for now
+        totalVisits: activeCount || 0,
         memberSince: user?.created_at || profile?.created_at,
         pendingApplications: pendingCount || 0,
         totalBusinessesFollowed,
@@ -492,7 +492,7 @@ const Profile = () => {
       }
 
       alert("Avatar uploaded successfully!");
-      await fetchAchievements(user.id); // Refresh achievements
+      await fetchAchievements(user.id);
     } catch (error) {
       console.error("Error in uploadAvatar:", error);
       alert(error.message || "Error uploading avatar!");
@@ -520,7 +520,7 @@ const Profile = () => {
 
       setIsEditing(false);
       alert("Profile updated successfully!");
-      await fetchAchievements(user.id); // Refresh achievements
+      await fetchAchievements(user.id);
     } catch (error) {
       console.error("Error updating profile:", error);
       alert("Failed to update profile. Please try again.");
@@ -710,28 +710,14 @@ const Profile = () => {
     });
   };
 
+  // Loading screen with consistent layout
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="text-center"
-        >
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="w-20 h-20 border-4 border-sky-200 border-t-sky-600 rounded-full mx-auto mb-4"
-          ></motion.div>
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-gray-600 font-medium"
-          >
-            Loading your profile...
-          </motion.p>
-        </motion.div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
+        <div className="text-center select-none">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4 select-none"></div>
+          <p className="text-gray-600 font-medium select-none">Loading your profile...</p>
+        </div>
       </div>
     );
   }
@@ -756,10 +742,10 @@ const Profile = () => {
         <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
       )}
 
-      {/* Main Content - Full Screen with padding-top for navbar */}
-      <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 min-h-screen">
+      {/* Main Content - with proper navbar spacing */}
+      <div className="pt-20 pb-16 px-4 sm:px-6 lg:px-8 min-h-screen">
         <div className="max-w-7xl mx-auto">
-          {/* Animated Floating Background Elements - Sky Blue */}
+          {/* Animated Floating Background Elements */}
           <div className="fixed inset-0 pointer-events-none overflow-hidden">
             <motion.div
               animate={{
@@ -790,21 +776,21 @@ const Profile = () => {
             />
           </div>
 
-          {/* Left Sidebar Widget */}
-          <div className="hidden xl:block fixed left-4 top-1/2 -translate-y-1/2 w-80">
+          {/* Left Sidebar Widget - Fixed position */}
+          <div className="hidden xl:block fixed left-6 top-1/2 -translate-y-1/2 w-80 z-10">
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2, type: "spring" }}
               className="space-y-4"
             >
-              {/* Quick Stats Card - REAL DATA */}
+              {/* Quick Stats Card */}
               <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="w-5 h-5 text-sky-600" />
                   <h3 className="font-semibold text-gray-800">Quick Stats</h3>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Active Memberships</span>
                     <span className="text-lg font-bold text-sky-600">{stats.activeMemberships}</span>
@@ -832,7 +818,7 @@ const Profile = () => {
                 </div>
               </div>
 
-              {/* Achievements Card - REAL DATA */}
+              {/* Achievements Card */}
               <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -841,7 +827,7 @@ const Profile = () => {
                   </div>
                   <span className="text-xs text-gray-500">{completedAchievements}/{totalAchievements}</span>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[320px] overflow-y-auto custom-scrollbar pr-2">
                   {achievements.slice(0, 5).map((achievement) => (
                     <div key={achievement.id} className="group">
                       <div className="flex items-center justify-between mb-1">
@@ -869,17 +855,12 @@ const Profile = () => {
                     </div>
                   ))}
                 </div>
-                {completedAchievements === totalAchievements && totalAchievements > 0 && (
-                  <div className="mt-4 p-2 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg text-center">
-                    <p className="text-xs text-yellow-700">🏆 Achievement Unlocked! You're a Pro!</p>
-                  </div>
-                )}
               </div>
             </motion.div>
           </div>
 
-          {/* Right Sidebar Widget - Recent Activity REAL DATA */}
-          <div className="hidden xl:block fixed right-4 top-1/2 -translate-y-1/2 w-80">
+          {/* Right Sidebar Widget - Recent Activity */}
+          <div className="hidden xl:block fixed right-6 top-1/2 -translate-y-1/2 w-80 z-10">
             <motion.div
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
@@ -897,7 +878,7 @@ const Profile = () => {
                     <div className="w-8 h-8 border-2 border-sky-200 border-t-sky-600 rounded-full animate-spin mx-auto"></div>
                   </div>
                 ) : recentActivities.length > 0 ? (
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                     {recentActivities.map((activity) => (
                       <motion.div
                         key={activity.id}
@@ -908,7 +889,7 @@ const Profile = () => {
                           {activity.icon}
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm text-gray-700">{activity.action}</p>
+                          <p className="text-sm text-gray-700 line-clamp-2">{activity.action}</p>
                           <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
                         </div>
                         {!activity.isRead && <div className="w-2 h-2 bg-sky-500 rounded-full"></div>}
@@ -920,11 +901,6 @@ const Profile = () => {
                     <Bell className="w-12 h-12 text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">No recent activity</p>
                   </div>
-                )}
-                {recentActivities.length > 0 && (
-                  <button className="mt-4 w-full text-center text-xs text-sky-600 hover:text-sky-700 font-medium transition-colors">
-                    View all activity →
-                  </button>
                 )}
               </div>
 
@@ -956,9 +932,9 @@ const Profile = () => {
             </motion.div>
           </div>
 
-          {/* Main Content - Centered */}
-          <div className="xl:mx-80">
-            {/* Profile Card */}
+          {/* Main Content - Wider Profile Card */}
+          <div className="lg:mx-80 xl:mx-72 2xl:mx-64">
+            {/* Profile Card - Made wider by adjusting margins */}
             <motion.div
               initial={{ opacity: 0, y: 30, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -993,33 +969,9 @@ const Profile = () => {
                   className="absolute inset-0 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600"
                 />
                 <div className="absolute inset-0 bg-black/20" />
-                
-                {/* Floating Particles */}
-                {[...Array(20)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{
-                      opacity: [0, 0.5, 0],
-                      scale: [0, 1, 0],
-                      x: [Math.random() * window.innerWidth, Math.random() * window.innerWidth],
-                      y: [Math.random() * 200, Math.random() * 200],
-                    }}
-                    transition={{
-                      duration: 3 + Math.random() * 2,
-                      repeat: Infinity,
-                      delay: Math.random() * 2,
-                    }}
-                    className="absolute w-2 h-2 bg-white/60 rounded-full"
-                    style={{
-                      left: `${Math.random() * 100}%`,
-                      top: `${Math.random() * 100}%`,
-                    }}
-                  />
-                ))}
               </div>
 
-              {/* Avatar Section */}
+              {/* Avatar Section - CIRCULAR */}
               <div className="relative px-8 sm:px-12">
                 <motion.div
                   initial={{ scale: 0, rotate: -180 }}
@@ -1031,16 +983,16 @@ const Profile = () => {
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.98 }}
-                      className="w-32 h-32 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-500 p-1 shadow-2xl"
+                      className="w-32 h-32 rounded-full bg-gradient-to-r from-sky-500 to-blue-500 p-1 shadow-2xl"
                     >
                       {avatarUrl ? (
                         <img
                           src={avatarUrl}
                           alt={fullName}
-                          className="w-full h-full rounded-xl object-cover"
+                          className="w-full h-full rounded-full object-cover"
                         />
                       ) : (
-                        <div className={`w-full h-full rounded-xl bg-gradient-to-br ${roleGradient} flex items-center justify-center`}>
+                        <div className={`w-full h-full rounded-full bg-gradient-to-br ${roleGradient} flex items-center justify-center`}>
                           <span className="text-4xl font-bold text-white">
                             {initials}
                           </span>
@@ -1051,7 +1003,7 @@ const Profile = () => {
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                       htmlFor="avatar-upload"
-                      className="absolute bottom-0 right-0 p-2 bg-white rounded-full cursor-pointer shadow-lg border-2 border-gray-200 hover:shadow-xl transition-all"
+                      className="absolute bottom-1 right-1 p-2 bg-white rounded-full cursor-pointer shadow-lg border-2 border-gray-200 hover:shadow-xl transition-all"
                     >
                       <Camera className="w-4 h-4 text-gray-600" />
                       <input
@@ -1067,7 +1019,7 @@ const Profile = () => {
                       <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center"
+                        className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center"
                       >
                         <motion.div
                           animate={{ rotate: 360 }}
@@ -1086,6 +1038,7 @@ const Profile = () => {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.2 }}
+                      className="flex-1"
                     >
                       <div className="flex items-center gap-3 mb-3 flex-wrap">
                         <motion.h1
@@ -1137,7 +1090,7 @@ const Profile = () => {
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.25 }}
-                      className="flex gap-3"
+                      className="flex gap-3 flex-shrink-0"
                     >
                       {!isEditing ? (
                         <>
@@ -1145,11 +1098,11 @@ const Profile = () => {
                             whileHover={{ scale: 1.05, y: -2 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => setIsEditing(true)}
-                            className="group relative px-8 py-3 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden"
+                            className="group relative px-6 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden whitespace-nowrap"
                           >
                             <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            <div className="relative flex items-center gap-3">
-                              <Edit2 className="w-5 h-5" />
+                            <div className="relative flex items-center gap-2">
+                              <Edit2 className="w-4 h-4" />
                               <span>Edit Profile</span>
                             </div>
                           </motion.button>
@@ -1157,11 +1110,11 @@ const Profile = () => {
                             whileHover={{ scale: 1.05, y: -2 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => setIsChangingPassword(true)}
-                            className="group relative px-8 py-3 bg-white text-gray-700 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-gray-200 overflow-hidden"
+                            className="group relative px-6 py-2.5 bg-white text-gray-700 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-gray-200 overflow-hidden whitespace-nowrap"
                           >
                             <div className="absolute inset-0 bg-gradient-to-r from-gray-50 to-gray-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            <div className="relative flex items-center gap-3">
-                              <Lock className="w-5 h-5" />
+                            <div className="relative flex items-center gap-2">
+                              <Lock className="w-4 h-4" />
                               <span>Change Password</span>
                             </div>
                           </motion.button>
@@ -1173,18 +1126,18 @@ const Profile = () => {
                             whileTap={{ scale: 0.98 }}
                             onClick={handleSaveProfile}
                             disabled={saving}
-                            className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-3"
+                            className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 whitespace-nowrap"
                           >
-                            <Save className="w-5 h-5" />
+                            <Save className="w-4 h-4" />
                             {saving ? "Saving..." : "Save Changes"}
                           </motion.button>
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => setIsEditing(false)}
-                            className="px-8 py-3 bg-gray-100 text-gray-700 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-3"
+                            className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 whitespace-nowrap"
                           >
-                            <X className="w-5 h-5" />
+                            <X className="w-4 h-4" />
                             Cancel
                           </motion.button>
                         </>
@@ -1296,192 +1249,7 @@ const Profile = () => {
               </div>
             </motion.div>
 
-            {/* Memberships Section - Only for Clients */}
-            {userData.role === "client" && (
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, type: "spring", stiffness: 100 }}
-                className="mt-8"
-              >
-                <div className="flex items-center gap-3 mb-6">
-                  <motion.div
-                    animate={{ rotate: [0, 10, -10, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                  >
-                    <Award className="w-8 h-8 text-sky-600" />
-                  </motion.div>
-                  <h2 className="text-2xl font-bold text-gray-800">My Memberships</h2>
-                </div>
-
-                {loadingMemberships ? (
-                  <div className="text-center py-12">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      className="w-12 h-12 border-4 border-sky-200 border-t-sky-600 rounded-full mx-auto mb-4"
-                    />
-                    <p className="text-gray-500">Loading your memberships...</p>
-                  </div>
-                ) : memberships.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {memberships.map((membership, index) => (
-                      <motion.div
-                        key={membership.id}
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 + index * 0.1 }}
-                        whileHover={{ y: -8, scale: 1.02 }}
-                        className="group relative bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-300"
-                      >
-                        {/* Animated Border */}
-                        <motion.div
-                          animate={{
-                            backgroundPosition: ["0% 0%", "100% 100%"],
-                          }}
-                          transition={{
-                            duration: 5,
-                            repeat: Infinity,
-                            ease: "linear",
-                          }}
-                          className="absolute inset-0 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                          style={{ backgroundSize: "200% 200%" }}
-                        />
-                        <div className="relative bg-white m-[2px] rounded-2xl overflow-hidden">
-                          <div className="p-6">
-                            {/* Business Header */}
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex items-center gap-3">
-                                <motion.div
-                                  whileHover={{ scale: 1.1, rotate: 5 }}
-                                  className="w-14 h-14 rounded-xl bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-3xl shadow-lg"
-                                >
-                                  {membership.businesses?.emoji || "🏢"}
-                                </motion.div>
-                                <div>
-                                  <h3 className="font-bold text-gray-800 text-lg">
-                                    {membership.businesses?.name}
-                                  </h3>
-                                  <div className="flex items-center gap-1 text-sm text-gray-500">
-                                    <Crown className="w-3 h-3" />
-                                    <span>{membership.businesses?.owner_name}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <motion.span
-                                whileHover={{ scale: 1.05 }}
-                                className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-md ${getStatusBadgeClass(membership.status)}`}
-                              >
-                                {membership.status.toUpperCase()}
-                              </motion.span>
-                            </div>
-
-                            {/* Plan Details */}
-                            <div className="mb-4">
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-bold text-sky-600">
-                                  ₱{membership.membership_plans?.price?.toLocaleString()}
-                                </span>
-                                <span className="text-gray-500 text-sm">/{membership.membership_plans?.duration}</span>
-                              </div>
-                              <p className="font-semibold text-gray-700 mt-1">{membership.membership_plans?.name}</p>
-                            </div>
-
-                            {/* Payment Method */}
-                            <div className="flex items-center gap-2 text-sm text-gray-600 mb-3 p-2 bg-gray-50 rounded-lg">
-                              {getPaymentMethodIcon(membership.payment_method)}
-                              <span>{getPaymentMethodLabel(membership.payment_method)}</span>
-                            </div>
-
-                            {/* Dates */}
-                            <div className="space-y-2 text-sm border-t border-gray-100 pt-3">
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Started:</span>
-                                <span className="text-gray-700 font-medium">{formatDate(membership.start_date)}</span>
-                              </div>
-                              {membership.end_date && (
-                                <div className="flex justify-between">
-                                  <span className="text-gray-500">Valid until:</span>
-                                  <motion.span
-                                    animate={{ scale: [1, 1.05, 1] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                    className="text-green-600 font-bold"
-                                  >
-                                    {formatDate(membership.end_date)}
-                                  </motion.span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Features */}
-                            {membership.membership_plans?.features && membership.membership_plans.features.length > 0 && (
-                              <div className="mt-4 pt-3 border-t border-gray-100">
-                                <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                                  <Star className="w-3 h-3" />
-                                  Features:
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {membership.membership_plans.features.slice(0, 3).map((feature, idx) => (
-                                    <motion.span
-                                      key={idx}
-                                      whileHover={{ scale: 1.05 }}
-                                      className="px-2 py-1 bg-gradient-to-r from-sky-50 to-blue-50 text-gray-700 text-xs rounded-lg"
-                                    >
-                                      {feature}
-                                    </motion.span>
-                                  ))}
-                                  {membership.membership_plans.features.length > 3 && (
-                                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg">
-                                      +{membership.membership_plans.features.length - 3} more
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Action Button */}
-                            <motion.button
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => navigate("/browse")}
-                              className="w-full mt-4 px-4 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all"
-                            >
-                              View Business
-                            </motion.button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-white rounded-2xl shadow-xl p-12 text-center"
-                  >
-                    <motion.div
-                      animate={{ y: [0, -10, 0] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="text-7xl mb-4"
-                    >
-                      📋
-                    </motion.div>
-                    <h3 className="text-xl font-semibold text-gray-800 mb-2">No Memberships Found</h3>
-                    <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                      You haven't joined any businesses yet or your memberships are pending approval.
-                    </p>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => navigate("/browse")}
-                      className="px-6 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
-                    >
-                      Browse Businesses
-                    </motion.button>
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
+            {/* Memberships Section - REMOVED */}
           </div>
         </div>
       </div>
@@ -1688,6 +1456,24 @@ const Profile = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Custom Scrollbar Styles */}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #3b82f6;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #2563eb;
+        }
+      `}</style>
     </div>
   );
 };
