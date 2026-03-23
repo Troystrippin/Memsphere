@@ -1,6 +1,6 @@
-import React from 'react';
-import '../styles/LandingPage.css';
-import { useNavigate } from 'react-router-dom';
+import React from "react";
+import "../styles/LandingPage.css";
+import { useNavigate } from "react-router-dom";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -14,20 +14,21 @@ const LandingPage = () => {
           MEMSPHERE
         </div>
         <ul className="nav-menu">
-          <li><a href="#features">Features</a></li>
-          <li><a href="#about">About</a></li>
           <li>
-            <button 
-              className="btn-outline" 
-              onClick={() => navigate('/login')}
-            >
+            <a href="#features">Features</a>
+          </li>
+          <li>
+            <a href="#about">About</a>
+          </li>
+          <li>
+            <button className="btn-outline" onClick={() => navigate("/login")}>
               Sign In
             </button>
           </li>
           <li>
-            <button 
-              className="btn-primary" 
-              onClick={() => navigate('/register')}
+            <button
+              className="btn-primary"
+              onClick={() => navigate("/register")}
             >
               Get Started
             </button>
@@ -40,19 +41,21 @@ const LandingPage = () => {
         <div className="hero-content">
           <div className="hero-badge">🚀 For Membership-Based Businesses</div>
           <h1 className="hero-title">
-            Smart Membership <span className="gradient-text">Management</span> System
+            Smart Membership <span className="gradient-text">Management</span>{" "}
+            System
           </h1>
           <p className="hero-subtitle">
             Simplify member tracking, renewals, and payments—all in one place
           </p>
           <p className="hero-description">
-            From gyms and clubs to co-working spaces and subscription services, 
-            Memsphere helps you manage memberships effortlessly while you focus on growing your business.
+            From gyms and clubs to co-working spaces and subscription services,
+            Memsphere helps you manage memberships effortlessly while you focus
+            on growing your business.
           </p>
           <div className="hero-content-buttons">
-            <button 
-              className="btn-primary btn-large" 
-              onClick={() => navigate('/register')}
+            <button
+              className="btn-primary btn-large"
+              onClick={() => navigate("/register")}
             >
               Get Started
             </button>
@@ -96,7 +99,7 @@ const LandingPage = () => {
         <p className="section-subtitle">
           Three powerful portals, one integrated platform
         </p>
-        
+
         <div className="personas-grid">
           <div className="persona-card">
             <div className="persona-icon">👤</div>
@@ -109,7 +112,7 @@ const LandingPage = () => {
               <li>✓ Receive announcements</li>
             </ul>
           </div>
-          
+
           <div className="persona-card featured">
             <div className="persona-icon">💼</div>
             <h3>Business Owners</h3>
@@ -121,7 +124,7 @@ const LandingPage = () => {
               <li>✓ View revenue reports</li>
             </ul>
           </div>
-          
+
           <div className="persona-card">
             <div className="persona-icon">⚙️</div>
             <h3>System Admins</h3>
@@ -142,38 +145,38 @@ const LandingPage = () => {
         <p className="section-subtitle">
           Everything you need to run a successful membership business
         </p>
-        
+
         <div className="features-grid">
           <div className="feature-card">
             <div className="feature-icon">📋</div>
             <h3>Application Management</h3>
             <p>Streamlined membership applications with approval workflows</p>
           </div>
-          
+
           <div className="feature-card">
             <div className="feature-icon">🔄</div>
             <h3>Renewal Tracking</h3>
             <p>Automated reminders for upcoming membership renewals</p>
           </div>
-          
+
           <div className="feature-card">
             <div className="feature-icon">💰</div>
             <h3>Payment Tracking</h3>
             <p>Mark payments as received and track monthly revenue</p>
           </div>
-          
+
           <div className="feature-card">
             <div className="feature-icon">📊</div>
             <h3>Member Analytics</h3>
             <p>Insights into active members, pending renewals, and growth</p>
           </div>
-          
+
           <div className="feature-card">
             <div className="feature-icon">📢</div>
             <h3>Announcements</h3>
             <p>Send messages and updates to your members instantly</p>
           </div>
-          
+
           <div className="feature-card">
             <div className="feature-icon">🔐</div>
             <h3>Role-Based Access</h3>
@@ -187,8 +190,10 @@ const LandingPage = () => {
         <div className="dashboard-container">
           <div className="dashboard-content">
             <h2>Complete Business Control</h2>
-            <p>See exactly what's happening with your memberships at a glance</p>
-            
+            <p>
+              See exactly what's happening with your memberships at a glance
+            </p>
+
             <div className="dashboard-stats-grid">
               <div className="dashboard-stat-item">
                 <div className="stat-icon">👥</div>
@@ -248,8 +253,10 @@ const LandingPage = () => {
       {/* How It Works */}
       <section className="how-it-works">
         <h2 className="section-title">Simple 3-Step Process</h2>
-        <p className="section-subtitle">Get started with Memsphere in minutes</p>
-        
+        <p className="section-subtitle">
+          Get started with Memsphere in minutes
+        </p>
+
         <div className="steps-container">
           <div className="step">
             <div className="step-number">1</div>
@@ -275,28 +282,44 @@ const LandingPage = () => {
           <div className="footer-section">
             <h4>MEMSPHERE</h4>
             <p>Smart Membership Management</p>
-            <p className="footer-address">© 2024 Memsphere. All rights reserved.</p>
+            <p className="footer-address">
+              © 2024 Memsphere. All rights reserved.
+            </p>
           </div>
           <div className="footer-section">
             <h4>Product</h4>
             <ul>
-              <li><a href="#features">Features</a></li>
-              <li><a href="#faq">FAQ</a></li>
+              <li>
+                <a href="#features">Features</a>
+              </li>
+              <li>
+                <a href="#faq">FAQ</a>
+              </li>
             </ul>
           </div>
           <div className="footer-section">
             <h4>Company</h4>
             <ul>
-              <li><a href="#about">About</a></li>
-              <li><a href="#contact">Contact</a></li>
+              <li>
+                <a href="#about">About</a>
+              </li>
+              <li>
+                <a href="#contact">Contact</a>
+              </li>
             </ul>
           </div>
           <div className="footer-section">
             <h4>Legal</h4>
             <ul>
-              <li><a href="#privacy">Privacy</a></li>
-              <li><a href="#terms">Terms</a></li>
-              <li><a href="#security">Security</a></li>
+              <li>
+                <a href="#privacy">Privacy</a>
+              </li>
+              <li>
+                <a href="#terms">Terms</a>
+              </li>
+              <li>
+                <a href="#security">Security</a>
+              </li>
             </ul>
           </div>
         </div>

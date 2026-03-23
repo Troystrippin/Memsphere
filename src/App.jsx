@@ -5,7 +5,7 @@ import {
   isSupabaseConfigured,
   testSupabaseConnection,
 } from "./lib/supabase";
-import { DarkModeProvider } from "./contexts/DarkModeContext";
+import { ThemeProvider } from "./contexts/ThemeContext"; // Changed this
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -430,7 +430,7 @@ function App() {
   };
 
   return (
-    <DarkModeProvider>
+    <ThemeProvider>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
@@ -595,7 +595,7 @@ function App() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </DarkModeProvider>
+    </ThemeProvider>
   );
 }
 
