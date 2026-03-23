@@ -86,8 +86,15 @@
 }
 
 @keyframes widthPulse {
-  0%, 100% { width: 80px; opacity: 1; }
-  50% { width: 120px; opacity: 0.7; }
+  0%,
+  100% {
+    width: 80px;
+    opacity: 1;
+  }
+  50% {
+    width: 120px;
+    opacity: 0.7;
+  }
 }
 
 .user-greeting {
@@ -114,11 +121,22 @@
 }
 
 @keyframes wave {
-  0%, 100% { transform: rotate(0deg); }
-  20% { transform: rotate(14deg); }
-  40% { transform: rotate(-8deg); }
-  60% { transform: rotate(14deg); }
-  80% { transform: rotate(-4deg); }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(14deg);
+  }
+  40% {
+    transform: rotate(-8deg);
+  }
+  60% {
+    transform: rotate(14deg);
+  }
+  80% {
+    transform: rotate(-4deg);
+  }
 }
 
 .greeting-text {
@@ -165,7 +183,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ===== MESSAGES ===== */
@@ -205,8 +225,14 @@
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* ===== VERIFICATION BANNER ===== */
@@ -252,8 +278,14 @@
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ===== NO BUSINESS STATE ===== */
@@ -274,8 +306,13 @@
 }
 
 @keyframes gentleBounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
 .no-business-state h2 {
@@ -373,7 +410,8 @@
   gap: 32px;
 }
 
-.left-column, .right-column {
+.left-column,
+.right-column {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -2092,8 +2130,14 @@
 }
 
 @keyframes modalSlideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .modal-header {
@@ -2208,7 +2252,7 @@
   .dashboard-main-full {
     padding: 24px 32px;
   }
-  
+
   .business-tab-content {
     padding: 24px;
   }
@@ -2218,96 +2262,96 @@
   .content-wrapper {
     padding-top: 64px;
   }
-  
+
   .dashboard-main-full {
     padding: 20px;
   }
-  
+
   .dashboard-header {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .page-title {
     font-size: 28px;
   }
-  
+
   .user-greeting {
     padding: 8px 20px;
   }
-  
+
   .business-tabs {
     padding: 0 16px;
   }
-  
+
   .business-tab {
     padding: 12px 16px;
     font-size: 13px;
   }
-  
+
   .business-tab-content {
     padding: 20px;
   }
-  
+
   .two-column-layout {
     grid-template-columns: 1fr;
     gap: 24px;
   }
-  
+
   .form-row {
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  
+
   .status-icon-row {
     flex-direction: column;
     gap: 8px;
   }
-  
+
   .business-hour-row {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
   }
-  
+
   .day-label {
     width: 100%;
   }
-  
+
   .hour-controls {
     width: 100%;
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .time-input {
     width: 100%;
   }
-  
+
   .rating-summary-section {
     grid-template-columns: 1fr;
     gap: 20px;
   }
-  
+
   .review-content,
   .review-footer {
     padding-left: 0;
   }
-  
+
   .review-card-header {
     flex-direction: column;
   }
-  
+
   .business-form-actions {
     flex-direction: column;
     padding: 16px 20px;
   }
-  
+
   .btn-save-business,
   .btn-cancel-edit {
     width: 100%;
   }
-  
+
   .payment-options-preview {
     grid-template-columns: 1fr;
   }
@@ -2317,38 +2361,38 @@
   .dashboard-main-full {
     padding: 16px;
   }
-  
+
   .page-title {
     font-size: 24px;
   }
-  
+
   .business-tab {
     padding: 10px 12px;
     font-size: 12px;
   }
-  
+
   .business-tab-content {
     padding: 16px;
   }
-  
+
   .no-business-state {
     padding: 32px 20px;
   }
-  
+
   .no-business-icon {
     font-size: 56px;
   }
-  
+
   .permit-info {
     flex-direction: column;
     text-align: center;
   }
-  
+
   .payment-info {
     flex-direction: column;
     text-align: center;
   }
-  
+
   .qr-image-large {
     width: 180px;
     height: 180px;
