@@ -22,14 +22,14 @@ const Applications = () => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState({});
   const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [clientAvatars, setClientAvatars] = useState({});
-  const [filter, setFilter] = useState('pending');
+  const [filter, setFilter] = useState("pending");
   const [expandedCard, setExpandedCard] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     fetchUserProfile();
@@ -42,17 +42,20 @@ const Applications = () => {
 
   const fetchUserProfile = async () => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) {
-        navigate('/login');
+        navigate("/login");
         return;
       }
 
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
         .single();
 
       if (profileError) throw profileError;
@@ -62,20 +65,20 @@ const Applications = () => {
         downloadAvatar(profileData.avatar_url);
       }
     } catch (err) {
-      console.error('Error fetching profile:', err);
+      console.error("Error fetching profile:", err);
     }
   };
 
   const downloadAvatar = async (path) => {
     try {
       const { data, error } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .download(path);
       if (error) throw error;
       const url = URL.createObjectURL(data);
       setAvatarUrl(url);
     } catch (error) {
-      console.error('Error downloading avatar:', error);
+      console.error("Error downloading avatar:", error);
     }
   };
 
@@ -84,33 +87,37 @@ const Applications = () => {
     if (clientAvatars[userId]) return clientAvatars[userId];
 
     try {
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('avatars')
+      const { data: publicUrlData } = supabase.storage
+        .from("avatars")
         .getPublicUrl(avatarPath);
-      
+
       if (publicUrlData?.publicUrl) {
         try {
-          const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
+          const response = await fetch(publicUrlData.publicUrl, {
+            method: "HEAD",
+          });
           if (response.ok) {
-            setClientAvatars(prev => ({ ...prev, [userId]: publicUrlData.publicUrl }));
+            setClientAvatars((prev) => ({
+              ...prev,
+              [userId]: publicUrlData.publicUrl,
+            }));
             return publicUrlData.publicUrl;
           }
         } catch (e) {
-          console.log('Public URL not accessible, trying download...');
+          console.log("Public URL not accessible, trying download...");
         }
       }
 
       const { data, error } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .download(avatarPath);
 
       if (error) throw error;
       const url = URL.createObjectURL(data);
-      setClientAvatars(prev => ({ ...prev, [userId]: url }));
+      setClientAvatars((prev) => ({ ...prev, [userId]: url }));
       return url;
     } catch (error) {
-      console.error('Error getting client avatar:', error);
+      console.error("Error getting client avatar:", error);
       return null;
     }
   };
@@ -124,30 +131,31 @@ const Applications = () => {
     if (!receiptPath) return null;
 
     try {
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('payment-receipts')
+      const { data: publicUrlData } = supabase.storage
+        .from("payment-receipts")
         .getPublicUrl(receiptPath);
-      
+
       if (publicUrlData?.publicUrl) {
         try {
-          const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
+          const response = await fetch(publicUrlData.publicUrl, {
+            method: "HEAD",
+          });
           if (response.ok) {
             return publicUrlData.publicUrl;
           }
         } catch (e) {
-          console.log('Public URL not accessible, trying download...');
+          console.log("Public URL not accessible, trying download...");
         }
       }
 
       const { data, error } = await supabase.storage
-        .from('payment-receipts')
+        .from("payment-receipts")
         .download(receiptPath);
 
       if (error) throw error;
       return URL.createObjectURL(data);
     } catch (error) {
-      console.error('Error getting receipt URL:', error);
+      console.error("Error getting receipt URL:", error);
       return null;
     }
   };
@@ -155,17 +163,20 @@ const Applications = () => {
   const fetchApplications = async () => {
     try {
       setLoading(true);
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) {
-        navigate('/login');
+        navigate("/login");
         return;
       }
 
       const { data: businessesData, error: businessesError } = await supabase
-        .from('businesses')
-        .select('id, verification_status')
-        .eq('owner_id', user.id);
+        .from("businesses")
+        .select("id, verification_status")
+        .eq("owner_id", user.id);
 
       if (businessesError) throw businessesError;
 
@@ -175,15 +186,16 @@ const Applications = () => {
         return;
       }
 
-      const businessIds = businessesData.map(b => b.id);
+      const businessIds = businessesData.map((b) => b.id);
       const businessVerificationMap = {};
-      businessesData.forEach(b => {
+      businessesData.forEach((b) => {
         businessVerificationMap[b.id] = b.verification_status;
       });
 
       let query = supabase
-        .from('memberships')
-        .select(`
+        .from("memberships")
+        .select(
+          `
           *,
           applicant:user_id (
             id,
@@ -221,18 +233,19 @@ const Applications = () => {
             created_at,
             verified_at
           )
-        `)
-        .in('business_id', businessIds)
-        .order('created_at', { ascending: false });
+        `,
+        )
+        .in("business_id", businessIds)
+        .order("created_at", { ascending: false });
 
-      if (filter !== 'all') {
-        query = query.eq('status', filter);
+      if (filter !== "all") {
+        query = query.eq("status", filter);
       }
 
       const { data, error } = await query;
 
       if (error) {
-        console.error('Query error:', error);
+        console.error("Query error:", error);
         throw error;
       }
 
@@ -266,7 +279,7 @@ const Applications = () => {
 
       setApplications(processedData || []);
     } catch (err) {
-      console.error('Error fetching applications:', err);
+      console.error("Error fetching applications:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -286,14 +299,14 @@ const Applications = () => {
       if (fetchError) throw fetchError;
       
       const { error } = await supabase
-        .from('memberships')
-        .update({ 
-          status: 'approved',
-          payment_status: 'paid',
+        .from("memberships")
+        .update({
+          status: "approved",
+          payment_status: "paid",
           reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', membershipId);
+        .eq("id", membershipId);
 
       if (error) throw error;
       
@@ -307,10 +320,10 @@ const Applications = () => {
       toast.success('Application approved successfully!');
       fetchApplications();
     } catch (err) {
-      console.error('Error approving application:', err);
+      console.error("Error approving application:", err);
       toast.error(err.message);
     } finally {
-      setProcessing(prev => ({ ...prev, [membershipId]: false }));
+      setProcessing((prev) => ({ ...prev, [membershipId]: false }));
     }
   };
 
@@ -327,13 +340,13 @@ const Applications = () => {
       if (fetchError) throw fetchError;
       
       const { error } = await supabase
-        .from('memberships')
-        .update({ 
-          status: 'rejected',
+        .from("memberships")
+        .update({
+          status: "rejected",
           reviewed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', membershipId);
+        .eq("id", membershipId);
 
       if (error) throw error;
       
@@ -347,35 +360,37 @@ const Applications = () => {
       toast.success('Application rejected successfully!');
       fetchApplications();
     } catch (err) {
-      console.error('Error rejecting application:', err);
+      console.error("Error rejecting application:", err);
       toast.error(err.message);
     } finally {
-      setProcessing(prev => ({ ...prev, [membershipId]: false }));
+      setProcessing((prev) => ({ ...prev, [membershipId]: false }));
     }
   };
 
   const handleVerifyPayment = async (membershipId) => {
     try {
-      setProcessing(prev => ({ ...prev, [membershipId]: true }));
-      const { data: { user } } = await supabase.auth.getUser();
+      setProcessing((prev) => ({ ...prev, [membershipId]: true }));
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       const { error } = await supabase
-        .from('memberships')
-        .update({ 
-          payment_status: 'paid',
+        .from("memberships")
+        .update({
+          payment_status: "paid",
           payment_verified_at: new Date().toISOString(),
           verified_by: user.id,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', membershipId);
+        .eq("id", membershipId);
 
       if (error) throw error;
-      toast.success('Payment verified successfully!');
+      toast.success("Payment verified successfully!");
       fetchApplications();
     } catch (err) {
-      console.error('Error verifying payment:', err);
+      console.error("Error verifying payment:", err);
       toast.error(err.message);
     } finally {
-      setProcessing(prev => ({ ...prev, [membershipId]: false }));
+      setProcessing((prev) => ({ ...prev, [membershipId]: false }));
     }
   };
 
@@ -390,25 +405,25 @@ const Applications = () => {
 
   const getFirstName = () => {
     if (profile?.first_name) return profile.first_name;
-    return 'Owner';
+    return "Owner";
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const getInitials = (firstName, lastName) => {
-    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+    return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
   };
 
-  const filteredApplications = applications.filter(app => {
+  const filteredApplications = applications.filter((app) => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -463,7 +478,11 @@ const Applications = () => {
       <div className="h-full pt-20 overflow-y-auto">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-12">
           {/* Header */}
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
                 <div className="flex items-center gap-3">
@@ -502,8 +521,12 @@ const Applications = () => {
                   <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pending</p>
                   <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
                 </div>
-                <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-yellow-600" />
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? "bg-yellow-900/30" : "bg-yellow-100"}`}
+                >
+                  <Clock
+                    className={`w-5 h-5 ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                  />
                 </div>
               </div>
             </div>
@@ -513,8 +536,12 @@ const Applications = () => {
                   <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Approved</p>
                   <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
                 </div>
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? "bg-green-900/30" : "bg-green-100"}`}
+                >
+                  <CheckCircle
+                    className={`w-5 h-5 ${isDarkMode ? "text-green-400" : "text-green-600"}`}
+                  />
                 </div>
               </div>
             </div>
@@ -524,8 +551,12 @@ const Applications = () => {
                   <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Rejected</p>
                   <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
                 </div>
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <XCircle className="w-5 h-5 text-red-600" />
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? "bg-red-900/30" : "bg-red-100"}`}
+                >
+                  <XCircle
+                    className={`w-5 h-5 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+                  />
                 </div>
               </div>
             </div>
@@ -537,8 +568,12 @@ const Applications = () => {
                     ₱{applications.filter(a => a.status === 'approved').reduce((sum, a) => sum + (a.price_paid || 0), 0).toLocaleString()}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-purple-600" />
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? "bg-purple-900/30" : "bg-purple-100"}`}
+                >
+                  <DollarSign
+                    className={`w-5 h-5 ${isDarkMode ? "text-purple-400" : "text-purple-600"}`}
+                  />
                 </div>
               </div>
             </div>
@@ -562,14 +597,29 @@ const Applications = () => {
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
               {[
-                { id: 'pending', label: 'Pending', icon: Clock, color: 'yellow' },
-                { id: 'approved', label: 'Approved', icon: CheckCircle, color: 'green' },
-                { id: 'rejected', label: 'Rejected', icon: XCircle, color: 'red' },
-                { id: 'all', label: 'All', icon: Filter, color: 'blue' }
-              ].map(tab => {
+                {
+                  id: "pending",
+                  label: "Pending",
+                  icon: Clock,
+                  color: "yellow",
+                },
+                {
+                  id: "approved",
+                  label: "Approved",
+                  icon: CheckCircle,
+                  color: "green",
+                },
+                {
+                  id: "rejected",
+                  label: "Rejected",
+                  icon: XCircle,
+                  color: "red",
+                },
+                { id: "all", label: "All", icon: Filter, color: "blue" },
+              ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = filter === tab.id;
-                const count = tab.id === 'all' ? stats.total : stats[tab.id];
+                const count = tab.id === "all" ? stats.total : stats[tab.id];
                 return (
                   <button
                     key={tab.id}
@@ -613,8 +663,10 @@ const Applications = () => {
             <div className="space-y-4">
               {filteredApplications.map((app) => {
                 const hasReceipt = app.receipt_url_display;
-                const isGcash = app.payment_method?.toLowerCase() === 'gcash';
-                const isVerified = ['paid'].includes(app.payment_status?.toLowerCase());
+                const isGcash = app.payment_method?.toLowerCase() === "gcash";
+                const isVerified = ["paid"].includes(
+                  app.payment_status?.toLowerCase(),
+                );
                 const isExpanded = expandedCard === app.id;
                 const isRenewal = app.is_renewal;
                 
@@ -630,25 +682,31 @@ const Applications = () => {
                     }`}
                   >
                     {/* Card Header */}
-                    <div className="p-5 cursor-pointer" onClick={() => toggleExpand(app.id)}>
+                    <div
+                      className="p-5 cursor-pointer"
+                      onClick={() => toggleExpand(app.id)}
+                    >
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                           <div className={`w-14 h-14 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${
                             isDarkMode ? 'bg-gray-700' : 'bg-gradient-to-br from-blue-100 to-purple-100'
                           }`}>
                             {app.client_avatar_display ? (
-                              <img 
-                                src={app.client_avatar_display} 
+                              <img
+                                src={app.client_avatar_display}
                                 alt={`${app.applicant?.first_name}`}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  e.target.style.display = 'none';
-                                  e.target.parentElement.innerHTML = `<div class="text-blue-600 font-bold text-xl">${getInitials(app.applicant?.first_name, app.applicant?.last_name)}</div>`;
+                                  e.target.style.display = "none";
+                                  e.target.parentElement.innerHTML = `<div class="text-blue-600 dark:text-blue-400 font-bold text-xl">${getInitials(app.applicant?.first_name, app.applicant?.last_name)}</div>`;
                                 }}
                               />
                             ) : (
-                              <div className="text-blue-600 font-bold text-xl">
-                                {getInitials(app.applicant?.first_name, app.applicant?.last_name)}
+                              <div className="text-blue-600 dark:text-blue-400 font-bold text-xl">
+                                {getInitials(
+                                  app.applicant?.first_name,
+                                  app.applicant?.last_name,
+                                )}
                               </div>
                             )}
                           </div>
@@ -678,16 +736,32 @@ const Applications = () => {
                             </div>
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center gap-3">
-                          <div className={`px-3 py-1.5 rounded-full text-sm font-semibold flex items-center gap-1 ${
-                            app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                            app.status === 'approved' ? 'bg-green-100 text-green-700' :
-                            'bg-red-100 text-red-700'
-                          }`}>
-                            {app.status === 'pending' && <Clock className="w-3 h-3" />}
-                            {app.status === 'approved' && <CheckCircle className="w-3 h-3" />}
-                            {app.status === 'rejected' && <XCircle className="w-3 h-3" />}
+                          <div
+                            className={`px-3 py-1.5 rounded-full text-sm font-semibold flex items-center gap-1 ${
+                              app.status === "pending"
+                                ? isDarkMode
+                                  ? "bg-yellow-900/50 text-yellow-300"
+                                  : "bg-yellow-100 text-yellow-700"
+                                : app.status === "approved"
+                                  ? isDarkMode
+                                    ? "bg-green-900/50 text-green-300"
+                                    : "bg-green-100 text-green-700"
+                                  : isDarkMode
+                                    ? "bg-red-900/50 text-red-300"
+                                    : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {app.status === "pending" && (
+                              <Clock className="w-3 h-3" />
+                            )}
+                            {app.status === "approved" && (
+                              <CheckCircle className="w-3 h-3" />
+                            )}
+                            {app.status === "rejected" && (
+                              <XCircle className="w-3 h-3" />
+                            )}
                             <span className="capitalize">{app.status}</span>
                           </div>
                           <button className={`p-2 rounded-lg transition-colors ${
@@ -723,7 +797,7 @@ const Applications = () => {
                       {isExpanded && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
+                          animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.3 }}
                           className={`border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`}
@@ -837,7 +911,7 @@ const Applications = () => {
                                             alt="Receipt"
                                             className="h-32 w-auto object-contain rounded"
                                             onError={(e) => {
-                                              e.target.style.display = 'none';
+                                              e.target.style.display = "none";
                                             }}
                                           />
                                           <p className="text-xs text-center text-blue-600 dark:text-blue-400 mt-1">Click to enlarge</p>
@@ -855,22 +929,25 @@ const Applications = () => {
                                           </div>
                                         </div>
                                       )}
-                                      {app.status === 'pending' && app.payment_status === 'pending' && (
-                                        <button
-                                          className="mt-4 w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
-                                          onClick={() => handleVerifyPayment(app.id)}
-                                          disabled={processing[app.id]}
-                                        >
-                                          {processing[app.id] ? (
-                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                          ) : (
-                                            <>
-                                              <CheckCircle className="w-4 h-4" />
-                                              Verify Payment
-                                            </>
-                                          )}
-                                        </button>
-                                      )}
+                                      {app.status === "pending" &&
+                                        app.payment_status === "pending" && (
+                                          <button
+                                            className="mt-4 w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+                                            onClick={() =>
+                                              handleVerifyPayment(app.id)
+                                            }
+                                            disabled={processing[app.id]}
+                                          >
+                                            {processing[app.id] ? (
+                                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            ) : (
+                                              <>
+                                                <CheckCircle className="w-4 h-4" />
+                                                Verify Payment
+                                              </>
+                                            )}
+                                          </button>
+                                        )}
                                       {isVerified && (
                                         <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded-lg text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
                                           <CheckCircle className="w-4 h-4" />
@@ -889,7 +966,7 @@ const Applications = () => {
                             )}
 
                             {/* Onsite Payment Section */}
-                            {app.payment_method?.toLowerCase() === 'onsite' && (
+                            {app.payment_method?.toLowerCase() === "onsite" && (
                               <div className="mb-6">
                                 <h4 className={`font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                                   <Building className="w-4 h-4 text-blue-500" />
@@ -904,28 +981,31 @@ const Applications = () => {
                                     <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Amount to Collect</p>
                                     <p className="text-xl font-bold text-blue-600">₱{app.price_paid?.toLocaleString()}</p>
                                   </div>
-                                  {app.status === 'pending' && app.payment_status === 'pending' && (
-                                    <button
-                                      className="w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
-                                      onClick={() => handleVerifyPayment(app.id)}
-                                      disabled={processing[app.id]}
-                                    >
-                                      {processing[app.id] ? (
-                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                      ) : (
-                                        <>
-                                          <CheckCircle className="w-4 h-4" />
-                                          Mark as Paid
-                                        </>
-                                      )}
-                                    </button>
-                                  )}
+                                  {app.status === "pending" &&
+                                    app.payment_status === "pending" && (
+                                      <button
+                                        className="w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+                                        onClick={() =>
+                                          handleVerifyPayment(app.id)
+                                        }
+                                        disabled={processing[app.id]}
+                                      >
+                                        {processing[app.id] ? (
+                                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        ) : (
+                                          <>
+                                            <CheckCircle className="w-4 h-4" />
+                                            Mark as Paid
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
                                 </div>
                               </div>
                             )}
 
-                            {/* Action Buttons */}
-                            {app.status === 'pending' && (
+                            {/* Action Buttons - FIXED: Added text color for disabled state */}
+                            {app.status === "pending" && (
                               <div className="flex gap-3">
                                 <button
                                   className={`flex-1 py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${
@@ -934,7 +1014,11 @@ const Applications = () => {
                                       : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg'
                                   }`}
                                   onClick={() => handleApprove(app.id)}
-                                  disabled={processing[app.id] || (isGcash && !isVerified) || app.business_verification === 'pending'}
+                                  disabled={
+                                    processing[app.id] ||
+                                    (isGcash && !isVerified) ||
+                                    app.business_verification === "pending"
+                                  }
                                 >
                                   {processing[app.id] ? (
                                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -976,10 +1060,10 @@ const Applications = () => {
               <p className={`mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 There are no {filter !== 'all' ? filter : ''} applications to display.
               </p>
-              {filter !== 'pending' && (
-                <button 
+              {filter !== "pending" && (
+                <button
                   className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                  onClick={() => setFilter('pending')}
+                  onClick={() => setFilter("pending")}
                 >
                   View Pending Applications
                 </button>
@@ -1017,7 +1101,7 @@ const Applications = () => {
                 <Download className="w-4 h-4" />
                 Download
               </a>
-              <button 
+              <button
                 onClick={() => setShowReceiptModal(false)}
                 className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors dark:text-gray-300"
               >
