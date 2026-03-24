@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 import {
   Mail,
   Lock,
@@ -31,6 +32,21 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [focusedField, setFocusedField] = useState(null);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
+
+  // Check for email verification success from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('verified') === 'true') {
+      setVerificationSuccess(true);
+      toast.success('Email verified successfully! You can now log in.');
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setTimeout(() => setVerificationSuccess(false), 5000);
+    }
+  }, []);
 
   // Check if user is already logged in
   useEffect(() => {
@@ -108,6 +124,36 @@ const LoginPage = () => {
     return true;
   };
 
+  const handleResendVerification = async () => {
+    if (!formData.email) {
+      setResendMessage('Please enter your email address first');
+      setTimeout(() => setResendMessage(''), 3000);
+      return;
+    }
+    
+    setResending(true);
+    setResendMessage('');
+    
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: formData.email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login?verified=true`,
+        },
+      });
+      
+      if (error) throw error;
+      setResendMessage('Verification email sent! Please check your inbox.');
+    } catch (error) {
+      console.error('Error resending verification:', error);
+      setResendMessage('Failed to send verification email. Please try again.');
+    } finally {
+      setResending(false);
+      setTimeout(() => setResendMessage(''), 5000);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -121,14 +167,22 @@ const LoginPage = () => {
 
     try {
       // Sign in with password
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email.trim(),
         password: formData.password,
       });
       
       if (signInError) throw signInError;
       
-      // No need to manually navigate here - the auth state change listener in App.js will handle it
+      // Always check if email is verified (since Supabase always requires email confirmation)
+      if (!signInData.user?.email_confirmed_at) {
+        await supabase.auth.signOut();
+        setError('Please verify your email address before logging in. Check your inbox for the verification link.');
+        setLoading(false);
+        return;
+      }
+      
+      // Login successful - auth state change listener in App.js will handle navigation
       
     } catch (error) {
       console.error('Login error:', error);
@@ -296,6 +350,23 @@ const LoginPage = () => {
                   </p>
                 </div>
 
+                {/* Verification Success Alert */}
+                <AnimatePresence>
+                  {verificationSuccess && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3"
+                    >
+                      <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                      <p className="text-sm text-green-600">
+                        Email verified successfully! You can now log in.
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 {/* Error Alert */}
                 <AnimatePresence>
                   {error && (
@@ -310,6 +381,30 @@ const LoginPage = () => {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Resend Message Alert */}
+                {resendMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`mb-6 p-4 rounded-xl flex items-start gap-3 ${
+                      resendMessage.includes('sent') 
+                        ? 'bg-green-50 border border-green-200' 
+                        : 'bg-yellow-50 border border-yellow-200'
+                    }`}
+                  >
+                    {resendMessage.includes('sent') ? (
+                      <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                    )}
+                    <p className={`text-sm ${
+                      resendMessage.includes('sent') ? 'text-green-600' : 'text-yellow-600'
+                    }`}>
+                      {resendMessage}
+                    </p>
+                  </motion.div>
+                )}
 
                 {/* Login Form */}
                 <form onSubmit={handleSubmit} className="space-y-5">
@@ -400,6 +495,19 @@ const LoginPage = () => {
                     )}
                   </motion.button>
                 </form>
+
+                {/* Resend Verification Link - Only show when there's an email verification error */}
+                {error && error.includes('verify') && (
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={handleResendVerification}
+                      disabled={resending}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                    >
+                      {resending ? 'Sending...' : 'Resend verification email'}
+                    </button>
+                  </div>
+                )}
 
                 {/* Divider */}
                 <div className="relative my-6">

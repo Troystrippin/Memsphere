@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
+import { motion } from "framer-motion";
+import { RefreshCw } from "lucide-react";
 import {
   supabase,
   isSupabaseConfigured,
@@ -31,6 +33,149 @@ import AdminProfile from "./components/admin/AdminProfile";
 import OwnerNotifications from "./pages/OwnerNotifications";
 import OwnerSettings from "./pages/OwnerSettings";
 import "./App.css";
+import logo from "./assets/logo_final.png";
+
+// Enhanced Maintenance Page Component with larger content
+const MaintenancePage = () => {
+  const navigate = useNavigate();
+  const [checking, setChecking] = useState(false);
+
+  const handleCheckStatus = async () => {
+    setChecking(true);
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'maintenance_mode')
+        .single();
+      
+      if (!error && data && data.value === 'false') {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+          
+          if (profile?.role === 'owner') {
+            navigate('/owner-dashboard', { replace: true });
+          } else if (profile?.role === 'admin') {
+            navigate('/admin-dashboard', { replace: true });
+          } else if (profile?.role === 'client') {
+            navigate('/ClientDashboard', { replace: true });
+          } else {
+            navigate('/', { replace: true });
+          }
+        } else {
+          navigate('/login', { replace: true });
+        }
+      } else {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error checking maintenance status:', error);
+      window.location.reload();
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
+      <div className="text-center p-8 max-w-2xl">
+        {/* Logo - Made Larger */}
+        <motion.div
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+          className="mb-8"
+        >
+          <div className="w-48 h-48 mx-auto rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-2xl">
+            <img 
+              src={logo} 
+              alt="Memsphere Logo" 
+              className="w-36 h-36 object-contain"
+            />
+          </div>
+        </motion.div>
+
+        {/* Title - Larger Text */}
+        <motion.h1 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-4 select-none"
+        >
+          Under Maintenance
+        </motion.h1>
+
+        {/* Subtitle - Larger Text */}
+        <motion.p 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-xl text-gray-600 mb-8 select-none"
+        >
+          We're currently performing scheduled maintenance to improve your experience.
+        </motion.p>
+
+        {/* Info Card - Larger */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.4 }}
+          className="bg-white rounded-2xl shadow-lg p-8 mb-8 border border-gray-100 select-none"
+        >
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="w-14 h-14 bg-yellow-100 rounded-full flex items-center justify-center">
+              <span className="text-2xl">🔧</span>
+            </div>
+            <span className="text-lg font-semibold text-gray-700">Maintenance in Progress</span>
+          </div>
+          <p className="text-base text-gray-500 select-none">
+            Our team is working hard to bring you new features and improvements.
+            Please check back soon!
+          </p>
+        </motion.div>
+
+        {/* Admin Access Note */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="pt-4 border-t border-gray-200 select-none"
+        >
+          <p className="text-sm text-gray-400 select-none">
+            ⚡ Administrators can still access the dashboard
+          </p>
+        </motion.div>
+
+        {/* Check Status Button - Larger */}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleCheckStatus}
+          disabled={checking}
+          className="mt-8 px-8 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2 mx-auto select-none disabled:opacity-50 text-base"
+        >
+          {checking ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Checking...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="w-5 h-5" />
+              Check Status
+            </>
+          )}
+        </motion.button>
+      </div>
+    </div>
+  );
+};
 
 function App() {
   const [session, setSession] = useState(null);
@@ -41,12 +186,93 @@ function App() {
   const [initialRedirectDone, setInitialRedirectDone] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [roleLoaded, setRoleLoaded] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceChecked, setMaintenanceChecked] = useState(false);
 
   const hasProcessedSignIn = useRef(false);
   const authInitialized = useRef(false);
   const navigationInProgress = useRef(false);
   const fetchRetryCount = useRef(0);
   const navigate = useNavigate();
+
+  // Check maintenance mode - also listen for changes
+  useEffect(() => {
+    const checkMaintenanceMode = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'maintenance_mode')
+          .single();
+        
+        if (!error && data && data.value === 'true') {
+          setMaintenanceMode(true);
+        } else {
+          setMaintenanceMode(false);
+        }
+      } catch (error) {
+        console.error('Error checking maintenance mode:', error);
+        setMaintenanceMode(false);
+      } finally {
+        setMaintenanceChecked(true);
+      }
+    };
+
+    checkMaintenanceMode();
+  }, []);
+
+  // Set up real-time subscription for maintenance mode changes
+  useEffect(() => {
+    const maintenanceSubscription = supabase
+      .channel('system_settings_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'system_settings',
+          filter: 'key=eq.maintenance_mode'
+        },
+        (payload) => {
+          console.log('Maintenance mode changed:', payload);
+          const newValue = payload.new?.value === 'true';
+          setMaintenanceMode(newValue);
+          
+          // If maintenance mode is turned off and user is on maintenance page, redirect
+          if (!newValue && window.location.pathname === '/maintenance') {
+            const redirectToDashboard = async () => {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('role')
+                  .eq('id', user.id)
+                  .single();
+                
+                if (profile?.role === 'owner') {
+                  navigate('/owner-dashboard', { replace: true });
+                } else if (profile?.role === 'admin') {
+                  navigate('/admin-dashboard', { replace: true });
+                } else if (profile?.role === 'client') {
+                  navigate('/ClientDashboard', { replace: true });
+                } else {
+                  navigate('/', { replace: true });
+                }
+              } else {
+                navigate('/login', { replace: true });
+              }
+            };
+            redirectToDashboard();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      maintenanceSubscription.unsubscribe();
+    };
+  }, [navigate]);
 
   useEffect(() => {
     if (authInitialized.current) return;
@@ -57,6 +283,7 @@ function App() {
       setConfigError(true);
       setLoading(false);
       setAuthChecked(true);
+      setRoleLoaded(true);
       return;
     }
 
@@ -70,6 +297,7 @@ function App() {
           setAuthError("Cannot connect to database");
           setLoading(false);
           setAuthChecked(true);
+          setRoleLoaded(true);
           return;
         }
 
@@ -84,6 +312,7 @@ function App() {
           setAuthError(error.message);
           setLoading(false);
           setAuthChecked(true);
+          setRoleLoaded(true);
           return;
         }
 
@@ -102,6 +331,7 @@ function App() {
             setSession(null);
             setLoading(false);
             setAuthChecked(true);
+            setRoleLoaded(true);
             return;
           }
 
@@ -116,6 +346,7 @@ function App() {
           setUserRole(undefined);
           setLoading(false);
           setAuthChecked(true);
+          setRoleLoaded(true);
         }
       } catch (error) {
         console.error("Error in auth initialization:", error);
@@ -123,6 +354,7 @@ function App() {
         setAuthError(error.message);
         setLoading(false);
         setAuthChecked(true);
+        setRoleLoaded(true);
       }
     };
 
@@ -146,6 +378,7 @@ function App() {
         setInitialRedirectDone(false);
         setAuthError(null);
         setLoading(true);
+        setRoleLoaded(false);
         setUserRole(undefined);
         try {
           await fetchUserData(session.user.id);
@@ -153,6 +386,7 @@ function App() {
           console.error("Error in sign in flow:", error);
           setLoading(false);
           setAuthChecked(true);
+          setRoleLoaded(true);
         }
       } else if (event === "TOKEN_REFRESHED") {
         console.log("🔄 Token refreshed");
@@ -173,6 +407,7 @@ function App() {
         setAuthError(null);
         setLoading(false);
         setInitialRedirectDone(false);
+        setRoleLoaded(true);
         hasProcessedSignIn.current = false;
         navigationInProgress.current = false;
         fetchRetryCount.current = 0;
@@ -222,29 +457,32 @@ function App() {
           setUserRole(undefined);
           setUserData(null);
         } else {
-          setUserRole("client");
-          setUserData({ role: "client" });
+          setUserRole(undefined);
+          setUserData(null);
         }
         setAuthError("Error loading user profile");
         setLoading(false);
         setAuthChecked(true);
+        setRoleLoaded(true);
         return;
       }
 
       if (data) {
         console.log("✅ User data loaded:", data);
-        setUserRole(data?.role || "client");
+        const role = data?.role || "client";
+        setUserRole(role);
         setUserData(data);
         setAuthError(null);
+        console.log("🎯 User role set to:", role);
       } else {
-        console.log("⚠️ No profile found, defaulting to client role");
-        setUserRole("client");
-        setUserData({ role: "client" });
+        console.log("⚠️ No profile found");
+        setUserRole(undefined);
+        setUserData(null);
       }
     } catch (error) {
       console.error("❌ Error in fetchUserData:", error);
-      setUserRole("client");
-      setUserData({ role: "client" });
+      setUserRole(undefined);
+      setUserData(null);
       setAuthError(error.message);
 
       if (fetchRetryCount.current < 2) {
@@ -261,6 +499,7 @@ function App() {
       console.log("✅ User data fetch complete");
       setLoading(false);
       setAuthChecked(true);
+      setRoleLoaded(true);
     }
   };
 
@@ -271,34 +510,24 @@ function App() {
         console.log("⚠️ Loading timeout - forcing completion");
         setAuthChecked(true);
         setLoading(false);
-        setUserRole("client");
-        setUserData({ role: "client" });
+        setRoleLoaded(true);
       }
     }, 8000);
 
     return () => clearTimeout(timeout);
   }, [loading, authChecked]);
 
-  // Handle initial redirect
+  // Handle initial redirect - ONLY when role is loaded
   useEffect(() => {
-    if (loading || !authChecked) {
+    if (loading || !authChecked || !roleLoaded || !maintenanceChecked) {
+      console.log("Waiting for role to load...", { loading, authChecked, roleLoaded, userRole, maintenanceChecked });
       return;
     }
 
-    if (!session) {
+    if (session && userRole === undefined) {
+      console.log("⚠️ Session exists but role is undefined");
       return;
     }
-
-    if (userRole === undefined) {
-      return;
-    }
-
-    if (navigationInProgress.current || initialRedirectDone) {
-      return;
-    }
-
-    const currentPath = window.location.pathname;
-    console.log("📍 Navigation check - Path:", currentPath, "Role:", userRole);
 
     const publicPaths = [
       "/login",
@@ -308,44 +537,123 @@ function App() {
       "/about",
       "/contact",
     ];
-
-    if (publicPaths.includes(currentPath)) {
+    
+    const currentPath = window.location.pathname;
+    
+    // MAINTENANCE MODE CHECK
+    if (maintenanceMode && session && userRole !== 'admin') {
+      console.log("🔧 Maintenance mode active, non-admin access blocked");
+      if (currentPath !== '/maintenance') {
+        navigate('/maintenance', { replace: true });
+      }
+      return;
+    }
+    
+    // If maintenance mode is off and user is on maintenance page, redirect
+    if (!maintenanceMode && currentPath === '/maintenance') {
+      console.log("🔧 Maintenance mode off, redirecting from maintenance page");
+      if (session && userRole !== undefined) {
+        let destination;
+        if (userRole === "owner") {
+          destination = "/owner-dashboard";
+        } else if (userRole === "admin") {
+          destination = "/admin-dashboard";
+        } else if (userRole === "client") {
+          destination = "/ClientDashboard";
+        } else {
+          destination = "/";
+        }
+        navigate(destination, { replace: true });
+      } else if (session && userRole === undefined) {
+        return;
+      } else {
+        navigate("/login", { replace: true });
+      }
+      return;
+    }
+    
+    if (currentPath === '/maintenance' && session && userRole === 'admin') {
+      console.log("🔧 Admin accessing during maintenance, redirecting to dashboard");
+      const destination = userRole === "owner" ? "/owner-dashboard" : 
+                         userRole === "admin" ? "/admin-dashboard" : "/ClientDashboard";
+      navigate(destination, { replace: true });
+      return;
+    }
+    
+    if (session && userRole !== undefined && publicPaths.includes(currentPath)) {
+      if (navigationInProgress.current || initialRedirectDone) {
+        return;
+      }
+      
       navigationInProgress.current = true;
       let destination;
-
+      
       if (userRole === "owner") {
         destination = "/owner-dashboard";
       } else if (userRole === "admin") {
         destination = "/admin-dashboard";
-      } else {
+      } else if (userRole === "client") {
         destination = "/ClientDashboard";
+      } else {
+        destination = "/";
       }
-
-      console.log(`🏠 Redirecting from ${currentPath} to ${destination}`);
-
+      
+      console.log(`🏠 Redirecting from ${currentPath} to ${destination} (role: ${userRole})`);
       navigate(destination, { replace: true });
       setInitialRedirectDone(true);
-      navigationInProgress.current = false;
+      setTimeout(() => {
+        navigationInProgress.current = false;
+      }, 100);
+      return;
+    }
+    
+    if (session && userRole !== undefined && !publicPaths.includes(currentPath)) {
+      if (currentPath.startsWith("/owner") && userRole !== "owner") {
+        console.log("🚫 Owner route blocked for non-owner");
+        const destination = userRole === "admin" ? "/admin-dashboard" : 
+                           userRole === "client" ? "/ClientDashboard" : "/";
+        navigate(destination, { replace: true });
+      } else if (currentPath.startsWith("/admin") && userRole !== "admin") {
+        console.log("🚫 Admin route blocked for non-admin");
+        const destination = userRole === "owner" ? "/owner-dashboard" : 
+                           userRole === "client" ? "/ClientDashboard" : "/";
+        navigate(destination, { replace: true });
+      } else if (currentPath === "/ClientDashboard" && userRole !== "client") {
+        console.log("🚫 Client dashboard blocked for non-client");
+        const destination = userRole === "admin" ? "/admin-dashboard" : "/owner-dashboard";
+        navigate(destination, { replace: true });
+      } else if (currentPath === "/browse" && userRole !== "client") {
+        console.log("🚫 Browse page blocked for non-client");
+        const destination = userRole === "admin" ? "/admin-dashboard" : "/owner-dashboard";
+        navigate(destination, { replace: true });
+      } else {
+        setInitialRedirectDone(true);
+      }
+    } else if (!session && !publicPaths.includes(currentPath) && currentPath !== '/maintenance') {
+      console.log("🔒 No session, redirecting to login");
+      navigate("/login", { replace: true });
     } else {
       setInitialRedirectDone(true);
     }
-  }, [loading, authChecked, session, userRole, navigate, initialRedirectDone]);
+  }, [loading, authChecked, roleLoaded, maintenanceChecked, maintenanceMode, session, userRole, navigate, initialRedirectDone]);
 
   // Debug logging
   useEffect(() => {
     console.log("📊 App State Update:", {
       loading,
       authChecked,
+      roleLoaded,
+      maintenanceChecked,
+      maintenanceMode,
       session: session?.user?.email,
       userRole,
       path: window.location.pathname,
       initialRedirectDone,
       authError,
     });
-  }, [loading, authChecked, session, userRole, initialRedirectDone, authError]);
+  }, [loading, authChecked, roleLoaded, maintenanceChecked, maintenanceMode, session, userRole, initialRedirectDone, authError]);
 
-  // Show minimal loading screen only during auth initialization
-  if (!authChecked || loading) {
+  if (!authChecked || loading || !roleLoaded || !maintenanceChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
         <div className="text-center select-none">
@@ -384,9 +692,12 @@ function App() {
       authChecked,
     );
 
-    // Don't render anything while checking auth
-    if (!authChecked) {
+    if (!authChecked || loading || !roleLoaded) {
       return null;
+    }
+
+    if (maintenanceMode && userRole !== 'admin') {
+      return <Navigate to="/maintenance" replace />;
     }
 
     if (!session) {
@@ -394,7 +705,8 @@ function App() {
       return <Navigate to="/login" replace />;
     }
 
-    if (userRole === null || userRole === undefined) {
+    if (userRole === undefined) {
+      console.log("⚠️ Role undefined, showing loading");
       return null;
     }
 
@@ -425,6 +737,9 @@ function App() {
   return (
     <ThemeProvider>
       <Routes>
+        {/* Maintenance Route */}
+        <Route path="/maintenance" element={<MaintenancePage />} />
+        
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />

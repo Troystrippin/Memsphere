@@ -1,41 +1,76 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import AdminSidebarNav from '../components/admin/AdminSidebarNav';
-import RejectionModal from '../components/admin/RejectionModal';
-import PermitViewerModal from '../components/admin/PermitViewerModal';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import AdminSidebarNav from "../components/admin/AdminSidebarNav";
+import RejectionModal from "../components/admin/RejectionModal";
+import PermitViewerModal from "../components/admin/PermitViewerModal";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "react-hot-toast";
+import {
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Eye,
+  Trash2,
+  Archive,
+  RefreshCw,
+  Building,
+  FileText,
+  AlertTriangle,
+  User,
+  MapPin,
+  Calendar,
+  Phone,
+  Mail,
+  Globe,
+  Star,
+  Users,
+  Plus,
+  X,
+  ChevronRight,
+  Clock,
+  Search,
+  Square,
+  CheckSquare,
+} from "lucide-react";
 
 const AdminBusinessManagement = () => {
   const navigate = useNavigate();
   const [businesses, setBusinesses] = useState([]);
   const [filteredBusinesses, setFilteredBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [verificationFilter, setVerificationFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [verificationFilter, setVerificationFilter] = useState("all");
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [showPermitModal, setShowPermitModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmBusinessId, setConfirmBusinessId] = useState(null);
+  const [confirmBusinessName, setConfirmBusinessName] = useState("");
   const [actionLoading, setActionLoading] = useState({});
+  const [selectedBusinesses, setSelectedBusinesses] = useState(new Set());
+  const [selectAll, setSelectAll] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
     pending: 0,
     suspended: 0,
+    archived: 0,
     verified: 0,
     unverified: 0,
-    permitPending: 0
+    permitPending: 0,
   });
 
-  // Business types for filter
+  // Business types for filter and icons
   const businessTypes = [
-    { id: 'all', label: 'All Types', icon: '🏢' },
-    { id: 'gym', label: 'Gym', icon: '🏋️' },
-    { id: 'cafe', label: 'Cafe', icon: '☕' },
-    { id: 'bakery', label: 'Bakery', icon: '🥐' },
+    { id: "all", label: "All Types", icon: "🏢" },
+    { id: "gym", label: "Gym", icon: "🏋️" },
+    { id: "cafe", label: "Cafe", icon: "☕" },
+    { id: "bookstore", label: "Bookstore", icon: "📚" },
   ];
 
   useEffect(() => {
@@ -46,13 +81,20 @@ const AdminBusinessManagement = () => {
     filterBusinesses();
   }, [searchTerm, statusFilter, typeFilter, verificationFilter, businesses]);
 
+  useEffect(() => {
+    // Reset select all when filtered businesses change
+    setSelectAll(false);
+    setSelectedBusinesses(new Set());
+  }, [filteredBusinesses]);
+
   const fetchBusinesses = async () => {
     try {
       setLoading(true);
-      
+
       const { data, error } = await supabase
-        .from('businesses')
-        .select(`
+        .from("businesses")
+        .select(
+          `
           *,
           owner:profiles!businesses_owner_id_fkey (
             id,
@@ -62,29 +104,39 @@ const AdminBusinessManagement = () => {
             role,
             verification_status
           )
-        `)
-        .order('created_at', { ascending: false });
+        `,
+        )
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
       setBusinesses(data || []);
       setFilteredBusinesses(data || []);
-      
-      // Calculate stats with permit info
+
       const stats = {
         total: data?.length || 0,
-        active: data?.filter(b => b.status === 'active').length || 0,
-        pending: data?.filter(b => b.verification_status === 'pending').length || 0,
-        suspended: data?.filter(b => b.status === 'suspended').length || 0,
-        verified: data?.filter(b => b.verification_status === 'approved' && b.permit_verified).length || 0,
-        unverified: data?.filter(b => b.verification_status === 'pending' || !b.verification_status).length || 0,
-        permitPending: data?.filter(b => b.permit_document && !b.permit_verified).length || 0
+        active: data?.filter((b) => b.status === "active").length || 0,
+        pending:
+          data?.filter((b) => b.verification_status === "pending").length || 0,
+        suspended: data?.filter((b) => b.status === "suspended").length || 0,
+        archived: data?.filter((b) => b.status === "archived").length || 0,
+        verified:
+          data?.filter(
+            (b) => b.verification_status === "approved" && b.permit_verified,
+          ).length || 0,
+        unverified:
+          data?.filter(
+            (b) =>
+              b.verification_status === "pending" || !b.verification_status,
+          ).length || 0,
+        permitPending:
+          data?.filter((b) => b.permit_document && !b.permit_verified).length ||
+          0,
       };
       setStats(stats);
-
     } catch (error) {
-      console.error('Error fetching businesses:', error);
-      alert('Failed to load businesses. Please try again.');
+      console.error("Error fetching businesses:", error);
+      toast.error("Failed to load businesses. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -93,173 +145,269 @@ const AdminBusinessManagement = () => {
   const filterBusinesses = () => {
     let filtered = [...businesses];
 
-    // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(business => 
-        business.name?.toLowerCase().includes(term) ||
-        business.business_type?.toLowerCase().includes(term) ||
-        business.owner?.email?.toLowerCase().includes(term) ||
-        business.owner?.first_name?.toLowerCase().includes(term) ||
-        business.owner?.last_name?.toLowerCase().includes(term) ||
-        business.location?.toLowerCase().includes(term) ||
-        business.permit_number?.toLowerCase().includes(term)
+      filtered = filtered.filter(
+        (business) =>
+          business.name?.toLowerCase().includes(term) ||
+          business.business_type?.toLowerCase().includes(term) ||
+          business.owner?.email?.toLowerCase().includes(term) ||
+          business.owner?.first_name?.toLowerCase().includes(term) ||
+          business.owner?.last_name?.toLowerCase().includes(term) ||
+          business.location?.toLowerCase().includes(term) ||
+          business.permit_number?.toLowerCase().includes(term),
       );
     }
 
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(business => business.status === statusFilter);
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(
+        (business) => business.status === statusFilter,
+      );
     }
 
-    // Filter by business type
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(business => business.business_type === typeFilter);
+    if (typeFilter !== "all") {
+      filtered = filtered.filter(
+        (business) => business.business_type === typeFilter,
+      );
     }
 
-    // Filter by verification status
-    if (verificationFilter !== 'all') {
-      filtered = filtered.filter(business => business.verification_status === verificationFilter);
+    if (verificationFilter !== "all") {
+      filtered = filtered.filter(
+        (business) => business.verification_status === verificationFilter,
+      );
     }
 
     setFilteredBusinesses(filtered);
   };
 
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedBusinesses(new Set());
+    } else {
+      const newSelected = new Set();
+      filteredBusinesses.forEach((business) => newSelected.add(business.id));
+      setSelectedBusinesses(newSelected);
+    }
+    setSelectAll(!selectAll);
+  };
+
+  const handleSelectBusiness = (businessId) => {
+    const newSelected = new Set(selectedBusinesses);
+    if (newSelected.has(businessId)) {
+      newSelected.delete(businessId);
+    } else {
+      newSelected.add(businessId);
+    }
+    setSelectedBusinesses(newSelected);
+    setSelectAll(
+      newSelected.size === filteredBusinesses.length &&
+        filteredBusinesses.length > 0,
+    );
+  };
+
+  const showConfirmDialog = (action, businessId, businessName) => {
+    setConfirmAction(action);
+    setConfirmBusinessId(businessId);
+    setConfirmBusinessName(businessName);
+    setShowConfirmModal(true);
+  };
+
+  const handleBulkAction = async (action) => {
+    const businessIds = Array.from(selectedBusinesses);
+    if (businessIds.length === 0) return;
+
+    setShowConfirmModal(false);
+
+    for (const businessId of businessIds) {
+      setActionLoading((prev) => ({ ...prev, [businessId]: action }));
+    }
+
+    try {
+      let updateData = {};
+      let successMessage = "";
+
+      switch (action) {
+        case "archive":
+          updateData = {
+            status: "archived",
+            updated_at: new Date().toISOString(),
+          };
+          successMessage = `${businessIds.length} business(es) archived successfully!`;
+          break;
+        case "suspend":
+          updateData = {
+            status: "suspended",
+            updated_at: new Date().toISOString(),
+          };
+          successMessage = `${businessIds.length} business(es) suspended successfully!`;
+          break;
+        case "delete":
+          // For delete, we need to delete each business individually
+          let deleteCount = 0;
+          for (const businessId of businessIds) {
+            const { error } = await supabase
+              .from("businesses")
+              .delete()
+              .eq("id", businessId);
+            if (!error) deleteCount++;
+          }
+          await fetchBusinesses();
+          setSelectedBusinesses(new Set());
+          setSelectAll(false);
+          toast.success(`${deleteCount} business(es) deleted successfully.`);
+          setActionLoading({});
+          return;
+        default:
+          return;
+      }
+
+      if (action !== "delete") {
+        const { error } = await supabase
+          .from("businesses")
+          .update(updateData)
+          .in("id", businessIds);
+
+        if (error) throw error;
+
+        await fetchBusinesses();
+        toast.success(successMessage);
+      }
+
+      setSelectedBusinesses(new Set());
+      setSelectAll(false);
+    } catch (error) {
+      console.error(`Error performing ${action}:`, error);
+      toast.error(`Failed to ${action} businesses: ${error.message}`);
+    } finally {
+      setActionLoading({});
+    }
+  };
+
   const handleApproveBusiness = async (business) => {
     try {
-      setActionLoading(prev => ({ ...prev, [business.id]: 'approve' }));
+      setActionLoading((prev) => ({ ...prev, [business.id]: "approve" }));
 
-      // Check if permit is uploaded
       if (!business.permit_document) {
-        alert('This business has not uploaded a business permit. Please ask them to upload a permit first.');
+        toast.error(
+          "This business has not uploaded a business permit. Please ask them to upload a permit first.",
+        );
         return;
       }
 
-      // Get current admin profile
       const { data: adminProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
+        .from("profiles")
+        .select("id")
+        .eq("role", "admin")
         .maybeSingle();
 
-      // Update business with full approval
       const { error: businessError } = await supabase
-        .from('businesses')
-        .update({ 
-          verification_status: 'approved',
-          status: 'active',
+        .from("businesses")
+        .update({
+          verification_status: "approved",
+          status: "active",
           permit_verified: true,
           permit_verified_at: new Date().toISOString(),
           permit_verified_by: adminProfile?.id || null,
           verified_at: new Date().toISOString(),
           verified_by: adminProfile?.id || null,
-          updated_at: new Date().toISOString()
+          rejection_reason: null,
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', business.id);
+        .eq("id", business.id);
 
       if (businessError) throw businessError;
 
-      // Check if owner exists and needs to be approved
       if (business.owner_id) {
         const { data: ownerData } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', business.owner_id)
+          .from("profiles")
+          .select("role")
+          .eq("id", business.owner_id)
           .maybeSingle();
 
-        if (ownerData?.role === 'pending_owner') {
+        if (ownerData?.role === "pending_owner") {
           await supabase
-            .from('profiles')
-            .update({ 
-              role: 'owner',
-              verification_status: 'approved',
+            .from("profiles")
+            .update({
+              role: "owner",
+              verification_status: "approved",
               approved_at: new Date().toISOString(),
               approved_by: adminProfile?.id || null,
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             })
-            .eq('id', business.owner_id);
+            .eq("id", business.owner_id);
         }
       }
 
-      // Log verification - wrap in try/catch to avoid breaking if table doesn't exist
       try {
-        await supabase
-          .from('verification_logs')
-          .insert({
-            business_id: business.id,
-            owner_id: business.owner_id,
-            action_by: adminProfile?.id || null,
-            action_type: 'approve',
-            created_at: new Date().toISOString()
-          });
+        await supabase.from("verification_logs").insert({
+          business_id: business.id,
+          owner_id: business.owner_id,
+          action_by: adminProfile?.id || null,
+          action_type: "approve",
+          created_at: new Date().toISOString(),
+        });
       } catch (logError) {
-        console.error('Log error (non-critical):', logError);
-        // Don't throw, just log
+        console.error("Log error (non-critical):", logError);
       }
 
       await fetchBusinesses();
-      alert('Business approved successfully!');
+      toast.success("Business approved successfully!");
     } catch (error) {
-      console.error('Error approving business:', error);
-      alert(`Failed to approve business: ${error.message || 'Please try again.'}`);
+      console.error("Error approving business:", error);
+      toast.error(`Failed to approve business: ${error.message || "Please try again."}`);
     } finally {
-      setActionLoading(prev => ({ ...prev, [business.id]: null }));
+      setActionLoading((prev) => ({ ...prev, [business.id]: null }));
     }
   };
 
   const handleRejectBusiness = async (business, reason) => {
     try {
-      setActionLoading(prev => ({ ...prev, [business.id]: 'reject' }));
+      setActionLoading((prev) => ({ ...prev, [business.id]: "reject" }));
 
       const { data: adminProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
+        .from("profiles")
+        .select("id")
+        .eq("role", "admin")
         .maybeSingle();
 
-      // Update business to rejected - use 'inactive' for status since 'rejected' is not allowed
       const { error: businessError } = await supabase
-        .from('businesses')
-        .update({ 
-          verification_status: 'rejected',  // This is allowed in verification_status
-          status: 'inactive',               // Changed from 'rejected' to 'inactive' (allowed in status)
+        .from("businesses")
+        .update({
+          verification_status: "rejected",
+          status: "inactive",
           rejection_reason: reason,
           permit_verified: false,
           verified_at: new Date().toISOString(),
           verified_by: adminProfile?.id || null,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', business.id);
+        .eq("id", business.id);
 
       if (businessError) {
-        console.error('Business update error:', businessError);
+        console.error("Business update error:", businessError);
         throw businessError;
       }
 
-      // Log rejection - wrap in try/catch to avoid breaking if table doesn't exist
       try {
-        await supabase
-          .from('verification_logs')
-          .insert({
-            business_id: business.id,
-            owner_id: business.owner_id,
-            action_by: adminProfile?.id || null,
-            action_type: 'reject',
-            reason: reason,
-            created_at: new Date().toISOString()
-          });
+        await supabase.from("verification_logs").insert({
+          business_id: business.id,
+          owner_id: business.owner_id,
+          action_by: adminProfile?.id || null,
+          action_type: "reject",
+          reason: reason,
+          created_at: new Date().toISOString(),
+        });
       } catch (logError) {
-        console.error('Log error (non-critical):', logError);
-        // Don't throw, just log
+        console.error("Log error (non-critical):", logError);
       }
 
       await fetchBusinesses();
-      alert('Business rejected successfully.');
+      toast.success("Business rejected successfully.");
     } catch (error) {
-      console.error('Error rejecting business:', error);
-      alert(`Failed to reject business: ${error.message || 'Please try again.'}`);
+      console.error("Error rejecting business:", error);
+      toast.error(`Failed to reject business: ${error.message || "Please try again."}`);
     } finally {
-      setActionLoading(prev => ({ ...prev, [business.id]: null }));
+      setActionLoading((prev) => ({ ...prev, [business.id]: null }));
       setShowRejectionModal(false);
       setSelectedBusiness(null);
     }
@@ -270,128 +418,100 @@ const AdminBusinessManagement = () => {
     setShowRejectionModal(true);
   };
 
-  const handleVerifyPermit = async (businessId) => {
+  const handleSuspendBusiness = async (businessId) => {
+    setShowConfirmModal(false);
     try {
-      setActionLoading(prev => ({ ...prev, [businessId]: 'verifyPermit' }));
-
-      const { data: adminProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
-        .maybeSingle();
+      setActionLoading((prev) => ({ ...prev, [businessId]: "suspend" }));
 
       const { error } = await supabase
-        .from('businesses')
-        .update({ 
-          permit_verified: true,
-          permit_verified_at: new Date().toISOString(),
-          permit_verified_by: adminProfile?.id || null,
-          updated_at: new Date().toISOString()
+        .from("businesses")
+        .update({
+          status: "suspended",
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', businessId);
+        .eq("id", businessId);
 
       if (error) throw error;
 
-      // Log verification - wrap in try/catch
-      try {
-        const business = businesses.find(b => b.id === businessId);
-        if (business) {
-          await supabase
-            .from('verification_logs')
-            .insert({
-              business_id: businessId,
-              owner_id: business.owner_id,
-              action_by: adminProfile?.id || null,
-              action_type: 'verify_permit',
-              created_at: new Date().toISOString()
-            });
-        }
-      } catch (logError) {
-        console.error('Log error (non-critical):', logError);
-      }
-
       await fetchBusinesses();
-      alert('Permit verified successfully!');
+      toast.success("Business suspended successfully!");
     } catch (error) {
-      console.error('Error verifying permit:', error);
-      alert(`Failed to verify permit: ${error.message || 'Please try again.'}`);
+      console.error("Error suspending business:", error);
+      toast.error(`Failed to suspend business: ${error.message || "Please try again."}`);
     } finally {
-      setActionLoading(prev => ({ ...prev, [businessId]: null }));
+      setActionLoading((prev) => ({ ...prev, [businessId]: null }));
     }
   };
 
-  const handleSuspendBusiness = async (businessId) => {
-    if (!window.confirm('Are you sure you want to suspend this business? The business will not be visible to users.')) return;
-
+  const handleArchiveBusiness = async (businessId) => {
+    setShowConfirmModal(false);
     try {
-      setActionLoading(prev => ({ ...prev, [businessId]: 'suspend' }));
+      setActionLoading((prev) => ({ ...prev, [businessId]: "archive" }));
 
       const { error } = await supabase
-        .from('businesses')
-        .update({ 
-          status: 'suspended',
-          updated_at: new Date().toISOString()
+        .from("businesses")
+        .update({
+          status: "archived",
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', businessId);
+        .eq("id", businessId);
 
       if (error) throw error;
 
       await fetchBusinesses();
-      alert('Business suspended successfully!');
+      toast.success("Business archived successfully!");
     } catch (error) {
-      console.error('Error suspending business:', error);
-      alert(`Failed to suspend business: ${error.message || 'Please try again.'}`);
+      console.error("Error archiving business:", error);
+      toast.error(`Failed to archive business: ${error.message || "Please try again."}`);
     } finally {
-      setActionLoading(prev => ({ ...prev, [businessId]: null }));
+      setActionLoading((prev) => ({ ...prev, [businessId]: null }));
     }
   };
 
   const handleActivateBusiness = async (businessId) => {
-    if (!window.confirm('Are you sure you want to activate this business?')) return;
-
+    setShowConfirmModal(false);
     try {
-      setActionLoading(prev => ({ ...prev, [businessId]: 'activate' }));
+      setActionLoading((prev) => ({ ...prev, [businessId]: "activate" }));
 
       const { error } = await supabase
-        .from('businesses')
-        .update({ 
-          status: 'active',
-          updated_at: new Date().toISOString()
+        .from("businesses")
+        .update({
+          status: "active",
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', businessId);
+        .eq("id", businessId);
 
       if (error) throw error;
 
       await fetchBusinesses();
-      alert('Business activated successfully!');
+      toast.success("Business activated successfully!");
     } catch (error) {
-      console.error('Error activating business:', error);
-      alert(`Failed to activate business: ${error.message || 'Please try again.'}`);
+      console.error("Error activating business:", error);
+      toast.error(`Failed to activate business: ${error.message || "Please try again."}`);
     } finally {
-      setActionLoading(prev => ({ ...prev, [businessId]: null }));
+      setActionLoading((prev) => ({ ...prev, [businessId]: null }));
     }
   };
 
   const handleDeleteBusiness = async (businessId) => {
-    if (!window.confirm('⚠️ ARE YOU ABSOLUTELY SURE?\n\nDeleting this business will permanently remove all associated data including:\n• Business information\n• Membership plans\n• Member memberships\n• Applications\n• Payment records\n\nThis action CANNOT be undone!')) return;
-
+    setShowConfirmModal(false);
     try {
-      setActionLoading(prev => ({ ...prev, [businessId]: 'delete' }));
+      setActionLoading((prev) => ({ ...prev, [businessId]: "delete" }));
 
       const { error } = await supabase
-        .from('businesses')
+        .from("businesses")
         .delete()
-        .eq('id', businessId);
+        .eq("id", businessId);
 
       if (error) throw error;
 
       await fetchBusinesses();
-      alert('Business deleted successfully.');
+      toast.success("Business deleted successfully.");
     } catch (error) {
-      console.error('Error deleting business:', error);
-      alert(`Failed to delete business: ${error.message || 'Please try again.'}`);
+      console.error("Error deleting business:", error);
+      toast.error(`Failed to delete business: ${error.message || "Please try again."}`);
     } finally {
-      setActionLoading(prev => ({ ...prev, [businessId]: null }));
+      setActionLoading((prev) => ({ ...prev, [businessId]: null }));
     }
   };
 
@@ -406,65 +526,208 @@ const AdminBusinessManagement = () => {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return "N/A";
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       });
     } catch (e) {
-      return 'Invalid Date';
+      return "Invalid Date";
     }
   };
 
   const getBusinessIcon = (business) => {
     switch (business.business_type) {
-      case 'gym':
-        return business.emoji || '🏋️';
-      case 'cafe':
-        return business.emoji || '☕';
-      case 'bakery':
-        return business.emoji || '🥐';
+      case "gym":
+        return "🏋️";
+      case "cafe":
+        return "☕";
+      case "bookstore":
+        return "📚";
       default:
-        return business.emoji || '🏢';
+        return "🏢";
     }
   };
 
   const getStatusBadge = (status) => {
-    switch(status) {
-      case 'active':
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>;
-      case 'pending':
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Pending</span>;
-      case 'suspended':
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">Suspended</span>;
-      case 'inactive':
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Inactive (Rejected)</span>;
-      case 'rejected':
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Rejected</span>;
+    switch (status) {
+      case "active":
+        return (
+          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+            Active
+          </span>
+        );
+      case "pending":
+        return (
+          <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+            Pending
+          </span>
+        );
+      case "suspended":
+        return (
+          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+            Suspended
+          </span>
+        );
+      case "archived":
+        return (
+          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+            Archived
+          </span>
+        );
+      case "inactive":
+        return (
+          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+            Inactive
+          </span>
+        );
+      case "rejected":
+        return (
+          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+            Rejected
+          </span>
+        );
       default:
-        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{status}</span>;
+        return (
+          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+            {status}
+          </span>
+        );
     }
   };
 
   const getPermitBadge = (business) => {
     if (!business.permit_document) {
-      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">📄 No Permit</span>;
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          📄 No Permit
+        </span>
+      );
     }
     if (business.permit_verified) {
-      return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">✅ Permit Verified</span>;
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+          ✅ Permit Verified
+        </span>
+      );
     }
-    return <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">⏳ Permit Pending</span>;
+    return (
+      <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+        ⏳ Permit Pending
+      </span>
+    );
+  };
+
+  // Confirmation Modal Component
+  const ConfirmActionModal = () => {
+    const getConfirmMessage = () => {
+      switch (confirmAction) {
+        case "suspend":
+          return `Are you sure you want to suspend "${confirmBusinessName}"? The business will not be visible to users.`;
+        case "archive":
+          return `Are you sure you want to archive "${confirmBusinessName}"? The business will be hidden but all data will be preserved.`;
+        case "activate":
+          return `Are you sure you want to activate "${confirmBusinessName}"? The business will become visible to users again.`;
+        case "delete":
+          return `⚠️ ARE YOU ABSOLUTELY SURE?\n\nDeleting "${confirmBusinessName}" will permanently remove all associated data including:\n• Business information\n• Membership plans\n• Member memberships\n• Applications\n• Payment records\n\nThis action CANNOT be undone!`;
+        case "bulk_suspend":
+          return `Are you sure you want to suspend ${selectedBusinesses.size} business(es)? They will not be visible to users.`;
+        case "bulk_archive":
+          return `Are you sure you want to archive ${selectedBusinesses.size} business(es)? They will be hidden but data will be preserved.`;
+        case "bulk_delete":
+          return `⚠️ ARE YOU ABSOLUTELY SURE?\n\nDeleting ${selectedBusinesses.size} business(es) will permanently remove all associated data. This action CANNOT be undone!`;
+        default:
+          return "Are you sure you want to perform this action?";
+      }
+    };
+
+    const handleConfirm = () => {
+      if (confirmAction === "suspend") {
+        handleSuspendBusiness(confirmBusinessId);
+      } else if (confirmAction === "archive") {
+        handleArchiveBusiness(confirmBusinessId);
+      } else if (confirmAction === "activate") {
+        handleActivateBusiness(confirmBusinessId);
+      } else if (confirmAction === "delete") {
+        handleDeleteBusiness(confirmBusinessId);
+      } else if (confirmAction === "bulk_suspend") {
+        handleBulkAction("suspend");
+      } else if (confirmAction === "bulk_archive") {
+        handleBulkAction("archive");
+      } else if (confirmAction === "bulk_delete") {
+        handleBulkAction("delete");
+      }
+    };
+
+    const isBulkAction = confirmAction?.startsWith("bulk_");
+    const isDelete =
+      confirmAction === "delete" || confirmAction === "bulk_delete";
+    const isActivate = confirmAction === "activate";
+
+    const getHeaderColor = () => {
+      if (isDelete) return "bg-red-600";
+      if (isActivate) return "bg-green-600";
+      return "bg-orange-600";
+    };
+
+    const getButtonColor = () => {
+      if (isDelete) return "bg-red-600 hover:bg-red-700";
+      if (isActivate) return "bg-green-600 hover:bg-green-700";
+      return "bg-orange-600 hover:bg-orange-700";
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+        >
+          <div className={`px-6 py-4 ${getHeaderColor()}`}>
+            <h3 className="text-lg font-semibold text-white">
+              {isDelete
+                ? "⚠️ Confirm Permanent Deletion"
+                : isActivate
+                  ? "Confirm Activation"
+                  : "Confirm Action"}
+            </h3>
+          </div>
+          <div className="p-6">
+            <p className="text-gray-700 whitespace-pre-line">
+              {getConfirmMessage()}
+            </p>
+          </div>
+          <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+            <button
+              onClick={() => setShowConfirmModal(false)}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              className={`px-4 py-2 rounded-lg transition-colors text-white ${getButtonColor()}`}
+            >
+              Confirm
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
   };
 
   if (loading) {
     return (
       <AdminSidebarNav>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading businesses...</p>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
+          <div className="text-center select-none">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4 select-none"></div>
+            <p className="text-gray-600 font-medium select-none">
+              Loading businesses...
+            </p>
           </div>
         </div>
       </AdminSidebarNav>
@@ -473,18 +736,23 @@ const AdminBusinessManagement = () => {
 
   return (
     <AdminSidebarNav>
-      <div className="space-y-6">
+      <div className="space-y-6 select-none">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Business Management</h1>
-            <p className="text-gray-600 mt-1">Manage and verify business accounts</p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Business Management
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Manage and verify business accounts
+            </p>
           </div>
-          <button 
+          <button
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
-            onClick={() => navigate('/admin/businesses/add')}
+            onClick={() => navigate("/admin/businesses/add")}
           >
-            <span>➕</span> Add Business
+            <Plus className="w-4 h-4" />
+            Add Business
           </button>
         </div>
 
@@ -493,10 +761,12 @@ const AdminBusinessManagement = () => {
           <div className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                <span className="text-2xl">🏢</span>
+                <Building className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.total}
+                </p>
                 <p className="text-sm text-gray-600">Total Businesses</p>
               </div>
             </div>
@@ -505,10 +775,12 @@ const AdminBusinessManagement = () => {
           <div className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-                <span className="text-2xl">✅</span>
+                <CheckCircle className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{stats.verified}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.verified}
+                </p>
                 <p className="text-sm text-gray-600">Fully Verified</p>
               </div>
             </div>
@@ -517,10 +789,12 @@ const AdminBusinessManagement = () => {
           <div className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center">
-                <span className="text-2xl">⏳</span>
+                <Clock className="w-6 h-6 text-yellow-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{stats.permitPending}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.permitPending}
+                </p>
                 <p className="text-sm text-gray-600">Permit Pending</p>
               </div>
             </div>
@@ -529,10 +803,12 @@ const AdminBusinessManagement = () => {
           <div className="bg-white rounded-xl shadow-lg p-5 hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
-                <span className="text-2xl">⚠️</span>
+                <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{stats.suspended}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.suspended}
+                </p>
                 <p className="text-sm text-gray-600">Suspended</p>
               </div>
             </div>
@@ -543,7 +819,7 @@ const AdminBusinessManagement = () => {
         <div className="bg-white rounded-xl shadow-lg p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
                 placeholder="Search businesses by name, type, permit #, or owner..."
@@ -552,11 +828,11 @@ const AdminBusinessManagement = () => {
                 className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {searchTerm && (
-                <button 
+                <button
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  onClick={() => setSearchTerm('')}
+                  onClick={() => setSearchTerm("")}
                 >
-                  ✕
+                  <X className="w-4 h-4" />
                 </button>
               )}
             </div>
@@ -582,7 +858,8 @@ const AdminBusinessManagement = () => {
                 <option value="active">Active</option>
                 <option value="pending">Pending</option>
                 <option value="suspended">Suspended</option>
-                <option value="inactive">Inactive (Rejected)</option>
+                <option value="archived">Archived</option>
+                <option value="inactive">Inactive</option>
               </select>
 
               <select
@@ -590,7 +867,7 @@ const AdminBusinessManagement = () => {
                 onChange={(e) => setTypeFilter(e.target.value)}
                 className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
               >
-                {businessTypes.map(type => (
+                {businessTypes.map((type) => (
                   <option key={type.id} value={type.id}>
                     {type.icon} {type.label}
                   </option>
@@ -600,9 +877,65 @@ const AdminBusinessManagement = () => {
           </div>
         </div>
 
+        {/* Bulk Actions Bar */}
+        {selectedBusinesses.size > 0 && (
+          <div className="bg-blue-50 rounded-xl shadow-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">
+                {selectedBusinesses.size} business(es) selected
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmAction("bulk_archive")}
+                className="px-3 py-1.5 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-xs font-medium flex items-center gap-1"
+              >
+                <Archive className="w-3 h-3" />
+                Archive Selected
+              </button>
+              <button
+                onClick={() => setConfirmAction("bulk_suspend")}
+                className="px-3 py-1.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-medium flex items-center gap-1"
+              >
+                <AlertCircle className="w-3 h-3" />
+                Suspend Selected
+              </button>
+              <button
+                onClick={() => setConfirmAction("bulk_delete")}
+                className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-medium flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" />
+                Delete Selected
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Results count */}
-        <div className="text-sm text-gray-600">
-          Showing {filteredBusinesses.length} of {businesses.length} businesses
+        <div className="text-sm text-gray-600 flex items-center justify-between">
+          <span>
+            Showing {filteredBusinesses.length} of {businesses.length}{" "}
+            businesses
+          </span>
+          {filteredBusinesses.length > 0 && (
+            <button
+              onClick={handleSelectAll}
+              className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1"
+            >
+              {selectAll ? (
+                <>
+                  <CheckSquare className="w-4 h-4" />
+                  Deselect All
+                </>
+              ) : (
+                <>
+                  <Square className="w-4 h-4" />
+                  Select All
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Businesses Grid */}
@@ -614,17 +947,36 @@ const AdminBusinessManagement = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300"
+                whileHover={{ y: -4 }}
+                className={`bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 ${
+                  selectedBusinesses.has(business.id)
+                    ? "ring-2 ring-blue-500"
+                    : ""
+                }`}
               >
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleSelectBusiness(business.id)}
+                        className="mt-1"
+                      >
+                        {selectedBusinesses.has(business.id) ? (
+                          <CheckSquare className="w-5 h-5 text-blue-600" />
+                        ) : (
+                          <Square className="w-5 h-5 text-gray-400 hover:text-gray-600" />
+                        )}
+                      </button>
                       <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center text-3xl">
                         {getBusinessIcon(business)}
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg text-gray-900">{business.name}</h3>
-                        <span className="text-sm text-gray-500">{business.business_type}</span>
+                        <h3 className="font-semibold text-lg text-gray-900">
+                          {business.name}
+                        </h3>
+                        <span className="text-sm text-gray-500">
+                          {business.business_type}
+                        </span>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -635,18 +987,28 @@ const AdminBusinessManagement = () => {
 
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-500 w-20">👑 Owner:</span>
+                      <User className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-500 w-20">Owner:</span>
                       <span className="text-gray-700">
-                        {business.owner ? `${business.owner.first_name || ''} ${business.owner.last_name || ''}`.trim() || business.owner.email : 'No owner'}
+                        {business.owner
+                          ? `${business.owner.first_name || ""} ${business.owner.last_name || ""}`.trim() ||
+                            business.owner.email
+                          : "No owner"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-500 w-20">📍 Location:</span>
-                      <span className="text-gray-700">{business.location || 'Not specified'}</span>
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-500 w-20">Location:</span>
+                      <span className="text-gray-700">
+                        {business.location || "Not specified"}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-500 w-20">📄 Permit #:</span>
-                      <span className="text-gray-700">{business.permit_number || 'Not submitted'}</span>
+                      <FileText className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-500 w-20">Permit #:</span>
+                      <span className="text-gray-700">
+                        {business.permit_number || "Not submitted"}
+                      </span>
                       {business.permit_document && (
                         <button
                           onClick={() => handleViewPermit(business)}
@@ -658,147 +1020,210 @@ const AdminBusinessManagement = () => {
                     </div>
                     {business.permit_expiry && (
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="text-gray-500 w-20">📅 Expiry:</span>
-                        <span className="text-gray-700">{formatDate(business.permit_expiry)}</span>
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-500 w-20">Expiry:</span>
+                        <span className="text-gray-700">
+                          {formatDate(business.permit_expiry)}
+                        </span>
                       </div>
                     )}
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-500 w-20">📅 Created:</span>
-                      <span className="text-gray-700">{formatDate(business.created_at)}</span>
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-500 w-20">Created:</span>
+                      <span className="text-gray-700">
+                        {formatDate(business.created_at)}
+                      </span>
                     </div>
                     {business.description && (
                       <div className="mt-3 pt-3 border-t border-gray-100">
                         <p className="text-sm text-gray-600 line-clamp-2">
-                          {business.description.length > 100 ? `${business.description.substring(0, 100)}...` : business.description}
+                          {business.description.length > 100
+                            ? `${business.description.substring(0, 100)}...`
+                            : business.description}
                         </p>
                       </div>
                     )}
-                    {business.rejection_reason && (
-                      <div className="mt-2 p-2 bg-red-50 rounded-lg">
-                        <p className="text-xs text-red-600 font-medium">Rejection reason:</p>
-                        <p className="text-sm text-red-700">{business.rejection_reason}</p>
-                      </div>
-                    )}
+                    {business.verification_status === "rejected" &&
+                      business.rejection_reason && (
+                        <div className="mt-2 p-2 bg-red-50 rounded-lg">
+                          <p className="text-xs text-red-600 font-medium">
+                            Rejection reason:
+                          </p>
+                          <p className="text-sm text-red-700">
+                            {business.rejection_reason}
+                          </p>
+                        </div>
+                      )}
                   </div>
 
+                  {/* Action Buttons */}
                   <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
-                    {/* Permit Verification Button */}
-                    {business.permit_document && !business.permit_verified && (
-                      <button
-                        onClick={() => handleVerifyPermit(business.id)}
-                        disabled={actionLoading[business.id]}
-                        className="flex-1 px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium disabled:opacity-50"
-                      >
-                        {actionLoading[business.id] === 'verifyPermit' ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Verifying...
-                          </div>
-                        ) : (
-                          <>✓ Verify Permit</>
-                        )}
-                      </button>
-                    )}
-
-                    {/* Approval/Rejection buttons for pending businesses */}
-                    {business.verification_status === 'pending' && business.permit_document && (
-                      <>
-                        <button
+                    {/* Approve Button */}
+                    {business.verification_status === "pending" &&
+                      business.permit_document && (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => handleApproveBusiness(business)}
                           disabled={actionLoading[business.id]}
-                          className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
+                          className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                          title="Approve Business"
                         >
-                          {actionLoading[business.id] === 'approve' ? (
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                              Approving...
-                            </div>
+                          {actionLoading[business.id] === "approve" ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
                           ) : (
-                            <>✓ Approve</>
+                            <CheckCircle className="w-3 h-3" />
                           )}
-                        </button>
-                        <button
+                          <span>Approve</span>
+                        </motion.button>
+                      )}
+
+                    {/* Reject Button */}
+                    {business.verification_status === "pending" &&
+                      business.permit_document && (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => handleRejectClick(business)}
                           disabled={actionLoading[business.id]}
-                          className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+                          className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                          title="Reject Business"
                         >
-                          {actionLoading[business.id] === 'reject' ? (
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                              Rejecting...
-                            </div>
+                          {actionLoading[business.id] === "reject" ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
                           ) : (
-                            <>✗ Reject</>
+                            <XCircle className="w-3 h-3" />
                           )}
-                        </button>
-                      </>
-                    )}
-
-                    {business.status === 'active' ? (
-                      <button
-                        onClick={() => handleSuspendBusiness(business.id)}
-                        disabled={actionLoading[business.id]}
-                        className="flex-1 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium disabled:opacity-50"
-                      >
-                        {actionLoading[business.id] === 'suspend' ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Suspending...
-                          </div>
-                        ) : (
-                          <>⚠️ Suspend</>
-                        )}
-                      </button>
-                    ) : business.status === 'suspended' ? (
-                      <button
-                        onClick={() => handleActivateBusiness(business.id)}
-                        disabled={actionLoading[business.id]}
-                        className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
-                      >
-                        {actionLoading[business.id] === 'activate' ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Activating...
-                          </div>
-                        ) : (
-                          <>✓ Activate</>
-                        )}
-                      </button>
-                    ) : business.status === 'inactive' && business.permit_document && (
-                      <button
-                        onClick={() => handleApproveBusiness(business)}
-                        disabled={actionLoading[business.id]}
-                        className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
-                      >
-                        {actionLoading[business.id] === 'approve' ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Reactivating...
-                          </div>
-                        ) : (
-                          <>🔄 Reactivate</>
-                        )}
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => handleViewDetails(business)}
-                      className="flex-1 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
-                    >
-                      👁️ View Details
-                    </button>
-
-                    <button
-                      onClick={() => handleDeleteBusiness(business.id)}
-                      disabled={actionLoading[business.id]}
-                      className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
-                    >
-                      {actionLoading[business.id] === 'delete' ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <>🗑️ Delete</>
+                          <span>Reject</span>
+                        </motion.button>
                       )}
-                    </button>
+
+                    {/* Archive Button (for active businesses) */}
+                    {business.status === "active" && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() =>
+                          showConfirmDialog(
+                            "archive",
+                            business.id,
+                            business.name,
+                          )
+                        }
+                        disabled={actionLoading[business.id]}
+                        className="px-3 py-1.5 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                        title="Archive Business"
+                      >
+                        {actionLoading[business.id] === "archive" ? (
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Archive className="w-3 h-3" />
+                        )}
+                        <span>Archive</span>
+                      </motion.button>
+                    )}
+
+                    {/* Suspend Button (for active businesses) */}
+                    {business.status === "active" && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() =>
+                          showConfirmDialog(
+                            "suspend",
+                            business.id,
+                            business.name,
+                          )
+                        }
+                        disabled={actionLoading[business.id]}
+                        className="px-3 py-1.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                        title="Suspend Business"
+                      >
+                        {actionLoading[business.id] === "suspend" ? (
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <AlertCircle className="w-3 h-3" />
+                        )}
+                        <span>Suspend</span>
+                      </motion.button>
+                    )}
+
+                    {/* Activate Button (for suspended/archived businesses) */}
+                    {(business.status === "suspended" ||
+                      business.status === "archived") && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() =>
+                          showConfirmDialog(
+                            "activate",
+                            business.id,
+                            business.name,
+                          )
+                        }
+                        disabled={actionLoading[business.id]}
+                        className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                        title="Activate Business"
+                      >
+                        {actionLoading[business.id] === "activate" ? (
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-3 h-3" />
+                        )}
+                        <span>Activate</span>
+                      </motion.button>
+                    )}
+
+                    {/* Reactivate Button (for inactive/rejected businesses with permit) */}
+                    {business.status === "inactive" &&
+                      business.permit_document && (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleApproveBusiness(business)}
+                          disabled={actionLoading[business.id]}
+                          className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                          title="Reactivate Business"
+                        >
+                          {actionLoading[business.id] === "approve" ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3" />
+                          )}
+                          <span>Reactivate</span>
+                        </motion.button>
+                      )}
+
+                    {/* View Details Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleViewDetails(business)}
+                      className="px-3 py-1.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-medium flex items-center gap-1"
+                      title="View Details"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>Details</span>
+                    </motion.button>
+
+                    {/* Delete Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() =>
+                        showConfirmDialog("delete", business.id, business.name)
+                      }
+                      disabled={actionLoading[business.id]}
+                      className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                      title="Delete Business Permanently"
+                    >
+                      {actionLoading[business.id] === "delete" ? (
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3 h-3" />
+                      )}
+                      <span>Delete</span>
+                    </motion.button>
                   </div>
                 </div>
               </motion.div>
@@ -807,16 +1232,24 @@ const AdminBusinessManagement = () => {
         ) : (
           <div className="text-center py-12 bg-white rounded-xl shadow-lg">
             <div className="text-6xl mb-4">🏢</div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No Businesses Found</h3>
-            <p className="text-gray-500">Try adjusting your search or filter to find what you're looking for.</p>
-            {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all' || verificationFilter !== 'all') && (
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">
+              No Businesses Found
+            </h3>
+            <p className="text-gray-500">
+              Try adjusting your search or filter to find what you're looking
+              for.
+            </p>
+            {(searchTerm ||
+              statusFilter !== "all" ||
+              typeFilter !== "all" ||
+              verificationFilter !== "all") && (
               <button
                 className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 onClick={() => {
-                  setSearchTerm('');
-                  setStatusFilter('all');
-                  setTypeFilter('all');
-                  setVerificationFilter('all');
+                  setSearchTerm("");
+                  setStatusFilter("all");
+                  setTypeFilter("all");
+                  setVerificationFilter("all");
                 }}
               >
                 Clear All Filters
@@ -825,10 +1258,13 @@ const AdminBusinessManagement = () => {
           </div>
         )}
 
-        {/* Business Details Modal */}
+        {/* Business Details Modal - No Footer */}
         <AnimatePresence>
           {showDetailsModal && selectedBusiness && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDetailsModal(false)}>
+            <div
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              onClick={() => setShowDetailsModal(false)}
+            >
               <motion.div
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -838,104 +1274,154 @@ const AdminBusinessManagement = () => {
               >
                 <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex justify-between items-center">
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl">{getBusinessIcon(selectedBusiness)}</span>
-                    <h2 className="text-xl font-bold text-white">{selectedBusiness.name}</h2>
+                    <span className="text-3xl">
+                      {getBusinessIcon(selectedBusiness)}
+                    </span>
+                    <h2 className="text-xl font-bold text-white">
+                      {selectedBusiness.name}
+                    </h2>
                   </div>
-                  <button onClick={() => setShowDetailsModal(false)} className="text-white hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center">
-                    ×
+                  <button
+                    onClick={() => setShowDetailsModal(false)}
+                    className="text-white hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center"
+                  >
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
-                
-                <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-6">
+
+                {/* Blue scrollbar styling */}
+                <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-6 scrollbar-thin scrollbar-thumb-blue-500 scrollbar-track-gray-200 hover:scrollbar-thumb-blue-600">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Business Information */}
                     <div className="space-y-4">
-                      <h3 className="font-semibold text-gray-900 border-b pb-2">Business Information</h3>
+                      <h3 className="font-semibold text-gray-900 border-b pb-2">
+                        Business Information
+                      </h3>
                       <div className="space-y-2">
-                        <div><span className="text-gray-500">Type:</span> {selectedBusiness.business_type}</div>
-                        <div><span className="text-gray-500">Status:</span> {getStatusBadge(selectedBusiness.status)}</div>
-                        <div><span className="text-gray-500">Verification:</span> {getPermitBadge(selectedBusiness)}</div>
-                        <div><span className="text-gray-500">Location:</span> {selectedBusiness.location || 'Not specified'}</div>
-                        <div><span className="text-gray-500">Address:</span> {selectedBusiness.address || 'Not specified'}</div>
+                        <div>
+                          <span className="text-gray-500">Type:</span>{" "}
+                          {selectedBusiness.business_type}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Status:</span>{" "}
+                          {getStatusBadge(selectedBusiness.status)}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Verification:</span>{" "}
+                          {getPermitBadge(selectedBusiness)}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Location:</span>{" "}
+                          {selectedBusiness.location || "Not specified"}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Address:</span>{" "}
+                          {selectedBusiness.address || "Not specified"}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Owner Information */}
                     <div className="space-y-4">
-                      <h3 className="font-semibold text-gray-900 border-b pb-2">Owner Information</h3>
+                      <h3 className="font-semibold text-gray-900 border-b pb-2">
+                        Owner Information
+                      </h3>
                       <div className="space-y-2">
-                        <div><span className="text-gray-500">Name:</span> {selectedBusiness.owner ? `${selectedBusiness.owner.first_name || ''} ${selectedBusiness.owner.last_name || ''}`.trim() || 'N/A' : 'No owner'}</div>
-                        <div><span className="text-gray-500">Email:</span> {selectedBusiness.owner?.email || 'N/A'}</div>
+                        <div>
+                          <span className="text-gray-500">Name:</span>{" "}
+                          {selectedBusiness.owner
+                            ? `${selectedBusiness.owner.first_name || ""} ${selectedBusiness.owner.last_name || ""}`.trim() ||
+                              "N/A"
+                            : "No owner"}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Email:</span>{" "}
+                          {selectedBusiness.owner?.email || "N/A"}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Permit Information */}
                     <div className="space-y-4">
-                      <h3 className="font-semibold text-gray-900 border-b pb-2">Permit Information</h3>
+                      <h3 className="font-semibold text-gray-900 border-b pb-2">
+                        Permit Information
+                      </h3>
                       <div className="space-y-2">
-                        <div><span className="text-gray-500">Permit Number:</span> {selectedBusiness.permit_number || 'Not provided'}</div>
-                        <div><span className="text-gray-500">Expiry Date:</span> {selectedBusiness.permit_expiry ? new Date(selectedBusiness.permit_expiry).toLocaleDateString() : 'Not provided'}</div>
+                        <div>
+                          <span className="text-gray-500">Permit Number:</span>{" "}
+                          {selectedBusiness.permit_number || "Not provided"}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Expiry Date:</span>{" "}
+                          {selectedBusiness.permit_expiry
+                            ? new Date(
+                                selectedBusiness.permit_expiry,
+                              ).toLocaleDateString()
+                            : "Not provided"}
+                        </div>
                         {selectedBusiness.permit_document && (
-                          <div><button onClick={() => { setShowDetailsModal(false); handleViewPermit(selectedBusiness); }} className="text-blue-600 hover:underline">📄 View Permit Document</button></div>
+                          <div>
+                            <button
+                              onClick={() => {
+                                setShowDetailsModal(false);
+                                handleViewPermit(selectedBusiness);
+                              }}
+                              className="text-blue-600 hover:underline"
+                            >
+                              📄 View Permit Document
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Contact Information */}
                     <div className="space-y-4">
-                      <h3 className="font-semibold text-gray-900 border-b pb-2">Contact Information</h3>
+                      <h3 className="font-semibold text-gray-900 border-b pb-2">
+                        Business Metrics
+                      </h3>
                       <div className="space-y-2">
-                        <div><span className="text-gray-500">Phone:</span> {selectedBusiness.contact_phone || 'Not provided'}</div>
-                        <div><span className="text-gray-500">Email:</span> {selectedBusiness.contact_email || 'Not provided'}</div>
-                        <div><span className="text-gray-500">Website:</span> {selectedBusiness.website || 'Not provided'}</div>
-                      </div>
-                    </div>
-
-                    {/* Business Metrics */}
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-gray-900 border-b pb-2">Business Metrics</h3>
-                      <div className="space-y-2">
-                        <div><span className="text-gray-500">Members:</span> {selectedBusiness.members_count || 0}</div>
-                        <div><span className="text-gray-500">Rating:</span> {selectedBusiness.rating || '0.0'} ⭐</div>
-                        <div><span className="text-gray-500">Created:</span> {formatDate(selectedBusiness.created_at)}</div>
-                        <div><span className="text-gray-500">Last Updated:</span> {formatDate(selectedBusiness.updated_at)}</div>
+                        <div>
+                          <span className="text-gray-500">Members:</span>{" "}
+                          {selectedBusiness.members_count || 0}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Rating:</span>{" "}
+                          {selectedBusiness.rating || "0.0"} ⭐
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Created:</span>{" "}
+                          {formatDate(selectedBusiness.created_at)}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Last Updated:</span>{" "}
+                          {formatDate(selectedBusiness.updated_at)}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Description */}
-                  <div className="mt-6">
-                    <h3 className="font-semibold text-gray-900 border-b pb-2">Description</h3>
-                    <p className="mt-2 text-gray-700">{selectedBusiness.description || 'No description provided.'}</p>
-                  </div>
-
-                  {/* Rejection Reason */}
-                  {selectedBusiness.rejection_reason && (
-                    <div className="mt-4 p-4 bg-red-50 rounded-lg">
-                      <h3 className="font-semibold text-red-800">Rejection Reason</h3>
-                      <p className="text-red-700">{selectedBusiness.rejection_reason}</p>
+                  {selectedBusiness.description && (
+                    <div className="mt-6">
+                      <h3 className="font-semibold text-gray-900 border-b pb-2">
+                        Description
+                      </h3>
+                      <p className="mt-2 text-gray-700">
+                        {selectedBusiness.description}
+                      </p>
                     </div>
                   )}
+
+                  {selectedBusiness.verification_status === "rejected" &&
+                    selectedBusiness.rejection_reason && (
+                      <div className="mt-4 p-4 bg-red-50 rounded-lg">
+                        <h3 className="font-semibold text-red-800">
+                          Rejection Reason
+                        </h3>
+                        <p className="text-red-700">
+                          {selectedBusiness.rejection_reason}
+                        </p>
+                      </div>
+                    )}
                 </div>
 
-                <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
-                  <button onClick={() => setShowDetailsModal(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
-                    Close
-                  </button>
-                  {selectedBusiness.verification_status === 'pending' && selectedBusiness.permit_document && (
-                    <>
-                      <button onClick={() => { setShowDetailsModal(false); handleApproveBusiness(selectedBusiness); }} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                        ✓ Approve Business
-                      </button>
-                      <button onClick={() => { setShowDetailsModal(false); handleRejectClick(selectedBusiness); }} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-                        ✗ Reject Business
-                      </button>
-                    </>
-                  )}
-                  <button onClick={() => { setShowDetailsModal(false); navigate(`/admin/businesses/edit/${selectedBusiness.id}`); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    Edit Business
-                  </button>
-                </div>
+                {/* No Footer - No buttons */}
               </motion.div>
             </div>
           )}
@@ -959,9 +1445,18 @@ const AdminBusinessManagement = () => {
             setSelectedBusiness(null);
           }}
           onConfirm={(reason) => handleRejectBusiness(selectedBusiness, reason)}
-          ownerName={selectedBusiness ? `${selectedBusiness.owner?.first_name || ''} ${selectedBusiness.owner?.last_name || ''}`.trim() : ''}
-          businessName={selectedBusiness?.name || ''}
+          ownerName={
+            selectedBusiness
+              ? `${selectedBusiness.owner?.first_name || ""} ${selectedBusiness.owner?.last_name || ""}`.trim()
+              : ""
+          }
+          businessName={selectedBusiness?.name || ""}
         />
+
+        {/* Confirmation Modal */}
+        <AnimatePresence>
+          {showConfirmModal && <ConfirmActionModal />}
+        </AnimatePresence>
       </div>
     </AdminSidebarNav>
   );

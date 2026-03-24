@@ -307,6 +307,7 @@ const OwnerDashboard = () => {
             timeAgo: timeAgo,
             avatarUrl: avatarUrl,
             businessName: app.business?.name || "Unknown Business",
+            businessEmoji: app.business?.emoji || "🏢",
             businessVerification:
               app.business?.verification_status || "pending",
             hasPermit: !!app.business?.permit_document,
@@ -901,7 +902,9 @@ const OwnerDashboard = () => {
                         </td>
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-1.5 text-gray-600 dark:text-gray-300">
-                            <Building className="w-3 h-3" />
+                            <span className="text-base select-none">
+                              {app.businessEmoji || "🏢"}
+                            </span>
                             <span className="text-sm select-none">
                               {app.businessName}
                             </span>

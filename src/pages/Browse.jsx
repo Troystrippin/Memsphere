@@ -110,7 +110,8 @@ const Browse = () => {
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [businessReviews, setBusinessReviews] = useState({});
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [selectedBusinessForReview, setSelectedBusinessForReview] = useState(null);
+  const [selectedBusinessForReview, setSelectedBusinessForReview] =
+    useState(null);
   const [reviewFormData, setReviewFormData] = useState({
     rating: 0,
     comment: "",
@@ -142,7 +143,7 @@ const Browse = () => {
     { id: "all", label: "All", icon: "🏢" },
     { id: "gym", label: "Gym", icon: "🏋️" },
     { id: "cafe", label: "Cafe", icon: "☕" },
-    { id: "bakery", label: "Bakery", icon: "🥐" },
+    { id: "bookstore", label: "Bookstore", icon: "📚" },
   ];
 
   useEffect(() => {
@@ -165,17 +166,21 @@ const Browse = () => {
   // ADDED: Auto-open business modal when coming from dashboard
   useEffect(() => {
     const state = location.state;
-    
+
     if (state?.businessToOpen) {
       console.log("Opening business modal for:", state.businessToOpen.name);
-      
+
       const openModal = () => {
         // Check if the business is already loaded
-        const businessExists = businesses.some(b => b.id === state.businessToOpen.id);
-        
+        const businessExists = businesses.some(
+          (b) => b.id === state.businessToOpen.id,
+        );
+
         if (businessExists) {
           // If business exists in list, open with that business
-          const business = businesses.find(b => b.id === state.businessToOpen.id);
+          const business = businesses.find(
+            (b) => b.id === state.businessToOpen.id,
+          );
           if (business) {
             handleViewDetails(business);
           } else {
@@ -184,7 +189,9 @@ const Browse = () => {
         } else {
           // If not loaded yet, wait a bit and try again
           setTimeout(() => {
-            const business = businesses.find(b => b.id === state.businessToOpen.id);
+            const business = businesses.find(
+              (b) => b.id === state.businessToOpen.id,
+            );
             if (business) {
               handleViewDetails(business);
             } else {
@@ -193,11 +200,11 @@ const Browse = () => {
             }
           }, 500);
         }
-        
+
         // Clear the state to prevent reopening on refresh
         navigate("/browse", { replace: true, state: {} });
       };
-      
+
       // Small delay to ensure businesses array is populated
       setTimeout(openModal, 100);
     }
@@ -311,7 +318,7 @@ const Browse = () => {
             last_name,
             avatar_url
           )
-        `
+        `,
         )
         .eq("business_id", businessId)
         .order("created_at", { ascending: false });
@@ -577,7 +584,7 @@ const Browse = () => {
       console.log("Membership created successfully:", data);
 
       const business = businesses.find(
-        (b) => b.id === selectedPlanForPayment.businessId
+        (b) => b.id === selectedPlanForPayment.businessId,
       );
 
       // Send notifications
@@ -589,11 +596,13 @@ const Browse = () => {
           user.id,
           newMembership.id,
           business.name,
-          selectedPlanForPayment.price
+          selectedPlanForPayment.price,
         );
 
         // Send notification to business owner about new application
-        const applicantName = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || user.email;
+        const applicantName =
+          `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() ||
+          user.email;
 
         await notificationService.sendApplicationReceivedToOwner(
           business.owner_id,
@@ -601,7 +610,7 @@ const Browse = () => {
           business.name,
           applicantName,
           selectedPlanForPayment.name,
-          selectedPlanForPayment.price
+          selectedPlanForPayment.price,
         );
       }
 
@@ -627,7 +636,7 @@ const Browse = () => {
       console.error("Error message:", error.message);
       console.error("Error details:", error.details);
       alert(
-        `Failed to submit payment: ${error.message || "Please try again."}`
+        `Failed to submit payment: ${error.message || "Please try again."}`,
       );
     } finally {
       setSubmittingPayment(false);
@@ -704,7 +713,7 @@ const Browse = () => {
       setSubmittingReview(true);
 
       const existingReview = await checkExistingReview(
-        selectedBusinessForReview.id
+        selectedBusinessForReview.id,
       );
 
       let result;
@@ -717,8 +726,7 @@ const Browse = () => {
             comment: reviewFormData.comment.trim(),
             updated_at: new Date().toISOString(),
           })
-          .eq("id", existingReview.id)
-          .select(`
+          .eq("id", existingReview.id).select(`
             *,
             profiles:user_id (
               first_name,
@@ -731,19 +739,16 @@ const Browse = () => {
         result = data[0];
         alert("Your review has been updated!");
       } else {
-        const { data, error } = await supabase
-          .from("reviews")
-          .insert([
-            {
-              business_id: selectedBusinessForReview.id,
-              user_id: user.id,
-              rating: reviewFormData.rating,
-              comment: reviewFormData.comment.trim(),
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-          ])
-          .select(`
+        const { data, error } = await supabase.from("reviews").insert([
+          {
+            business_id: selectedBusinessForReview.id,
+            user_id: user.id,
+            rating: reviewFormData.rating,
+            comment: reviewFormData.comment.trim(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]).select(`
             *,
             profiles:user_id (
               first_name,
@@ -762,7 +767,7 @@ const Browse = () => {
         [selectedBusinessForReview.id]: [
           result,
           ...(prev[selectedBusinessForReview.id]?.filter(
-            (r) => r.id !== result.id
+            (r) => r.id !== result.id,
           ) || []),
         ],
       }));
@@ -784,8 +789,8 @@ const Browse = () => {
         prev.map((b) =>
           b.id === selectedBusinessForReview.id
             ? { ...b, rating: avgRating, review_count: newReviews.length }
-            : b
-        )
+            : b,
+        ),
       );
 
       setShowReviewModal(false);
@@ -833,8 +838,8 @@ const Browse = () => {
         return business.emoji || "🏋️";
       case "cafe":
         return business.emoji || "☕";
-      case "bakery":
-        return business.emoji || "🥐";
+      case "bookstore":
+        return business.emoji || "📚";
       default:
         return business.emoji || "🏢";
     }
@@ -916,19 +921,19 @@ const Browse = () => {
         stars.push(
           <span key={i} className={`star full ${isYellow ? "yellow" : ""}`}>
             ★
-          </span>
+          </span>,
         );
       } else if (i === fullStars + 1 && hasHalfStar) {
         stars.push(
           <span key={i} className={`star half ${isYellow ? "yellow" : ""}`}>
             ★
-          </span>
+          </span>,
         );
       } else {
         stars.push(
           <span key={i} className={`star empty ${isYellow ? "yellow" : ""}`}>
             ☆
-          </span>
+          </span>,
         );
       }
     }
@@ -940,7 +945,9 @@ const Browse = () => {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
         <div className="text-center select-none">
           <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4 select-none"></div>
-          <p className="text-gray-600 font-medium select-none">Loading Businesses...</p>
+          <p className="text-gray-600 font-medium select-none">
+            Loading Businesses...
+          </p>
         </div>
       </div>
     );
@@ -958,7 +965,7 @@ const Browse = () => {
             <span className="title-glow"></span>
           </h1>
           <p className={`browse-subtitle ${isDarkMode ? "dark-mode" : ""}`}>
-            Find the perfect gym, cafe, or bakery that matches your lifestyle
+            Find the perfect gym, cafe, or bookstore that matches your lifestyle
           </p>
         </div>
 
@@ -1358,7 +1365,7 @@ const Browse = () => {
                             <CheckCircle size={14} />
                             {amenity}
                           </div>
-                        )
+                        ),
                       )}
                     </div>
                   </div>
@@ -1486,7 +1493,7 @@ const Browse = () => {
                                   className={`review-date ${isDarkMode ? "dark-mode" : ""}`}
                                 >
                                   {new Date(
-                                    review.created_at
+                                    review.created_at,
                                   ).toLocaleDateString("en-US", {
                                     year: "numeric",
                                     month: "short",
@@ -1661,7 +1668,9 @@ const Browse = () => {
                         </ul>
                         <button
                           className={`join-plan-btn-enhanced ${isDarkMode ? "dark-mode" : ""}`}
-                          onClick={() => handleJoinNow(selectedBusiness.id, plan)}
+                          onClick={() =>
+                            handleJoinNow(selectedBusiness.id, plan)
+                          }
                           disabled={joiningPlan === plan.id}
                         >
                           {joiningPlan === plan.id ? (

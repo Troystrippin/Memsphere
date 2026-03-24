@@ -1718,261 +1718,244 @@ body {
   background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
 }
 
-.dashboard-container.dark-mode .user-greeting {
+/* Dark mode for Tailwind classes used in ClientDashboard */
+.dark-mode.bg-gray-900,
+.dark-mode .bg-gray-900 {
+  background-color: #111827 !important;
+}
+
+.dark-mode .bg-gray-800 {
+  background-color: #1f2937 !important;
+}
+
+.dark-mode .bg-gray-50 {
+  background-color: #111827 !important;
+}
+
+.dark-mode .bg-white {
+  background-color: #1f2937 !important;
+}
+
+.dark-mode .text-white {
+  color: #f3f4f6 !important;
+}
+
+.dark-mode .text-gray-900 {
+  color: #f3f4f6 !important;
+}
+
+.dark-mode .text-gray-800 {
+  color: #e5e7eb !important;
+}
+
+.dark-mode .text-gray-700 {
+  color: #d1d5db !important;
+}
+
+.dark-mode .text-gray-600 {
+  color: #9ca3af !important;
+}
+
+.dark-mode .text-gray-500 {
+  color: #6b7280 !important;
+}
+
+.dark-mode .text-gray-400 {
+  color: #9ca3af !important;
+}
+
+.dark-mode .text-gray-300 {
+  color: #d1d5db !important;
+}
+
+.dark-mode .border-gray-700 {
+  border-color: #374151 !important;
+}
+
+.dark-mode .border-gray-200 {
+  border-color: #374151 !important;
+}
+
+.dark-mode .border-gray-100 {
+  border-color: #374151 !important;
+}
+
+.dark-mode .bg-gray-100 {
+  background-color: #374151 !important;
+}
+
+.dark-mode .hover\:bg-gray-50:hover {
+  background-color: #374151 !important;
+}
+
+.dark-mode .hover\:bg-gray-100:hover {
+  background-color: #4b5563 !important;
+}
+
+.dark-mode .divide-gray-700 > * {
+  border-color: #374151 !important;
+}
+
+.dark-mode .divide-gray-100 > * {
+  border-color: #374151 !important;
+}
+
+.dark-mode .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Stats cards in dark mode */
+.dark-mode .rounded-2xl.shadow-lg {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+.dark-mode .bg-gradient-to-r.from-blue-50.to-indigo-50 {
+  background: linear-gradient(135deg, #1e3a8a 0%, #4c1d95 100%) !important;
+}
+
+.dark-mode .bg-gradient-to-r.from-gray-800.to-gray-900 {
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%) !important;
+}
+
+.dark-mode .bg-gradient-to-br.from-blue-500.to-purple-600 {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%) !important;
+}
+
+/* Membership table in dark mode */
+.dark-mode .bg-gray-50 {
+  background-color: #111827 !important;
+}
+
+.dark-mode table thead tr {
+  background-color: #111827 !important;
+}
+
+.dark-mode table tbody tr {
+  background-color: #1f2937 !important;
+}
+
+.dark-mode table tbody tr:hover {
+  background-color: #374151 !important;
+}
+
+.dark-mode .hover\:bg-gray-50:hover {
+  background-color: #374151 !important;
+}
+
+/* Badges in dark mode */
+.dark-mode .bg-green-100 {
+  background-color: #064e3b !important;
+  color: #6ee7b7 !important;
+}
+
+.dark-mode .bg-yellow-100 {
+  background-color: #713f12 !important;
+  color: #fde047 !important;
+}
+
+.dark-mode .bg-red-100 {
+  background-color: #991b1b !important;
+  color: #fca5a5 !important;
+}
+
+.dark-mode .bg-blue-100 {
+  background-color: #1e3a8a !important;
+  color: #93c5fd !important;
+}
+
+.dark-mode .text-green-600 {
+  color: #4ade80 !important;
+}
+
+.dark-mode .text-yellow-600 {
+  color: #facc15 !important;
+}
+
+.dark-mode .text-red-600 {
+  color: #f87171 !important;
+}
+
+.dark-mode .text-blue-600 {
+  color: #60a5fa !important;
+}
+
+/* Buttons in dark mode */
+.dark-mode .bg-blue-600 {
+  background-color: #2563eb !important;
+}
+
+.dark-mode .bg-blue-600:hover {
+  background-color: #1d4ed8 !important;
+}
+
+.dark-mode .bg-gray-700 {
+  background-color: #374151 !important;
+}
+
+/* Recommended cards in dark mode */
+.dark-mode .bg-gradient-to-br.from-blue-50.to-purple-50 {
+  background: linear-gradient(135deg, #1e3a8a 0%, #5b21b6 100%) !important;
+}
+
+.dark-mode .bg-gray-800 {
+  background-color: #1f2937 !important;
+}
+
+.dark-mode .border-blue-500\/50 {
+  border-color: rgba(59, 130, 246, 0.5) !important;
+}
+
+.dark-mode .text-blue-400 {
+  color: #60a5fa !important;
+}
+
+.dark-mode .hover\:bg-blue-500\/20:hover {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Scrollbar for dark mode */
+.dark-mode ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark-mode ::-webkit-scrollbar-track {
   background: #1f2937;
-  border-color: #374151;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
-.dashboard-container.dark-mode .user-greeting:hover {
-  border-color: #3b82f6;
+.dark-mode ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
 }
 
-.dashboard-container.dark-mode .greeting-text,
-.dashboard-container.dark-mode .greeting-name {
-  color: #e5e7eb;
+.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
-.dashboard-container.dark-mode .enhanced-stat-card {
-  background: #1f2937;
-  border-color: #374151;
+/* Dashboard Main Container */
+.dashboard-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--gray-50) 0%, #ffffff 100%);
+  position: relative;
+  width: 100%;
+  overflow-x: hidden;
+  padding-top: var(--navbar-height);
 }
 
-.dashboard-container.dark-mode .enhanced-stat-card:hover {
-  border-color: #3b82f6;
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.3),
-    0 10px 15px -3px rgba(0, 0, 0, 0.2);
+.dashboard-main {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  padding: 2rem;
+  width: 100%;
 }
 
-.dashboard-container.dark-mode .stat-label {
-  color: #9ca3af;
+/* Dark mode for dashboard */
+.dashboard-container.dark-mode {
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
 }
 
-.dashboard-container.dark-mode .stat-value-large {
-  color: #f3f4f6;
+.dashboard-container.dark-mode .dashboard-main {
+  background: transparent;
 }
 
-.dashboard-container.dark-mode .stat-footer {
-  color: #6b7280;
-}
-
-.dashboard-container.dark-mode .status-badge {
-  background: #1f2937;
-  border-color: #374151;
-}
-
-.dashboard-container.dark-mode .status-label {
-  color: #9ca3af;
-}
-sec .dashboard-container.dark-mode .sort-btn {
-  background: #1f2937;
-  border-color: #374151;
-  color: #9ca3af;
-}
-
-.dashboard-container.dark-mode .sort-btn:hover {
-  background: #374151;
-  border-color: #3b82f6;
-  color: #3b82f6;
-}
-
-.dashboard-container.dark-mode .sort-btn.active {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: white;
-}
-
-.dashboard-container.dark-mode .membership-card-enhanced {
-  background: #1f2937;
-  border-color: #374151;
-}
-
-.dashboard-container.dark-mode .business-name-enhanced {
-  color: #f3f4f6;
-}
-
-.dashboard-container.dark-mode .plan-badge-container {
-  background: #374151;
-  border-color: #4b5563;
-  color: #3b82f6;
-}
-
-.dashboard-container.dark-mode .timeline-label {
-  color: #9ca3af;
-}
-
-.dashboard-container.dark-mode .timeline-value {
-  color: #f3f4f6;
-}
-
-.dashboard-container.dark-mode .features-title {
-  color: #9ca3af;
-  border-top-color: #374151;
-}
-
-.dashboard-container.dark-mode .benefit-item {
-  background: #374151;
-  border-color: #4b5563;
-  color: #3b82f6;
-}
-
-.dashboard-container.dark-mode .timer,
-.dashboard-container.dark-mode .timer-warning,
-.dashboard-container.dark-mode .timer-critical {
-  background: #374151;
-  border-color: #4b5563;
-}
-
-.dashboard-container.dark-mode .timer {
-  color: #3b82f6;
-}
-
-.dashboard-container.dark-mode .timer-warning {
-  color: #f59e0b;
-  background: #422006;
-  border-color: #f59e0b;
-}
-
-.dashboard-container.dark-mode .timer-critical {
-  color: #ef4444;
-  background: #450a0a;
-  border-color: #ef4444;
-}
-
-.dashboard-container.dark-mode .expired-badge {
-  background: #374151;
-  color: #9ca3af;
-}
-
-.dashboard-container.dark-mode .memberships-table {
-  background: #1f2937;
-  border-color: #374151;
-}
-
-.dashboard-container.dark-mode .table-row {
-  border-bottom-color: #374151;
-  background: #1f2937;
-}
-
-.dashboard-container.dark-mode .table-row:hover {
-  background: #374151;
-}
-
-.dashboard-container.dark-mode .table-cell {
-  color: #e5e7eb;
-}
-
-.dashboard-container.dark-mode .business-name-mini {
-  color: #f3f4f6;
-}
-
-.dashboard-container.dark-mode .plan-tag {
-  background: #374151;
-  border-color: #4b5563;
-  color: #3b82f6;
-}
-
-.dashboard-container.dark-mode .date-cell {
-  color: #9ca3af;
-}
-
-.dashboard-container.dark-mode .recommended-card-enhanced {
-  background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
-  border-color: #4b5563;
-}
-
-.dashboard-container.dark-mode .recommended-card-enhanced:hover {
-  background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
-  border-color: #3b82f6;
-}
-
-.dashboard-container.dark-mode .card-title-enhanced {
-  color: #f3f4f6;
-}
-
-.dashboard-container.dark-mode .owner-highlight {
-  background: #374151;
-  border-color: #4b5563;
-}
-
-.dashboard-container.dark-mode .owner-name {
-  color: #e5e7eb;
-}
-
-.dashboard-container.dark-mode .card-description-enhanced {
-  color: #9ca3af;
-}
-
-.dashboard-container.dark-mode .meta-item-enhanced {
-  background: #374151;
-  border-color: #4b5563;
-  color: #9ca3af;
-}
-
-.dashboard-container.dark-mode .meta-item-enhanced.price {
-  background: #064e3b;
-  border-color: #10b981;
-  color: #10b981;
-}
-
-.dashboard-container.dark-mode .card-btn-enhanced {
-  background: #374151;
-  border-color: #4b5563;
-  color: #e5e7eb;
-}
-
-.dashboard-container.dark-mode .card-btn-enhanced:hover {
-  background: #3b82f6;
-}
-
-.dashboard-container.dark-mode .empty-state-enhanced {
-  background: #1f2937;
-  border-color: #374151;
-}
-
-.dashboard-container.dark-mode .empty-title-large {
-  color: #f3f4f6;
-}
-
-.dashboard-container.dark-mode .empty-description-enhanced {
-  color: #9ca3af;
-}
-
-.dashboard-container.dark-mode .view-all-btn {
-  background: #1f2937;
-  border-color: #374151;
-  color: #9ca3af;
-}
-
-.dashboard-container.dark-mode .view-all-btn:hover {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: white;
-}
-
-.dashboard-container.dark-mode .loading-container {
-  background: #1f2937;
-  border-color: #374151;
-}
-
-.dashboard-container.dark-mode .loading-text {
-  color: #9ca3af;
-}
-
-.dashboard-container.dark-mode .empty-container-enhanced {
-  background: #1f2937;
-  border-color: #374151;
-}
-
-.dashboard-container.dark-mode .empty-text {
-  color: #9ca3af;
-}
-
-/* Dark mode spinner */
-.spinner.dark-mode,
-.spinner-small.dark-mode {
-  border-color: #374151;
-  border-top-color: #3b82f6;
-  border-right-color: #60a5fa;
-}

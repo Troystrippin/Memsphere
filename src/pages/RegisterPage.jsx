@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -15,13 +15,11 @@ import {
   Shield,
   Crown,
   CheckCircle,
-  XCircle,
   User,
   Phone,
   Building,
   MapPin,
   Briefcase,
-  Star,
 } from "lucide-react";
 import logo from "../assets/logo3.png";
 
@@ -34,6 +32,9 @@ const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [touchedFields, setTouchedFields] = useState({});
+  const [registrationsEnabled, setRegistrationsEnabled] = useState(true);
+  const [checkingStatus, setCheckingStatus] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -41,7 +42,7 @@ const RegisterPage = () => {
     mobile: "",
     businessName: "",
     businessCategory: "",
-    businessAddress: "",
+    businessLocation: "",
     businessDescription: "",
     password: "",
     confirmPassword: "",
@@ -54,23 +55,55 @@ const RegisterPage = () => {
     mobile: "",
     businessName: "",
     businessCategory: "",
-    businessAddress: "",
+    businessLocation: "",
     businessDescription: "",
   });
 
   const [passwordStrength, setPasswordStrength] = useState("");
 
+  // Business categories
   const businessCategories = [
     { id: "gym", label: "Gym / Fitness Center", icon: "🏋️" },
     { id: "cafe", label: "Cafe / Coffee Shop", icon: "☕" },
-    { id: "bakery", label: "Bakery / Pastry Shop", icon: "🥐" },
+    { id: "bookstore", label: "Bookstore", icon: "📚" },
+  ];
+
+  // Business locations (same as Browse page)
+  const businessLocations = [
+    { value: "Downtown", label: "Downtown" },
+    { value: "Arellano", label: "Arellano" },
+    { value: "Pantal", label: "Pantal" },
+    { value: "Perez", label: "Perez" },
+    { value: "PNR", label: "PNR" },
+    { value: "Bonuan", label: "Bonuan" },
+    { value: "AB Fernandez", label: "AB Fernandez" },
   ];
 
   const features = [
-    { icon: Shield, text: "Secure Data", value: "Encrypted", color: "from-blue-500 to-cyan-500" },
-    { icon: Users, text: "Easy to Use", value: "Simple", color: "from-green-500 to-emerald-500" },
-    { icon: Star, text: "Support", value: "24/7", color: "from-purple-500 to-pink-500" },
-    { icon: Crown, text: "Trial", value: "30 Days", color: "from-yellow-500 to-orange-500" },
+    {
+      icon: Shield,
+      text: "Secure Data",
+      value: "Encrypted",
+      color: "from-blue-500 to-cyan-500",
+    },
+    {
+      icon: Users,
+      text: "Easy to Use",
+      value: "Simple",
+      color: "from-green-500 to-emerald-500",
+    },
+    {
+      icon: TrendingUp,
+      text: "Support",
+      value: "24/7",
+      color: "from-purple-500 to-pink-500",
+    },
+    {
+      icon: Crown,
+      text: "Trial",
+      value: "30 Days",
+      color: "from-yellow-500 to-orange-500",
+    },
   ];
 
   const benefits = [
@@ -80,6 +113,37 @@ const RegisterPage = () => {
     "Free 30-day trial",
   ];
 
+  // Check if registrations are enabled
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("system_settings")
+          .select("value")
+          .eq("key", "allow_registrations")
+          .single();
+
+        if (!error && data && data.value === "false") {
+          setRegistrationsEnabled(false);
+          setErrorMessage(
+            "Registrations are currently disabled by the administrator.",
+          );
+        } else {
+          setRegistrationsEnabled(true);
+          setErrorMessage("");
+        }
+      } catch (error) {
+        console.error("Error checking registration status:", error);
+        setRegistrationsEnabled(true);
+      } finally {
+        setCheckingStatus(false);
+      }
+    };
+
+    checkRegistrationStatus();
+  }, []);
+
+  // Password strength checker
   useEffect(() => {
     if (formData.password) {
       const hasLowerCase = /[a-z]/.test(formData.password);
@@ -91,9 +155,9 @@ const RegisterPage = () => {
       const criteria = [hasLowerCase, hasUpperCase, hasNumbers, hasSpecial];
       const metCriteria = criteria.filter(Boolean).length;
 
-      if (length < 6) setPasswordStrength("weak");
-      else if (length >= 6 && metCriteria <= 2) setPasswordStrength("weak");
-      else if (length >= 6 && metCriteria === 3) setPasswordStrength("medium");
+      if (length < 8) setPasswordStrength("weak");
+      else if (length >= 8 && metCriteria <= 2) setPasswordStrength("weak");
+      else if (length >= 8 && metCriteria === 3) setPasswordStrength("medium");
       else if (length >= 8 && metCriteria >= 3) setPasswordStrength("strong");
       else setPasswordStrength("weak");
     } else {
@@ -101,6 +165,7 @@ const RegisterPage = () => {
     }
   }, [formData.password]);
 
+  // Validate individual fields
   useEffect(() => {
     validateField("firstName");
     validateField("lastName");
@@ -109,7 +174,7 @@ const RegisterPage = () => {
     if (activeTab === "owner") {
       validateField("businessName");
       validateField("businessCategory");
-      validateField("businessAddress");
+      validateField("businessLocation");
       validateField("businessDescription");
     }
   }, [
@@ -119,7 +184,7 @@ const RegisterPage = () => {
     formData.mobile,
     formData.businessName,
     formData.businessCategory,
-    formData.businessAddress,
+    formData.businessLocation,
     formData.businessDescription,
     activeTab,
   ]);
@@ -172,9 +237,9 @@ const RegisterPage = () => {
         }
         break;
 
-      case "businessAddress":
-        if (activeTab === "owner" && !formData.businessAddress.trim()) {
-          errorMessage = "Business address is required";
+      case "businessLocation":
+        if (activeTab === "owner" && !formData.businessLocation) {
+          errorMessage = "Please select a business location";
         }
         break;
 
@@ -229,13 +294,13 @@ const RegisterPage = () => {
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    if (tab === 'client') {
-      setFormData(prev => ({
+    if (tab === "client") {
+      setFormData((prev) => ({
         ...prev,
-        businessName: '',
-        businessCategory: '',
-        businessAddress: '',
-        businessDescription: ''
+        businessName: "",
+        businessCategory: "",
+        businessLocation: "",
+        businessDescription: "",
       }));
     }
   };
@@ -245,7 +310,9 @@ const RegisterPage = () => {
       alert("First name is required");
       return false;
     } else if (!/^[A-Za-z\s.-]+$/.test(formData.firstName)) {
-      alert("First name can only contain letters, spaces, dots (.) and hyphens (-)");
+      alert(
+        "First name can only contain letters, spaces, dots (.) and hyphens (-)",
+      );
       return false;
     }
 
@@ -253,7 +320,9 @@ const RegisterPage = () => {
       alert("Last name is required");
       return false;
     } else if (!/^[A-Za-z\s.-]+$/.test(formData.lastName)) {
-      alert("Last name can only contain letters, spaces, dots (.) and hyphens (-)");
+      alert(
+        "Last name can only contain letters, spaces, dots (.) and hyphens (-)",
+      );
       return false;
     }
 
@@ -282,8 +351,8 @@ const RegisterPage = () => {
         alert("Please select a business category");
         return false;
       }
-      if (!formData.businessAddress.trim()) {
-        alert("Business address is required");
+      if (!formData.businessLocation) {
+        alert("Please select a business location");
         return false;
       }
       if (!formData.businessDescription.trim()) {
@@ -308,7 +377,9 @@ const RegisterPage = () => {
       alert("Password must contain at least one number");
       return false;
     } else if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(formData.password)) {
-      alert("Password must contain at least one special character (!@#$%^&* etc.)");
+      alert(
+        "Password must contain at least one special character (!@#$%^&* etc.)",
+      );
       return false;
     }
 
@@ -326,9 +397,28 @@ const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const allFields = ["firstName", "lastName", "email", "mobile", "password", "confirmPassword"];
+    if (!registrationsEnabled) {
+      setErrorMessage(
+        "Registrations are currently disabled. Please try again later.",
+      );
+      return;
+    }
+
+    const allFields = [
+      "firstName",
+      "lastName",
+      "email",
+      "mobile",
+      "password",
+      "confirmPassword",
+    ];
     if (activeTab === "owner") {
-      allFields.push("businessName", "businessCategory", "businessAddress", "businessDescription");
+      allFields.push(
+        "businessName",
+        "businessCategory",
+        "businessLocation",
+        "businessDescription",
+      );
     }
 
     const touched = {};
@@ -337,11 +427,29 @@ const RegisterPage = () => {
     });
     setTouchedFields(touched);
 
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
 
     setIsLoading(true);
+    setErrorMessage("");
 
     try {
+      const { data: settingsData, error: settingsError } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "allow_registrations")
+        .single();
+
+      if (!settingsError && settingsData && settingsData.value === "false") {
+        setRegistrationsEnabled(false);
+        setErrorMessage(
+          "Registrations are currently disabled. Please try again later.",
+        );
+        setIsLoading(false);
+        return;
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -352,15 +460,17 @@ const RegisterPage = () => {
             mobile: formData.mobile,
             user_type: activeTab,
           },
-          emailRedirectTo: `${window.location.origin}/login`,
+          emailRedirectTo: `${window.location.origin}/login?verified=true`,
         },
       });
 
       if (authError) throw authError;
-
       if (!authData.user) throw new Error("No user data returned from signup");
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Store email for resend verification
+      localStorage.setItem('pending_verification_email', formData.email);
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       const { data: profile, error: profileCheckError } = await supabase
         .from("profiles")
@@ -369,27 +479,41 @@ const RegisterPage = () => {
         .maybeSingle();
 
       if (!profile) {
-        const { error: insertError } = await supabase
-          .from("profiles")
-          .insert({
-            id: authData.user.id,
-            email: formData.email,
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            mobile: formData.mobile,
-            role: activeTab === "owner" ? "owner" : "client",
-            verification_status: "approved",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
+        const { error: insertError } = await supabase.from("profiles").insert({
+          id: authData.user.id,
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          mobile: formData.mobile,
+          role: activeTab === "owner" ? "owner" : "client",
+          verification_status: "approved",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
 
         if (insertError) throw insertError;
+      } else {
+        if (profile.role !== activeTab) {
+          await supabase
+            .from("profiles")
+            .update({ role: activeTab })
+            .eq("id", authData.user.id);
+        }
       }
 
       if (activeTab === "owner") {
-        const location = formData.businessAddress.split(",").pop().trim() || "Downtown";
+        // Use the selected location for the location field
+        const location = formData.businessLocation;
+        // Address is just the location now (no street address)
+        const fullAddress = location;
 
-        const { error: businessError, data: businessData } = await supabase
+        // Get emoji based on business category
+        let emoji = "🏢";
+        if (formData.businessCategory === "gym") emoji = "🏋️";
+        else if (formData.businessCategory === "cafe") emoji = "☕";
+        else if (formData.businessCategory === "bookstore") emoji = "📚";
+
+        const { error: businessError } = await supabase
           .from("businesses")
           .insert([
             {
@@ -400,8 +524,8 @@ const RegisterPage = () => {
               description: formData.businessDescription,
               price: 0,
               location: location,
-              address: formData.businessAddress,
-              emoji: formData.businessCategory === "gym" ? "🏋️" : formData.businessCategory === "cafe" ? "☕" : "🥐",
+              address: fullAddress,
+              emoji: emoji,
               rating: 0,
               members_count: 0,
               status: "active",
@@ -409,8 +533,7 @@ const RegisterPage = () => {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             },
-          ])
-          .select();
+          ]);
 
         if (businessError) throw businessError;
       }
@@ -419,38 +542,15 @@ const RegisterPage = () => {
 
       setTimeout(() => {
         setShowSuccess(false);
-        if (activeTab === "owner") {
-          navigate("/owner-dashboard");
-        } else {
-          navigate("/ClientDashboard");
-        }
+        navigate("/login");
       }, 2000);
-
     } catch (error) {
       console.error("Registration failed:", error);
-      alert(error.message || "Registration failed. Please try again.");
+      setErrorMessage(
+        error.message || "Registration failed. Please try again.",
+      );
       setIsLoading(false);
     }
-  };
-
-  const getInputClassName = (fieldName) => {
-    let className = "w-full";
-    
-    if (focusedField === fieldName) className += " scale-[1.01]";
-    
-    if (touchedFields[fieldName] && fieldErrors[fieldName]) {
-      className += " border-red-500 focus:ring-red-500";
-    } else if (touchedFields[fieldName] && formData[fieldName] && !fieldErrors[fieldName]) {
-      if (fieldName !== "password" && fieldName !== "confirmPassword") {
-        className += " border-green-500 focus:ring-green-500";
-      } else {
-        className += " border-gray-300 focus:ring-blue-500";
-      }
-    } else {
-      className += " border-gray-300 focus:ring-blue-500";
-    }
-    
-    return className;
   };
 
   const getPasswordStrengthMessage = () => {
@@ -458,17 +558,119 @@ const RegisterPage = () => {
 
     const missingCriteria = [];
     if (formData.password.length < 8) missingCriteria.push("8+ characters");
-    if (!/(?=.*[a-z])/.test(formData.password)) missingCriteria.push("lowercase");
-    if (!/(?=.*[A-Z])/.test(formData.password)) missingCriteria.push("uppercase");
+    if (!/(?=.*[a-z])/.test(formData.password))
+      missingCriteria.push("lowercase");
+    if (!/(?=.*[A-Z])/.test(formData.password))
+      missingCriteria.push("uppercase");
     if (!/(?=.*\d)/.test(formData.password)) missingCriteria.push("number");
-    if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(formData.password)) missingCriteria.push("special character");
+    if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(formData.password))
+      missingCriteria.push("special character");
 
     if (missingCriteria.length === 0) return "✓ Strong password";
     return `Missing: ${missingCriteria.join(", ")}`;
   };
 
+  const getPasswordStrengthColor = () => {
+    if (passwordStrength === "strong") return "text-green-600";
+    if (passwordStrength === "medium") return "text-yellow-600";
+    if (passwordStrength === "weak") return "text-red-600";
+    return "text-gray-500";
+  };
+
+  const getPasswordStrengthBar = () => {
+    if (passwordStrength === "strong") return "bg-green-500";
+    if (passwordStrength === "medium") return "bg-yellow-500";
+    if (passwordStrength === "weak") return "bg-red-500";
+    return "bg-gray-200";
+  };
+
+  const getInputClassName = (fieldName) => {
+    let className =
+      "w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all";
+
+    if (touchedFields[fieldName] && fieldErrors[fieldName]) {
+      className += " border-red-500 focus:ring-red-500";
+    } else if (
+      touchedFields[fieldName] &&
+      formData[fieldName] &&
+      !fieldErrors[fieldName]
+    ) {
+      if (fieldName !== "password" && fieldName !== "confirmPassword") {
+        className += " border-green-500 focus:ring-green-500";
+      } else {
+        className += " border-gray-300";
+      }
+    } else {
+      className += " border-gray-300";
+    }
+
+    return className;
+  };
+
+  const getSelectClassName = (fieldName) => {
+    let className =
+      "w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none bg-white";
+
+    if (touchedFields[fieldName] && fieldErrors[fieldName]) {
+      className += " border-red-500 focus:ring-red-500";
+    } else if (
+      touchedFields[fieldName] &&
+      formData[fieldName] &&
+      !fieldErrors[fieldName]
+    ) {
+      className += " border-green-500 focus:ring-green-500";
+    } else {
+      className += " border-gray-300";
+    }
+
+    return className;
+  };
+
+  if (checkingStatus) {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
+        <div className="h-full w-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600 font-medium">
+              Checking registration status...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!registrationsEnabled) {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
+        <div className="h-full w-full overflow-y-auto">
+          <div className="min-h-full flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+              <div className="text-6xl mb-4">🔒</div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                Registration Closed
+              </h2>
+              <p className="text-gray-600 mb-6">
+                New user registrations are currently disabled. Please check back
+                later.
+              </p>
+              <button
+                onClick={() => navigate("/login")}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Go to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100">
+    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none">
+      {/* Decorative Elements */}
       <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl"></div>
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
 
@@ -486,12 +688,20 @@ const RegisterPage = () => {
                 <div className="space-y-8">
                   <div>
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center overflow-hidden">
-                        <img src={logo} alt="Memsphere Logo" className="w-full h-full object-contain" />
+                      <div className="w-24 h-24 rounded-2xl flex items-center justify-center overflow-hidden">
+                        <img
+                          src={logo}
+                          alt="Memsphere Logo"
+                          className="w-full h-full object-contain"
+                        />
                       </div>
                       <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Memsphere</h1>
-                        <p className="text-gray-500 text-sm">Membership Management Platform</p>
+                        <h1 className="text-3xl font-bold text-gray-900">
+                          Memsphere
+                        </h1>
+                        <p className="text-gray-500 text-sm">
+                          Membership Management Platform
+                        </p>
                       </div>
                     </div>
                     <p className="text-gray-600 text-lg">
@@ -508,17 +718,25 @@ const RegisterPage = () => {
                         transition={{ delay: 0.3 + index * 0.1 }}
                         className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
                       >
-                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${feature.color} flex items-center justify-center mb-3`}>
+                        <div
+                          className={`w-10 h-10 rounded-xl bg-gradient-to-r ${feature.color} flex items-center justify-center mb-3`}
+                        >
                           <feature.icon className="w-6 h-6 text-white" />
                         </div>
-                        <div className="text-2xl font-bold text-gray-900 mb-1">{feature.value}</div>
-                        <div className="text-xs text-gray-600">{feature.text}</div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {feature.value}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {feature.text}
+                        </div>
                       </motion.div>
                     ))}
                   </div>
 
                   <div className="space-y-3">
-                    <p className="text-gray-800 text-sm font-semibold">Why choose Memsphere?</p>
+                    <p className="text-gray-800 text-sm font-semibold">
+                      Why choose Memsphere?
+                    </p>
                     <div className="grid grid-cols-2 gap-3">
                       {benefits.map((benefit, index) => (
                         <motion.div
@@ -529,7 +747,9 @@ const RegisterPage = () => {
                           className="flex items-center gap-2"
                         >
                           <CheckCircle className="w-4 h-4 text-green-500" />
-                          <span className="text-sm text-gray-700 font-medium">{benefit}</span>
+                          <span className="text-sm text-gray-700 font-medium">
+                            {benefit}
+                          </span>
                         </motion.div>
                       ))}
                     </div>
@@ -547,25 +767,45 @@ const RegisterPage = () => {
                 <div className="text-center mb-8">
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full mb-4">
                     <Sparkles className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs text-blue-600 font-medium">Join Us</span>
+                    <span className="text-xs text-blue-600 font-medium">
+                      Join Us
+                    </span>
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Create Account</h2>
-                  <p className="text-gray-500 text-sm">Start your journey with Memsphere today</p>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    Create Account
+                  </h2>
+                  <p className="text-gray-500 text-sm">
+                    Start your journey with Memsphere today
+                  </p>
                 </div>
 
+                {/* Error Alert */}
                 <AnimatePresence>
-                  {showSuccess && (
+                  {errorMessage && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3"
+                      className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3"
                     >
-                      <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                      <p className="text-sm text-green-600">✨ Registration successful! Redirecting to dashboard...</p>
+                      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <p className="text-sm text-red-600">{errorMessage}</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {showSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3"
+                  >
+                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <p className="text-sm text-green-600">
+                      ✨ Registration successful! Redirecting to login...
+                    </p>
+                  </motion.div>
+                )}
 
                 <div className="flex gap-3 mb-6">
                   <button
@@ -591,9 +831,12 @@ const RegisterPage = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* First Name and Last Name */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        First Name
+                      </label>
                       <div className="relative">
                         <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
@@ -605,20 +848,27 @@ const RegisterPage = () => {
                           onBlur={() => handleBlur("firstName")}
                           placeholder="John"
                           disabled={isLoading}
-                          className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("firstName")}`}
+                          className={getInputClassName("firstName")}
                         />
                       </div>
                       <AnimatePresence>
                         {touchedFields.firstName && fieldErrors.firstName && (
-                          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> {fieldErrors.firstName}
+                          <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                          >
+                            <AlertCircle className="w-3 h-3" />{" "}
+                            {fieldErrors.firstName}
                           </motion.p>
                         )}
                       </AnimatePresence>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Last Name
+                      </label>
                       <div className="relative">
                         <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
@@ -630,21 +880,29 @@ const RegisterPage = () => {
                           onBlur={() => handleBlur("lastName")}
                           placeholder="Doe"
                           disabled={isLoading}
-                          className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("lastName")}`}
+                          className={getInputClassName("lastName")}
                         />
                       </div>
                       <AnimatePresence>
                         {touchedFields.lastName && fieldErrors.lastName && (
-                          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> {fieldErrors.lastName}
+                          <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                          >
+                            <AlertCircle className="w-3 h-3" />{" "}
+                            {fieldErrors.lastName}
                           </motion.p>
                         )}
                       </AnimatePresence>
                     </div>
                   </div>
 
+                  {/* Email Address */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address
+                    </label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -656,25 +914,36 @@ const RegisterPage = () => {
                         onBlur={() => handleBlur("email")}
                         placeholder="example@gmail.com"
                         disabled={isLoading}
-                        className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("email")}`}
+                        className={getInputClassName("email")}
                       />
                     </div>
                     <AnimatePresence>
                       {touchedFields.email && fieldErrors.email && (
-                        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" /> {fieldErrors.email}
+                        <motion.p
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                        >
+                          <AlertCircle className="w-3 h-3" />{" "}
+                          {fieldErrors.email}
                         </motion.p>
                       )}
                     </AnimatePresence>
-                    {touchedFields.email && formData.email && !fieldErrors.email && (
-                      <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" /> ✓ Valid Gmail address
-                      </p>
-                    )}
+                    {touchedFields.email &&
+                      formData.email &&
+                      !fieldErrors.email && (
+                        <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> ✓ Valid Gmail
+                          address
+                        </p>
+                      )}
                   </div>
 
+                  {/* Mobile Number */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number (PH Format)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Mobile Number (PH Format)
+                    </label>
                     <div className="relative">
                       <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -687,25 +956,37 @@ const RegisterPage = () => {
                         placeholder="09171234567"
                         disabled={isLoading}
                         maxLength={11}
-                        className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("mobile")}`}
+                        className={getInputClassName("mobile")}
                       />
                     </div>
                     <AnimatePresence>
                       {touchedFields.mobile && fieldErrors.mobile && (
-                        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" /> {fieldErrors.mobile}
+                        <motion.p
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                        >
+                          <AlertCircle className="w-3 h-3" />{" "}
+                          {fieldErrors.mobile}
                         </motion.p>
                       )}
                     </AnimatePresence>
-                    {formData.mobile && formData.mobile.length > 0 && !fieldErrors.mobile && (
-                      <p className="text-xs text-gray-500 mt-1">Format: 09xxxxxxxxx (11 digits)</p>
-                    )}
+                    {formData.mobile &&
+                      formData.mobile.length > 0 &&
+                      !fieldErrors.mobile && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Format: 09xxxxxxxxx (11 digits)
+                        </p>
+                      )}
                   </div>
 
+                  {/* Owner-only fields */}
                   {activeTab === "owner" && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Business Name</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Business Name
+                        </label>
                         <div className="relative">
                           <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <input
@@ -717,20 +998,28 @@ const RegisterPage = () => {
                             onBlur={() => handleBlur("businessName")}
                             placeholder="My Awesome Business"
                             disabled={isLoading}
-                            className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("businessName")}`}
+                            className={getInputClassName("businessName")}
                           />
                         </div>
                         <AnimatePresence>
-                          {touchedFields.businessName && fieldErrors.businessName && (
-                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3" /> {fieldErrors.businessName}
-                            </motion.p>
-                          )}
+                          {touchedFields.businessName &&
+                            fieldErrors.businessName && (
+                              <motion.p
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                              >
+                                <AlertCircle className="w-3 h-3" />{" "}
+                                {fieldErrors.businessName}
+                              </motion.p>
+                            )}
                         </AnimatePresence>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Business Category</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Business Category
+                        </label>
                         <div className="relative">
                           <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                           <select
@@ -740,7 +1029,7 @@ const RegisterPage = () => {
                             onFocus={() => setFocusedField("businessCategory")}
                             onBlur={() => handleBlur("businessCategory")}
                             disabled={isLoading}
-                            className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all appearance-none bg-white ${getInputClassName("businessCategory")}`}
+                            className={getSelectClassName("businessCategory")}
                           >
                             <option value="">Select a category</option>
                             {businessCategories.map((cat) => (
@@ -751,41 +1040,63 @@ const RegisterPage = () => {
                           </select>
                         </div>
                         <AnimatePresence>
-                          {touchedFields.businessCategory && fieldErrors.businessCategory && (
-                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3" /> {fieldErrors.businessCategory}
-                            </motion.p>
-                          )}
+                          {touchedFields.businessCategory &&
+                            fieldErrors.businessCategory && (
+                              <motion.p
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                              >
+                                <AlertCircle className="w-3 h-3" />{" "}
+                                {fieldErrors.businessCategory}
+                              </motion.p>
+                            )}
                         </AnimatePresence>
                       </div>
 
+                      {/* Business Location - No Icons */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Business Address</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Business Location *
+                        </label>
                         <div className="relative">
                           <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                          <input
-                            type="text"
-                            name="businessAddress"
-                            value={formData.businessAddress}
+                          <select
+                            name="businessLocation"
+                            value={formData.businessLocation}
                             onChange={handleInputChange}
-                            onFocus={() => setFocusedField("businessAddress")}
-                            onBlur={() => handleBlur("businessAddress")}
-                            placeholder="123 Main St, Downtown, City"
+                            onFocus={() => setFocusedField("businessLocation")}
+                            onBlur={() => handleBlur("businessLocation")}
                             disabled={isLoading}
-                            className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("businessAddress")}`}
-                          />
+                            className={getSelectClassName("businessLocation")}
+                          >
+                            <option value="">Select a location</option>
+                            {businessLocations.map((loc) => (
+                              <option key={loc.value} value={loc.value}>
+                                {loc.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <AnimatePresence>
-                          {touchedFields.businessAddress && fieldErrors.businessAddress && (
-                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3" /> {fieldErrors.businessAddress}
-                            </motion.p>
-                          )}
+                          {touchedFields.businessLocation &&
+                            fieldErrors.businessLocation && (
+                              <motion.p
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                              >
+                                <AlertCircle className="w-3 h-3" />{" "}
+                                {fieldErrors.businessLocation}
+                              </motion.p>
+                            )}
                         </AnimatePresence>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Business Description</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Business Description
+                        </label>
                         <textarea
                           name="businessDescription"
                           value={formData.businessDescription}
@@ -795,21 +1106,35 @@ const RegisterPage = () => {
                           placeholder="Describe your business, services, and what makes it special..."
                           disabled={isLoading}
                           rows="3"
-                          className={`w-full px-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all resize-none ${getInputClassName("businessDescription")}`}
+                          className={`w-full px-4 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none ${
+                            touchedFields.businessDescription &&
+                            fieldErrors.businessDescription
+                              ? "border-red-500"
+                              : "border-gray-300"
+                          }`}
                         />
                         <AnimatePresence>
-                          {touchedFields.businessDescription && fieldErrors.businessDescription && (
-                            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3" /> {fieldErrors.businessDescription}
-                            </motion.p>
-                          )}
+                          {touchedFields.businessDescription &&
+                            fieldErrors.businessDescription && (
+                              <motion.p
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                              >
+                                <AlertCircle className="w-3 h-3" />{" "}
+                                {fieldErrors.businessDescription}
+                              </motion.p>
+                            )}
                         </AnimatePresence>
                       </div>
                     </>
                   )}
 
+                  {/* Password */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Password
+                    </label>
                     <div className="relative">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -821,32 +1146,49 @@ const RegisterPage = () => {
                         onBlur={() => handleBlur("password")}
                         placeholder="Enter your password"
                         disabled={isLoading}
-                        className={`w-full pl-12 pr-12 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("password")}`}
+                        className={`w-full pl-12 pr-12 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                          touchedFields.password && fieldErrors.password
+                            ? "border-red-500"
+                            : "border-gray-300"
+                        }`}
                       />
                       <button
                         type="button"
                         onClick={() => togglePasswordVisibility("password")}
                         className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                       >
-                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        {showPassword ? (
+                          <EyeOff className="w-5 h-5" />
+                        ) : (
+                          <Eye className="w-5 h-5" />
+                        )}
                       </button>
                     </div>
                     {formData.password && (
                       <div className="mt-2">
                         <div className="flex gap-1 h-1 mb-1">
-                          <div className={`flex-1 rounded-full ${passwordStrength === "strong" ? "bg-green-500" : "bg-gray-200"}`}></div>
-                          <div className={`flex-1 rounded-full ${passwordStrength === "medium" || passwordStrength === "strong" ? "bg-yellow-500" : "bg-gray-200"}`}></div>
-                          <div className={`flex-1 rounded-full ${passwordStrength === "strong" ? "bg-green-500" : "bg-gray-200"}`}></div>
+                          <div
+                            className={`flex-1 rounded-full ${getPasswordStrengthBar()}`}
+                          ></div>
+                          <div
+                            className={`flex-1 rounded-full ${passwordStrength === "strong" ? "bg-green-500" : passwordStrength === "medium" ? "bg-yellow-500" : "bg-gray-200"}`}
+                          ></div>
+                          <div
+                            className={`flex-1 rounded-full ${passwordStrength === "strong" ? "bg-green-500" : "bg-gray-200"}`}
+                          ></div>
                         </div>
-                        <p className={`text-xs ${passwordStrength === "strong" ? "text-green-600" : passwordStrength === "medium" ? "text-yellow-600" : "text-gray-500"}`}>
+                        <p className={`text-xs ${getPasswordStrengthColor()}`}>
                           {getPasswordStrengthMessage()}
                         </p>
                       </div>
                     )}
                   </div>
 
+                  {/* Confirm Password */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirm Password
+                    </label>
                     <div className="relative">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -858,22 +1200,37 @@ const RegisterPage = () => {
                         onBlur={() => handleBlur("confirmPassword")}
                         placeholder="Confirm your password"
                         disabled={isLoading}
-                        className={`w-full pl-12 pr-12 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${getInputClassName("confirmPassword")}`}
+                        className={`w-full pl-12 pr-12 py-3 border rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                          touchedFields.confirmPassword &&
+                          fieldErrors.confirmPassword
+                            ? "border-red-500"
+                            : "border-gray-300"
+                        }`}
                       />
                       <button
                         type="button"
                         onClick={() => togglePasswordVisibility("confirm")}
                         className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                       >
-                        {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        {showConfirmPassword ? (
+                          <EyeOff className="w-5 h-5" />
+                        ) : (
+                          <Eye className="w-5 h-5" />
+                        )}
                       </button>
                     </div>
                     <AnimatePresence>
-                      {touchedFields.confirmPassword && formData.password !== formData.confirmPassword && (
-                        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" /> Passwords do not match
-                        </motion.p>
-                      )}
+                      {touchedFields.confirmPassword &&
+                        formData.password !== formData.confirmPassword && (
+                          <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                          >
+                            <AlertCircle className="w-3 h-3" /> Passwords do not
+                            match
+                          </motion.p>
+                        )}
                     </AnimatePresence>
                   </div>
 
@@ -891,7 +1248,9 @@ const RegisterPage = () => {
                       </>
                     ) : (
                       <>
-                        {activeTab === "owner" ? "REGISTER AS OWNER" : "REGISTER AS CLIENT"}
+                        {activeTab === "owner"
+                          ? "REGISTER AS OWNER"
+                          : "REGISTER AS CLIENT"}
                         <ArrowRight className="w-5 h-5" />
                       </>
                     )}
@@ -903,7 +1262,9 @@ const RegisterPage = () => {
                     <div className="w-full border-t border-gray-200"></div>
                   </div>
                   <div className="relative flex justify-center text-xs">
-                    <span className="px-4 bg-white text-gray-500">Already have an account?</span>
+                    <span className="px-4 bg-white text-gray-500">
+                      Already have an account?
+                    </span>
                   </div>
                 </div>
 

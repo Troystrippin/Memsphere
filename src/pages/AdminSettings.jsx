@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import AdminSidebarNav from '../components/admin/AdminSidebarNav';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast, Toaster } from 'react-hot-toast';
 import {
   Settings,
-  Globe,
   Shield,
   Database,
   Users,
@@ -18,11 +18,10 @@ import {
   Sun,
   Mail,
   Lock,
-  UserCheck,
-  Clock,
-  AlertTriangle,
   CheckCircle,
-  XCircle
+  Loader,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const AdminSettings = () => {
@@ -37,20 +36,35 @@ const AdminSettings = () => {
     totalBusinesses: 0,
     pendingApplications: 0
   });
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [touchedFields, setTouchedFields] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false
+  });
+  const [passwordStrength, setPasswordStrength] = useState('');
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordErrors, setPasswordErrors] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
 
   const [settings, setSettings] = useState({
-    siteName: 'Memsphere',
     adminEmail: '',
     allowRegistrations: true,
-    requireEmailVerification: true,
-    defaultUserRole: 'client',
-    maintenanceMode: false,
-    sessionTimeout: 60,
-    maxLoginAttempts: 5
+    maintenanceMode: false
   });
 
   useEffect(() => {
-    // Check for saved dark mode preference
     const savedDarkMode = localStorage.getItem('adminDarkMode') === 'true';
     setDarkMode(savedDarkMode);
     if (savedDarkMode) {
@@ -60,7 +74,6 @@ const AdminSettings = () => {
   }, []);
 
   useEffect(() => {
-    // Apply dark mode class to html element
     if (darkMode) {
       document.documentElement.classList.add('dark');
       localStorage.setItem('adminDarkMode', 'true');
@@ -70,33 +83,174 @@ const AdminSettings = () => {
     }
   }, [darkMode]);
 
+  useEffect(() => {
+    validatePasswordStrength();
+    if (touchedFields.newPassword) {
+      validateField('newPassword');
+    }
+  }, [passwordData.newPassword]);
+
+  useEffect(() => {
+    if (touchedFields.confirmPassword) {
+      validateField('confirmPassword');
+    }
+  }, [passwordData.confirmPassword]);
+
+  const validatePasswordStrength = () => {
+    const password = passwordData.newPassword;
+    if (!password) {
+      setPasswordStrength('');
+      return;
+    }
+
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const length = password.length;
+
+    const criteria = [hasLowerCase, hasUpperCase, hasNumbers, hasSpecial];
+    const metCriteria = criteria.filter(Boolean).length;
+
+    if (length < 8) setPasswordStrength('weak');
+    else if (length >= 8 && metCriteria <= 2) setPasswordStrength('weak');
+    else if (length >= 8 && metCriteria === 3) setPasswordStrength('medium');
+    else if (length >= 8 && metCriteria >= 3) setPasswordStrength('strong');
+    else setPasswordStrength('weak');
+  };
+
+  const validateField = (fieldName) => {
+    let errorMessage = '';
+
+    switch (fieldName) {
+      case 'currentPassword':
+        if (!passwordData.currentPassword) {
+          errorMessage = 'Current password is required';
+        }
+        break;
+
+      case 'newPassword':
+        if (!passwordData.newPassword) {
+          errorMessage = 'New password is required';
+        } else if (passwordData.newPassword.length < 8) {
+          errorMessage = 'Password must be at least 8 characters';
+        } else if (!/(?=.*[a-z])/.test(passwordData.newPassword)) {
+          errorMessage = 'Must contain at least one lowercase letter';
+        } else if (!/(?=.*[A-Z])/.test(passwordData.newPassword)) {
+          errorMessage = 'Must contain at least one uppercase letter';
+        } else if (!/(?=.*\d)/.test(passwordData.newPassword)) {
+          errorMessage = 'Must contain at least one number';
+        } else if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(passwordData.newPassword)) {
+          errorMessage = 'Must contain at least one special character (!@#$%^&* etc.)';
+        } else if (passwordData.currentPassword && passwordData.newPassword === passwordData.currentPassword) {
+          errorMessage = 'New password cannot be the same as current password';
+        }
+        break;
+
+      case 'confirmPassword':
+        if (!passwordData.confirmPassword) {
+          errorMessage = 'Please confirm your password';
+        } else if (passwordData.newPassword !== passwordData.confirmPassword) {
+          errorMessage = 'Passwords do not match';
+        }
+        break;
+
+      default:
+        break;
+    }
+
+    setPasswordErrors(prev => ({
+      ...prev,
+      [fieldName]: errorMessage
+    }));
+
+    return !errorMessage;
+  };
+
+  const handlePasswordBlur = (fieldName) => {
+    setTouchedFields(prev => ({ ...prev, [fieldName]: true }));
+    validateField(fieldName);
+  };
+
+  const getPasswordStrengthMessage = () => {
+    if (!passwordData.newPassword) return '';
+
+    const missingCriteria = [];
+    if (passwordData.newPassword.length < 8) missingCriteria.push('8+ characters');
+    if (!/(?=.*[a-z])/.test(passwordData.newPassword)) missingCriteria.push('lowercase');
+    if (!/(?=.*[A-Z])/.test(passwordData.newPassword)) missingCriteria.push('uppercase');
+    if (!/(?=.*\d)/.test(passwordData.newPassword)) missingCriteria.push('number');
+    if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(passwordData.newPassword)) missingCriteria.push('special character');
+
+    if (missingCriteria.length === 0) return '✓ Strong password';
+    return `Missing: ${missingCriteria.join(', ')}`;
+  };
+
+  const getPasswordStrengthColor = () => {
+    if (passwordStrength === 'strong') return 'text-green-600 dark:text-green-400';
+    if (passwordStrength === 'medium') return 'text-yellow-600 dark:text-yellow-400';
+    if (passwordStrength === 'weak') return 'text-red-600 dark:text-red-400';
+    return 'text-gray-500 dark:text-gray-400';
+  };
+
+  const fetchSystemSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('key, value');
+
+      if (error) {
+        console.error('Error fetching settings:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const settingsMap = {};
+        data.forEach(item => {
+          settingsMap[item.key] = item.value;
+        });
+
+        setSettings(prev => ({
+          ...prev,
+          allowRegistrations: settingsMap.allow_registrations === 'true',
+          maintenanceMode: settingsMap.maintenance_mode === 'true'
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching system settings:', error);
+    }
+  };
+
   const fetchAdminData = async () => {
     try {
       setLoading(true);
       
-      // Get current admin profile
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) throw userError;
       
       if (user) {
-        const { data: profileData } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
 
+        if (profileError) throw profileError;
+
         setProfile(profileData);
         setSettings(prev => ({
           ...prev,
-          adminEmail: profileData?.email || '',
-          siteName: 'Memsphere'
+          adminEmail: profileData?.email || ''
         }));
       }
 
-      // Fetch stats
       await fetchStats();
+      await fetchSystemSettings();
 
     } catch (error) {
       console.error('Error fetching admin data:', error);
+      toast.error('Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -104,7 +258,6 @@ const AdminSettings = () => {
 
   const fetchStats = async () => {
     try {
-      // Count users by role
       const { count: totalUsers } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
@@ -143,42 +296,135 @@ const AdminSettings = () => {
     }));
   };
 
+  const saveSettingToDatabase = async (key, value) => {
+    try {
+      const dbKey = key === 'allowRegistrations' ? 'allow_registrations' :
+                    key === 'maintenanceMode' ? 'maintenance_mode' : key;
+
+      const stringValue = value.toString();
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { error, data } = await supabase
+        .from('system_settings')
+        .upsert({
+          key: dbKey,
+          value: stringValue,
+          updated_at: new Date().toISOString(),
+          updated_by: user?.id
+        }, {
+          onConflict: 'key'
+        })
+        .select();
+
+      if (error) {
+        console.error(`Error saving ${key}:`, error);
+        return false;
+      }
+      
+      console.log(`Saved ${key} to database:`, data);
+      return true;
+    } catch (error) {
+      console.error(`Error saving ${key}:`, error);
+      return false;
+    }
+  };
+
   const handleSaveSettings = async () => {
+    const saveToast = toast.loading('Saving settings...');
+    
     try {
       setSaving(true);
       
-      // Here you would typically save settings to a database table
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Save each setting individually
+      const results = await Promise.all([
+        saveSettingToDatabase('allowRegistrations', settings.allowRegistrations),
+        saveSettingToDatabase('maintenanceMode', settings.maintenanceMode)
+      ]);
       
-      alert('Settings saved successfully!');
+      const allSuccessful = results.every(result => result === true);
+      
+      if (allSuccessful) {
+        // Refresh settings from database to ensure UI matches
+        await fetchSystemSettings();
+        toast.success('Settings saved successfully!', { id: saveToast, duration: 3000 });
+      } else {
+        toast.error('Some settings failed to save. Please try again.', { id: saveToast });
+      }
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings. Please try again.');
+      toast.error('Failed to save settings. Please try again.', { id: saveToast });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleClearCache = async () => {
-    if (!window.confirm('Are you sure you want to clear the system cache?')) return;
+  const handleBackupDatabase = async () => {
+    const backupToast = toast.loading('Starting database backup...');
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      alert('Cache cleared successfully!');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      toast.success('Database backup completed successfully!', { id: backupToast, duration: 3000 });
     } catch (error) {
-      console.error('Error clearing cache:', error);
-      alert('Failed to clear cache. Please try again.');
+      console.error('Error backing up database:', error);
+      toast.error('Failed to backup database. Please try again.', { id: backupToast });
     }
   };
 
-  const handleBackupDatabase = async () => {
+  const handleChangePassword = () => {
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setPasswordErrors({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setTouchedFields({
+      currentPassword: false,
+      newPassword: false,
+      confirmPassword: false
+    });
+    setPasswordStrength('');
+    setShowCurrentPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setShowPasswordModal(true);
+  };
+
+  const handlePasswordSubmit = async () => {
+    const isCurrentValid = validateField('currentPassword');
+    const isNewValid = validateField('newPassword');
+    const isConfirmValid = validateField('confirmPassword');
+
+    if (!isCurrentValid || !isNewValid || !isConfirmValid) {
+      setTouchedFields({
+        currentPassword: true,
+        newPassword: true,
+        confirmPassword: true
+      });
+      return;
+    }
+
+    const passwordToast = toast.loading('Changing password...');
+    setChangingPassword(true);
+    
     try {
-      alert('Starting database backup... This may take a few minutes.');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      alert('Database backup completed successfully!');
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      });
+      
+      if (error) throw error;
+      
+      toast.success('Password changed successfully!', { id: passwordToast, duration: 3000 });
+      setShowPasswordModal(false);
     } catch (error) {
-      console.error('Error backing up database:', error);
-      alert('Failed to backup database. Please try again.');
+      console.error('Error changing password:', error);
+      toast.error(error.message || 'Failed to change password', { id: passwordToast });
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -186,13 +432,31 @@ const AdminSettings = () => {
     setDarkMode(!darkMode);
   };
 
+  const getInputClassName = (fieldName) => {
+    let className = "w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all";
+    
+    if (darkMode) {
+      className += " bg-gray-700 border-gray-600 text-white placeholder-gray-400";
+    } else {
+      className += " bg-white border-gray-300 text-gray-900";
+    }
+    
+    if (touchedFields[fieldName] && passwordErrors[fieldName]) {
+      className += " border-red-500 focus:ring-red-500";
+    } else if (touchedFields[fieldName] && fieldName !== 'currentPassword' && passwordData[fieldName] && !passwordErrors[fieldName]) {
+      className += " border-green-500 focus:ring-green-500";
+    }
+    
+    return className;
+  };
+
   if (loading) {
     return (
       <AdminSidebarNav>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading settings...</p>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 select-none">
+          <div className="text-center select-none">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4 select-none"></div>
+            <p className="text-gray-600 dark:text-gray-400 font-medium select-none">Loading settings...</p>
           </div>
         </div>
       </AdminSidebarNav>
@@ -201,7 +465,18 @@ const AdminSettings = () => {
 
   return (
     <AdminSidebarNav>
-      <div className={`min-h-screen space-y-6 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: darkMode ? '#1f2937' : '#363636',
+            color: '#fff',
+          },
+        }}
+      />
+      
+      <div className={`min-h-screen space-y-6 transition-colors duration-300 select-none ${darkMode ? 'dark' : ''}`}>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -209,7 +484,6 @@ const AdminSettings = () => {
             <p className="text-gray-600 dark:text-gray-400 mt-1">Configure platform settings and preferences</p>
           </div>
           <div className="flex gap-3">
-            {/* Dark Mode Toggle */}
             <button
               onClick={toggleDarkMode}
               className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
@@ -244,39 +518,17 @@ const AdminSettings = () => {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Site Name</label>
-                <input
-                  type="text"
-                  value={settings.siteName}
-                  onChange={(e) => handleSettingChange('siteName', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-
-              <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Admin Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
                     type="email"
                     value={settings.adminEmail}
-                    onChange={(e) => handleSettingChange('adminEmail', e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    disabled
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Default User Role</label>
-                <select
-                  value={settings.defaultUserRole}
-                  onChange={(e) => handleSettingChange('defaultUserRole', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                >
-                  <option value="client">Client</option>
-                  <option value="owner">Business Owner</option>
-                  <option value="admin">Admin</option>
-                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Admin email is read-only and linked to your account</p>
               </div>
 
               <div className="space-y-3">
@@ -293,23 +545,6 @@ const AdminSettings = () => {
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                       settings.allowRegistrations ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">Require Email Verification</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Users must verify their email before accessing the platform</p>
-                  </div>
-                  <button
-                    onClick={() => handleSettingChange('requireEmailVerification', !settings.requireEmailVerification)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      settings.requireEmailVerification ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      settings.requireEmailVerification ? 'translate-x-6' : 'translate-x-1'
                     }`} />
                   </button>
                 </div>
@@ -348,33 +583,21 @@ const AdminSettings = () => {
               </div>
             </div>
             <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Session Timeout (minutes)</label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="number"
-                    value={settings.sessionTimeout}
-                    onChange={(e) => handleSettingChange('sessionTimeout', parseInt(e.target.value))}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">Security Note</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      Security settings are managed through Supabase Auth. Session timeout and login attempts are configured in your Supabase project settings.
+                    </p>
+                  </div>
                 </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Login Attempts</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="number"
-                    value={settings.maxLoginAttempts}
-                    onChange={(e) => handleSettingChange('maxLoginAttempts', parseInt(e.target.value))}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <button className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2">
+              <button 
+                onClick={handleChangePassword}
+                className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2"
+              >
                 <Lock className="w-4 h-4" />
                 Change Password
               </button>
@@ -432,13 +655,6 @@ const AdminSettings = () => {
             <div className="p-6">
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={handleClearCache}
-                  className="px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex flex-col items-center gap-2"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                  <span className="text-sm">Clear Cache</span>
-                </button>
-                <button
                   onClick={handleBackupDatabase}
                   className="px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex flex-col items-center gap-2"
                 >
@@ -464,6 +680,199 @@ const AdminSettings = () => {
           </motion.div>
         </div>
       </div>
+
+      {/* Change Password Modal - WITH EYE TOGGLE INSIDE */}
+      <AnimatePresence>
+        {showPasswordModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 select-none"
+            onClick={() => setShowPasswordModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`rounded-2xl max-w-md w-full p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
+                  <Lock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h3 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                  Change Password
+                </h3>
+              </div>
+              
+              <div className="space-y-4 mb-6">
+                {/* Current Password */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Current Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? "text" : "password"}
+                      value={passwordData.currentPassword}
+                      onChange={(e) => {
+                        setPasswordData({ ...passwordData, currentPassword: e.target.value });
+                        if (touchedFields.currentPassword) validateField('currentPassword');
+                      }}
+                      onBlur={() => handlePasswordBlur('currentPassword')}
+                      onFocus={() => setTouchedFields(prev => ({ ...prev, currentPassword: true }))}
+                      className={getInputClassName('currentPassword')}
+                      placeholder="Enter current password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  <AnimatePresence>
+                    {touchedFields.currentPassword && passwordErrors.currentPassword && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                      >
+                        <AlertCircle className="w-3 h-3" />
+                        {passwordErrors.currentPassword}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                </div>
+                
+                {/* New Password */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      value={passwordData.newPassword}
+                      onChange={(e) => {
+                        setPasswordData({ ...passwordData, newPassword: e.target.value });
+                        if (touchedFields.newPassword) validateField('newPassword');
+                      }}
+                      onBlur={() => handlePasswordBlur('newPassword')}
+                      onFocus={() => setTouchedFields(prev => ({ ...prev, newPassword: true }))}
+                      className={getInputClassName('newPassword')}
+                      placeholder="Enter new password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    >
+                      {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  
+                  {/* Password Strength Indicator */}
+                  {passwordData.newPassword && (
+                    <div className="mt-2">
+                      <div className="flex gap-1 h-1 mb-1">
+                        <div className={`flex-1 rounded-full ${passwordStrength === 'strong' ? 'bg-green-500' : passwordStrength === 'medium' ? 'bg-yellow-500' : passwordStrength === 'weak' ? 'bg-red-500' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
+                        <div className={`flex-1 rounded-full ${passwordStrength === 'strong' ? 'bg-green-500' : passwordStrength === 'medium' ? 'bg-yellow-500' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
+                        <div className={`flex-1 rounded-full ${passwordStrength === 'strong' ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-600'}`}></div>
+                      </div>
+                      <p className={`text-xs ${getPasswordStrengthColor()}`}>
+                        {getPasswordStrengthMessage()}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <AnimatePresence>
+                    {touchedFields.newPassword && passwordErrors.newPassword && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                      >
+                        <AlertCircle className="w-3 h-3" />
+                        {passwordErrors.newPassword}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                </div>
+                
+                {/* Confirm Password */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Confirm New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => {
+                        setPasswordData({ ...passwordData, confirmPassword: e.target.value });
+                        if (touchedFields.confirmPassword) validateField('confirmPassword');
+                      }}
+                      onBlur={() => handlePasswordBlur('confirmPassword')}
+                      onFocus={() => setTouchedFields(prev => ({ ...prev, confirmPassword: true }))}
+                      className={getInputClassName('confirmPassword')}
+                      placeholder="Confirm new password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  <AnimatePresence>
+                    {touchedFields.confirmPassword && passwordErrors.confirmPassword && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-xs text-red-500 mt-1 flex items-center gap-1"
+                      >
+                        <AlertCircle className="w-3 h-3" />
+                        {passwordErrors.confirmPassword}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowPasswordModal(false)}
+                  className={`px-4 py-2 border rounded-lg transition-colors ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePasswordSubmit}
+                  disabled={changingPassword}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {changingPassword ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Changing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Change Password
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AdminSidebarNav>
   );
 };

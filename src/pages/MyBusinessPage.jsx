@@ -201,32 +201,11 @@ const MyBusinessPage = () => {
       description: "Food & Beverage",
     },
     {
-      id: "bakery",
-      label: "Bakery / Pastry Shop",
-      icon: "🥐",
-      color: "from-yellow-500 to-amber-500",
-      description: "Food & Beverage",
-    },
-    {
-      id: "restaurant",
-      label: "Restaurant",
-      icon: "🍽️",
-      color: "from-red-500 to-orange-500",
-      description: "Food & Beverage",
-    },
-    {
-      id: "salon",
-      label: "Salon / Spa",
-      icon: "💇",
-      color: "from-pink-500 to-rose-500",
-      description: "Beauty & Wellness",
-    },
-    {
-      id: "retail",
-      label: "Retail Store",
-      icon: "🛍️",
-      color: "from-blue-500 to-cyan-500",
-      description: "Shopping",
+      id: "bookstore",
+      label: "Bookstore",
+      icon: "📚",
+      color: "from-blue-500 to-indigo-500",
+      description: "Books & Education",
     },
   ];
 
@@ -1036,7 +1015,9 @@ const MyBusinessPage = () => {
                       Business Verification Pending
                     </h3>
                     <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
-                      Your business permit is under review. Your business is currently hidden from customers until verified. This usually takes 1-2 business days.
+                      Your business permit is under review. Your business is
+                      currently hidden from customers until verified. This
+                      usually takes 1-2 business days.
                     </p>
                     <div className="mt-3">
                       <button
@@ -1069,10 +1050,14 @@ const MyBusinessPage = () => {
                       Verification Failed - Action Required!
                     </h3>
                     <p className="text-sm text-red-700 dark:text-red-400 mt-1">
-                      Your business permit was not approved. {business?.rejection_reason ? `Reason: ${business.rejection_reason}` : "Please upload a valid business permit."}
+                      Your business permit was not approved.{" "}
+                      {business?.rejection_reason
+                        ? `Reason: ${business.rejection_reason}`
+                        : "Please upload a valid business permit."}
                     </p>
                     <p className="text-sm text-red-700 dark:text-red-400 mt-1 font-medium">
-                      ⚠️ Your business is NOT visible to customers until verification is approved.
+                      ⚠️ Your business is NOT visible to customers until
+                      verification is approved.
                     </p>
                     <div className="mt-3">
                       <button
@@ -1105,7 +1090,8 @@ const MyBusinessPage = () => {
                       Business Not Verified
                     </h3>
                     <p className="text-sm text-orange-700 dark:text-orange-400 mt-1">
-                      Your business is currently NOT visible to customers. Please upload your business permit for verification.
+                      Your business is currently NOT visible to customers.
+                      Please upload your business permit for verification.
                     </p>
                     <div className="mt-3">
                       <button

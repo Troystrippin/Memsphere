@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
 import OwnerNavbar from "../components/owner/OwnerNavbar";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "react-hot-toast";
 import {
   User,
   Mail,
@@ -275,11 +276,20 @@ const Profile = () => {
       const uniqueBusinesses = new Set(businessesFollowed?.map(m => m.business_id));
       const totalBusinessesFollowed = uniqueBusinesses.size;
 
+      // Get member since date from profile creation
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("created_at")
+        .eq("id", userId)
+        .single();
+
+      const memberSince = profileData?.created_at || user?.created_at || new Date().toISOString();
+
       setStats({
         totalSpent,
         activeMemberships: activeCount || 0,
         totalVisits: activeCount || 0,
-        memberSince: user?.created_at || profile?.created_at,
+        memberSince: memberSince,
         pendingApplications: pendingCount || 0,
         totalBusinessesFollowed,
         totalReviews: reviewsCount || 0
@@ -491,11 +501,11 @@ const Profile = () => {
         setAvatarUrl(urlData.publicUrl);
       }
 
-      alert("Avatar uploaded successfully!");
+      toast.success("Avatar uploaded successfully!");
       await fetchAchievements(user.id);
     } catch (error) {
       console.error("Error in uploadAvatar:", error);
-      alert(error.message || "Error uploading avatar!");
+      toast.error(error.message || "Error uploading avatar!");
     } finally {
       setUploading(false);
       event.target.value = "";
@@ -519,11 +529,11 @@ const Profile = () => {
       if (error) throw error;
 
       setIsEditing(false);
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
       await fetchAchievements(user.id);
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Failed to update profile. Please try again.");
+      toast.error("Failed to update profile. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -558,6 +568,10 @@ const Profile = () => {
       errors.newPassword = "New password is required";
     } else if (passwordData.newPassword.length < 8) {
       errors.newPassword = "Password must be at least 8 characters";
+    } else if (passwordData.newPassword === passwordData.currentPassword) {
+      errors.newPassword = "New password cannot be the same as current password";
+    } else if (!/^[a-zA-Z0-9!@#$%^&*]+$/.test(passwordData.newPassword)) {
+      errors.newPassword = "Password must contain only letters, numbers, and special characters";
     }
 
     if (!passwordData.confirmPassword) {
@@ -588,10 +602,12 @@ const Profile = () => {
           confirmPassword: "",
         });
         setIsChangingPassword(false);
+        toast.success("Password changed successfully!");
         setTimeout(() => setPasswordSuccess(""), 3000);
       } catch (error) {
         console.error("Error changing password:", error);
         setPasswordErrors({ currentPassword: "Current password is incorrect" });
+        toast.error("Failed to change password. Please check your current password.");
       }
     } else {
       setPasswordErrors(errors);
@@ -648,6 +664,19 @@ const Profile = () => {
     return "U";
   };
 
+  const getBusinessIcon = (business) => {
+    switch (business.business_type) {
+      case "gym":
+        return business.emoji || "🏋️";
+      case "cafe":
+        return business.emoji || "☕";
+      case "bookstore":
+        return business.emoji || "📚";
+      default:
+        return business.emoji || "🏢";
+    }
+  };
+
   const getUserRole = () => {
     if (userData.role === "owner") return "Business Owner";
     if (userData.role === "admin") return "Admin";
@@ -666,46 +695,11 @@ const Profile = () => {
     return <UserCheck className="w-4 h-4" />;
   };
 
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case "approved":
-        return "bg-gradient-to-r from-green-500 to-emerald-500";
-      case "rejected":
-        return "bg-gradient-to-r from-red-500 to-pink-500";
-      case "pending":
-        return "bg-gradient-to-r from-yellow-500 to-orange-500";
-      default:
-        return "bg-gradient-to-r from-gray-500 to-gray-600";
-    }
-  };
-
-  const getPaymentMethodIcon = (method) => {
-    switch (method) {
-      case "gcash":
-        return <CreditCard className="w-4 h-4" />;
-      case "onsite":
-        return <Building className="w-4 h-4" />;
-      default:
-        return <CreditCard className="w-4 h-4" />;
-    }
-  };
-
-  const getPaymentMethodLabel = (method) => {
-    switch (method) {
-      case "gcash":
-        return "GCash";
-      case "onsite":
-        return "Pay at Business";
-      default:
-        return method || "Not specified";
-    }
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
-      month: "short",
+      month: "long",
       day: "numeric",
     });
   };
@@ -734,7 +728,7 @@ const Profile = () => {
   const totalAchievements = achievements.length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50 select-none">
       {/* Role-based Navbar */}
       {userData.role === "owner" ? (
         <OwnerNavbar profile={profile} avatarUrl={avatarUrl} />
@@ -743,7 +737,7 @@ const Profile = () => {
       )}
 
       {/* Main Content - with proper navbar spacing */}
-      <div className="pt-20 pb-16 px-4 sm:px-6 lg:px-8 min-h-screen">
+      <div className="pt-28 pb-16 px-4 sm:px-6 lg:px-8 min-h-screen">
         <div className="max-w-7xl mx-auto">
           {/* Animated Floating Background Elements */}
           <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -934,7 +928,7 @@ const Profile = () => {
 
           {/* Main Content - Wider Profile Card */}
           <div className="lg:mx-80 xl:mx-72 2xl:mx-64">
-            {/* Profile Card - Made wider by adjusting margins */}
+            {/* Profile Card */}
             <motion.div
               initial={{ opacity: 0, y: 30, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1081,7 +1075,7 @@ const Profile = () => {
                         )}
                         <div className="flex items-center gap-3 text-gray-500 text-sm">
                           <Calendar className="w-4 h-4" />
-                          <span>Joined {user?.created_at ? formatDate(user.created_at) : "N/A"}</span>
+                          <span>Joined {stats.memberSince ? formatDate(stats.memberSince) : "N/A"}</span>
                         </div>
                       </motion.div>
                     </motion.div>
@@ -1098,25 +1092,19 @@ const Profile = () => {
                             whileHover={{ scale: 1.05, y: -2 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => setIsEditing(true)}
-                            className="group relative px-6 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden whitespace-nowrap"
+                            className="px-6 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
                           >
-                            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            <div className="relative flex items-center gap-2">
-                              <Edit2 className="w-4 h-4" />
-                              <span>Edit Profile</span>
-                            </div>
+                            <Edit2 className="w-4 h-4" />
+                            <span>Edit Profile</span>
                           </motion.button>
                           <motion.button
                             whileHover={{ scale: 1.05, y: -2 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => setIsChangingPassword(true)}
-                            className="group relative px-6 py-2.5 bg-white text-gray-700 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-gray-200 overflow-hidden whitespace-nowrap"
+                            className="px-6 py-2.5 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
                           >
-                            <div className="absolute inset-0 bg-gradient-to-r from-gray-50 to-gray-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            <div className="relative flex items-center gap-2">
-                              <Lock className="w-4 h-4" />
-                              <span>Change Password</span>
-                            </div>
+                            <Lock className="w-4 h-4" />
+                            <span>Change Password</span>
                           </motion.button>
                         </>
                       ) : (
@@ -1135,7 +1123,7 @@ const Profile = () => {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => setIsEditing(false)}
-                            className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 whitespace-nowrap"
+                            className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 whitespace-nowrap"
                           >
                             <X className="w-4 h-4" />
                             Cancel
@@ -1248,8 +1236,6 @@ const Profile = () => {
                 </div>
               </div>
             </motion.div>
-
-            {/* Memberships Section - REMOVED */}
           </div>
         </div>
       </div>
@@ -1286,7 +1272,7 @@ const Profile = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 select-none"
             onClick={() => setIsChangingPassword(false)}
           >
             <motion.div
