@@ -671,13 +671,13 @@ const OwnerNavbar = ({ profile, avatarUrl, isDarkMode, toggleDarkMode }) => {
                   <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full animate-pulse"></span>
                 </div>
 
-                {/* UPDATED: Profile text with dark mode support */}
+                {/* FIXED: Profile text - now always white in light mode */}
                 <div className="hidden lg:block text-left">
-                  <p className="text-sm font-semibold text-white dark:text-gray-200 flex items-center space-x-1">
+                  <p className="text-sm font-semibold text-white flex items-center space-x-1">
                     <span>{firstName}</span>
                     <Crown className="w-3 h-3 text-yellow-300 ml-1" />
                   </p>
-                  <p className="text-xs text-blue-100 dark:text-gray-400">
+                  <p className="text-xs text-blue-100">
                     {userRole}
                   </p>
                 </div>

@@ -1,12 +1,14 @@
-// pages/Notifications.jsx - UPDATED with plan name in expiration notifications
+// pages/Notifications.jsx - UPDATED with Dark Mode Support
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
 import RenewMembershipModal from "./RenewMembershipModal";
+import { useTheme } from "../contexts/ThemeContext";
 import "../styles/Notifications.css";
 
 const Notifications = () => {
+  const { isDarkMode } = useTheme();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -447,11 +449,14 @@ const Notifications = () => {
     });
   };
 
+  // Updated loading screen with Browse page layout
   if (loading && notifications.length === 0) {
     return (
-      <div className="notifications-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading notifications...</p>
+      <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100 select-none ${isDarkMode ? "dark-mode" : ""}`}>
+        <div className="text-center select-none">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4 select-none"></div>
+          <p className="text-gray-600 font-medium select-none">Loading notifications...</p>
+        </div>
       </div>
     );
   }
@@ -459,10 +464,10 @@ const Notifications = () => {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <div className="notifications-container-page">
+    <div className={`notifications-container-page ${isDarkMode ? "dark-mode" : ""} select-none`}>
       <ClientNavbar profile={profile} avatarUrl={avatarUrl} unreadCount={unreadCount} />
 
-      <div className="notifications-main" style={{ paddingTop: "calc(70px + 2rem)" }}>
+      <div className="notifications-main">
         <div className="notifications-header">
           <div className="header-left">
             <h1 className="page-title">

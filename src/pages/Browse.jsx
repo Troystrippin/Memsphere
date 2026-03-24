@@ -122,7 +122,7 @@ const Browse = () => {
   const [hasMembership, setHasMembership] = useState({});
 
   const navigate = useNavigate();
-  const location = useLocation(); // ADDED: for receiving navigation state
+  const location = useLocation();
   const { isDarkMode } = useTheme();
 
   const locations = [
@@ -163,7 +163,7 @@ const Browse = () => {
     }
   }, [selectedBusiness]);
 
-  // ADDED: Auto-open business modal when coming from dashboard
+  // Auto-open business modal when coming from dashboard
   useEffect(() => {
     const state = location.state;
 
@@ -171,13 +171,11 @@ const Browse = () => {
       console.log("Opening business modal for:", state.businessToOpen.name);
 
       const openModal = () => {
-        // Check if the business is already loaded
         const businessExists = businesses.some(
           (b) => b.id === state.businessToOpen.id,
         );
 
         if (businessExists) {
-          // If business exists in list, open with that business
           const business = businesses.find(
             (b) => b.id === state.businessToOpen.id,
           );
@@ -187,7 +185,6 @@ const Browse = () => {
             handleViewDetails(state.businessToOpen);
           }
         } else {
-          // If not loaded yet, wait a bit and try again
           setTimeout(() => {
             const business = businesses.find(
               (b) => b.id === state.businessToOpen.id,
@@ -195,17 +192,14 @@ const Browse = () => {
             if (business) {
               handleViewDetails(business);
             } else {
-              // If still not found, just use the provided business data
               handleViewDetails(state.businessToOpen);
             }
           }, 500);
         }
 
-        // Clear the state to prevent reopening on refresh
         navigate("/browse", { replace: true, state: {} });
       };
 
-      // Small delay to ensure businesses array is populated
       setTimeout(openModal, 100);
     }
   }, [location.state, businesses]);
@@ -385,7 +379,14 @@ const Browse = () => {
         }
       }
 
-      setBusinesses(businessesData || []);
+      // Sort businesses by rating (highest first)
+      const sortedBusinesses = (businessesData || []).sort((a, b) => {
+        const ratingA = a.rating || 0;
+        const ratingB = b.rating || 0;
+        return ratingB - ratingA;
+      });
+
+      setBusinesses(sortedBusinesses);
       setLoading(false);
 
       if (businessesData && businessesData.length > 0) {
@@ -954,7 +955,7 @@ const Browse = () => {
   }
 
   return (
-    <div className={`browse-container ${isDarkMode ? "dark-mode" : ""}`}>
+    <div className={`browse-container ${isDarkMode ? "dark-mode" : ""} select-none`}>
       <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
 
       <div className={`browse-main ${isDarkMode ? "dark-mode" : ""}`}>

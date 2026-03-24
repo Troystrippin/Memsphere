@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import OwnerNavbar from "../components/owner/OwnerNavbar";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "../contexts/ThemeContext";
 import {
   User,
   Mail,
@@ -57,8 +58,10 @@ import {
   Rocket,
   Target as TargetIcon
 } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 const OwnerProfile = () => {
+  const { isDarkMode, toggleTheme } = useTheme();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -193,7 +196,6 @@ const OwnerProfile = () => {
     try {
       setLoadingStats(true);
       
-      // Fetch businesses owned by this user
       const { data: businessesData, error: businessesError } = await supabase
         .from("businesses")
         .select("*")
@@ -221,7 +223,6 @@ const OwnerProfile = () => {
 
   const fetchBusinessStats = async (businessId) => {
     try {
-      // Get total members (approved memberships)
       const { count: totalMembers, error: membersError } = await supabase
         .from("memberships")
         .select("*", { count: "exact", head: true })
@@ -230,7 +231,6 @@ const OwnerProfile = () => {
 
       if (membersError) throw membersError;
 
-      // Get active members (end_date >= today)
       const { count: activeMembers, error: activeError } = await supabase
         .from("memberships")
         .select("*", { count: "exact", head: true })
@@ -240,7 +240,6 @@ const OwnerProfile = () => {
 
       if (activeError) throw activeError;
 
-      // Get pending applications
       const { count: pendingApps, error: pendingError } = await supabase
         .from("memberships")
         .select("*", { count: "exact", head: true })
@@ -249,7 +248,6 @@ const OwnerProfile = () => {
 
       if (pendingError) throw pendingError;
 
-      // Get ALL payments with status 'paid' for total revenue
       const { data: allPaidPayments, error: allPaymentsError } = await supabase
         .from("payments")
         .select("amount, paid_at")
@@ -260,7 +258,6 @@ const OwnerProfile = () => {
 
       const totalRevenue = allPaidPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
-      // Calculate monthly revenue (current month) - using paid_at
       const currentDate = new Date();
       const currentMonth = currentDate.getMonth();
       const currentYear = currentDate.getFullYear();
@@ -271,7 +268,6 @@ const OwnerProfile = () => {
         return paidDate.getMonth() === currentMonth && paidDate.getFullYear() === currentYear;
       }).reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
-      // Get reviews and rating
       const { data: reviews, error: reviewsError } = await supabase
         .from("reviews")
         .select("rating")
@@ -285,47 +281,6 @@ const OwnerProfile = () => {
 
       const totalReviews = reviews?.length || 0;
 
-      // Calculate revenue growth (compare with last month)
-      const lastMonth = new Date();
-      lastMonth.setMonth(lastMonth.getMonth() - 1);
-      const lastMonthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
-      const lastMonthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0, 23, 59, 59);
-      
-      const lastMonthRevenue = allPaidPayments?.filter(p => {
-        if (!p.paid_at) return false;
-        const paidDate = new Date(p.paid_at);
-        return paidDate >= lastMonthStart && paidDate <= lastMonthEnd;
-      }).reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-
-      const revenueGrowth = lastMonthRevenue > 0 
-        ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
-        : monthlyRevenue > 0 ? 100 : 0;
-
-      // Calculate membership growth (compare with last month)
-      const lastMonthMembersStart = new Date();
-      lastMonthMembersStart.setMonth(lastMonthMembersStart.getMonth() - 1);
-      lastMonthMembersStart.setDate(1);
-      lastMonthMembersStart.setHours(0, 0, 0, 0);
-      
-      const lastMonthMembersEnd = new Date(lastMonthMembersStart);
-      lastMonthMembersEnd.setMonth(lastMonthMembersEnd.getMonth() + 1);
-      lastMonthMembersEnd.setDate(0);
-      lastMonthMembersEnd.setHours(23, 59, 59, 999);
-      
-      const { count: lastMonthMembers, error: lastMonthError } = await supabase
-        .from("memberships")
-        .select("*", { count: "exact", head: true })
-        .eq("business_id", businessId)
-        .eq("status", "approved")
-        .lt("created_at", lastMonthMembersEnd.toISOString());
-
-      let membershipGrowth = 0;
-      if (!lastMonthError) {
-        membershipGrowth = lastMonthMembers > 0 
-          ? ((totalMembers - lastMonthMembers) / lastMonthMembers) * 100 
-          : totalMembers > 0 ? 100 : 0;
-      }
-
       setBusinessStats({
         totalMembers: totalMembers || 0,
         activeMemberships: activeMembers || 0,
@@ -334,8 +289,8 @@ const OwnerProfile = () => {
         monthlyRevenue,
         averageRating: parseFloat(averageRating.toFixed(1)),
         totalReviews,
-        membershipGrowth: parseFloat(membershipGrowth.toFixed(1)),
-        revenueGrowth: parseFloat(revenueGrowth.toFixed(1))
+        membershipGrowth: 0,
+        revenueGrowth: 0
       });
     } catch (error) {
       console.error("Error fetching business stats:", error);
@@ -444,7 +399,6 @@ const OwnerProfile = () => {
       const achievementsList = [];
       let businessComplete = 0;
 
-      // Check business profile completion
       const business = businesses.find(b => b.id === businessId);
       if (business) {
         if (business.name && business.name !== "") businessComplete += 20;
@@ -454,14 +408,12 @@ const OwnerProfile = () => {
         if (business.contact_phone || business.contact_email) businessComplete += 20;
       }
 
-      // Get total members count
       const { count: totalMembers } = await supabase
         .from("memberships")
         .select("*", { count: "exact", head: true })
         .eq("business_id", businessId)
         .eq("status", "approved");
 
-      // Get total revenue from PAID payments only
       const { data: paidPayments } = await supabase
         .from("payments")
         .select("amount")
@@ -470,7 +422,6 @@ const OwnerProfile = () => {
 
       const totalRevenue = paidPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
-      // Get reviews count and rating
       const { data: reviews } = await supabase
         .from("reviews")
         .select("rating")
@@ -481,7 +432,6 @@ const OwnerProfile = () => {
         ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
         : 0;
 
-      // Build achievements
       achievementsList.push({
         id: "first_member",
         title: "First Member",
@@ -500,7 +450,6 @@ const OwnerProfile = () => {
         progress: Math.min(100, ((totalMembers || 0) / 10) * 100)
       });
 
-      // Revenue Milestone - Check total revenue from PAID payments
       achievementsList.push({
         id: "revenue_milestone",
         title: "Revenue Milestone",
@@ -510,7 +459,6 @@ const OwnerProfile = () => {
         progress: Math.min(100, (totalRevenue / 10000) * 100)
       });
 
-      // Top Rated - Check average rating from reviews
       achievementsList.push({
         id: "top_rated",
         title: "Top Rated",
@@ -604,10 +552,10 @@ const OwnerProfile = () => {
         setAvatarUrl(urlData.publicUrl);
       }
 
-      alert("Avatar uploaded successfully!");
+      toast.success("Avatar uploaded successfully!");
     } catch (error) {
       console.error("Error in uploadAvatar:", error);
-      alert(error.message || "Error uploading avatar!");
+      toast.error(error.message || "Error uploading avatar!");
     } finally {
       setUploading(false);
       event.target.value = "";
@@ -631,11 +579,11 @@ const OwnerProfile = () => {
       if (error) throw error;
 
       setIsEditing(false);
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
       await getUserProfile(user);
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Failed to update profile. Please try again.");
+      toast.error("Failed to update profile. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -670,6 +618,8 @@ const OwnerProfile = () => {
       errors.newPassword = "New password is required";
     } else if (passwordData.newPassword.length < 8) {
       errors.newPassword = "Password must be at least 8 characters";
+    } else if (passwordData.newPassword === passwordData.currentPassword) {
+      errors.newPassword = "New password cannot be the same as current password";
     }
 
     if (!passwordData.confirmPassword) {
@@ -700,10 +650,12 @@ const OwnerProfile = () => {
           confirmPassword: "",
         });
         setIsChangingPassword(false);
+        toast.success("Password changed successfully!");
         setTimeout(() => setPasswordSuccess(""), 3000);
       } catch (error) {
         console.error("Error changing password:", error);
         setPasswordErrors({ currentPassword: "Current password is incorrect" });
+        toast.error("Failed to change password. Please check your current password.");
       }
     } else {
       setPasswordErrors(errors);
@@ -791,21 +743,14 @@ const OwnerProfile = () => {
     ]);
   };
 
+  // Loading screen
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="text-center"
-        >
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="w-20 h-20 border-4 border-sky-200 border-t-sky-600 rounded-full mx-auto mb-4"
-          />
-          <motion.p className="text-gray-600 font-medium">Loading your profile...</motion.p>
-        </motion.div>
+      <div className={`min-h-screen flex items-center justify-center select-none ${isDarkMode ? "dark bg-gray-900" : "bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100"}`}>
+        <div className="text-center select-none">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4 select-none"></div>
+          <p className={`${isDarkMode ? "text-gray-300" : "text-gray-600"} font-medium select-none`}>Loading your profile...</p>
+        </div>
       </div>
     );
   }
@@ -820,539 +765,507 @@ const OwnerProfile = () => {
   const completedAchievements = achievements.filter(a => a.completed).length;
   const totalAchievements = achievements.length;
 
+  // Main wrapper class - uses Tailwind dark: prefix
+  const mainWrapperClass = `min-h-screen select-none bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50 dark:bg-gradient-to-br dark:from-gray-900 dark:via-slate-900 dark:to-gray-900`;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50">
-      {/* Owner Navbar */}
-      <OwnerNavbar profile={profile} avatarUrl={avatarUrl} />
+    <div className={mainWrapperClass}>
+      {/* Owner Navbar - Pass dark mode props */}
+      <OwnerNavbar 
+        profile={profile} 
+        avatarUrl={avatarUrl} 
+        isDarkMode={isDarkMode}
+        toggleDarkMode={toggleTheme}
+      />
 
-      {/* Main Content - Added z-index and proper positioning */}
-      <div className="relative z-10 pt-24 pb-16 px-4 sm:px-6 lg:px-8 min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          {/* Animated Floating Background Elements - Lower z-index */}
-          <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-            <motion.div
-              animate={{ y: [0, -30, 0], x: [0, 20, 0], scale: [1, 1.1, 1] }}
-              transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute top-10 left-5 w-96 h-96 bg-sky-400/20 rounded-full blur-3xl"
-            />
-            <motion.div
-              animate={{ y: [0, 30, 0], x: [0, -20, 0], scale: [1, 1.2, 1] }}
-              transition={{ duration: 15, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-              className="absolute bottom-10 right-5 w-[500px] h-[500px] bg-blue-400/20 rounded-full blur-3xl"
-            />
-          </div>
-
-          {/* Left Sidebar - Business Stats - Fixed positioning with top offset to avoid navbar */}
-          <div className="hidden xl:block fixed left-4 top-32 w-80">
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2, type: "spring" }}
-              className="space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar"
-            >
-              {/* Business Selector */}
-              {businesses.length > 1 && (
-                <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Business</label>
-                  <select
-                    value={selectedBusiness?.id || ""}
-                    onChange={(e) => handleBusinessChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                  >
-                    {businesses.map(business => (
-                      <option key={business.id} value={business.id}>
-                        {business.name} {business.verification_status === "verified" ? "✓" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Business Stats Card */}
-              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
-                <div className="flex items-center gap-2 mb-4">
-                  <Store className="w-5 h-5 text-sky-600" />
-                  <h3 className="font-semibold text-gray-800">Business Stats</h3>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Total Members</span>
-                    <span className="text-lg font-bold text-sky-600">{businessStats.totalMembers}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Active Members</span>
-                    <span className="text-lg font-bold text-green-600">{businessStats.activeMemberships}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Pending Applications</span>
-                    <span className="text-lg font-bold text-yellow-600">{businessStats.pendingApplications}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Total Revenue</span>
-                    <span className="text-lg font-bold text-purple-600">{formatCurrency(businessStats.totalRevenue)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Monthly Revenue</span>
-                    <span className="text-lg font-bold text-blue-600">{formatCurrency(businessStats.monthlyRevenue)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Rating</span>
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                      <span className="text-lg font-bold text-gray-800">{businessStats.averageRating}</span>
-                      <span className="text-xs text-gray-500">({businessStats.totalReviews})</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Business Achievements */}
-              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-sky-600" />
-                    <h3 className="font-semibold text-gray-800">Business Achievements</h3>
-                  </div>
-                  <span className="text-xs text-gray-500">{completedAchievements}/{totalAchievements}</span>
-                </div>
-                <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                  {achievements.map((achievement) => (
-                    <div key={achievement.id} className="group">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <div className={`p-1.5 rounded-lg ${achievement.completed ? 'bg-sky-100 text-sky-600' : 'bg-gray-100 text-gray-400'}`}>
-                            {achievement.icon}
-                          </div>
-                          <div>
-                            <p className={`text-xs font-medium ${achievement.completed ? 'text-gray-800' : 'text-gray-500'}`}>
-                              {achievement.title}
-                            </p>
-                            <p className="text-xs text-gray-400">{achievement.description}</p>
-                          </div>
-                        </div>
-                        {achievement.completed && <Check className="w-3 h-3 text-green-500" />}
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${achievement.progress}%` }}
-                          transition={{ duration: 1 }}
-                          className={`h-1.5 rounded-full ${achievement.completed ? 'bg-sky-500' : 'bg-sky-300'}`}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Right Sidebar - Recent Activity - Fixed positioning with top offset to avoid navbar */}
-          <div className="hidden xl:block fixed right-4 top-32 w-80">
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2, type: "spring" }}
-              className="space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar"
-            >
-              {/* Recent Members */}
-              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
-                <div className="flex items-center gap-2 mb-4">
-                  <Users className="w-5 h-5 text-sky-600" />
-                  <h3 className="font-semibold text-gray-800">Newest Members</h3>
-                </div>
-                {loadingMembers ? (
-                  <div className="text-center py-4">
-                    <div className="w-8 h-8 border-2 border-sky-200 border-t-sky-600 rounded-full animate-spin mx-auto" />
-                  </div>
-                ) : recentMembers.length > 0 ? (
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                    {recentMembers.map((member) => (
-                      <div key={member.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-white text-sm font-bold">
-                          {member.name.charAt(0)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{member.name}</p>
-                          <p className="text-xs text-gray-500">{member.plan}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-semibold text-green-600">{formatCurrency(member.amount)}</p>
-                          <p className="text-xs text-gray-400">{member.joined}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No members yet</p>
+      {/* Main Content - Three Column Layout */}
+      <div className="pt-28 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1600px] mx-auto">
+          <div className="flex flex-col xl:flex-row gap-8">
+            {/* Left Sidebar - Sticky */}
+            <div className="hidden xl:block w-80 flex-shrink-0">
+              <div className="sticky top-32 space-y-4">
+                {/* Business Selector */}
+                {businesses.length > 1 && (
+                  <div className="bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-white/20 dark:border-gray-700 rounded-2xl p-5 shadow-lg border">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Business</label>
+                    <select
+                      value={selectedBusiness?.id || ""}
+                      onChange={(e) => handleBusinessChange(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                    >
+                      {businesses.map(business => (
+                        <option key={business.id} value={business.id}>
+                          {business.name} {business.verification_status === "verified" ? "✓" : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 )}
-              </div>
 
-              {/* Pending Applications */}
-              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg border border-white/20">
-                <div className="flex items-center gap-2 mb-4">
-                  <Clock className="w-5 h-5 text-sky-600" />
-                  <h3 className="font-semibold text-gray-800">Pending Applications</h3>
-                  {businessStats.pendingApplications > 0 && (
-                    <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
-                      {businessStats.pendingApplications}
-                    </span>
+                {/* Business Stats Card */}
+                <div className="bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-white/20 dark:border-gray-700 rounded-2xl p-5 shadow-lg border">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Store className="w-5 h-5 text-sky-600 dark:text-blue-400" />
+                    <h3 className="font-semibold text-gray-800 dark:text-white">Business Stats</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Total Members</span>
+                      <span className="text-lg font-bold text-sky-600 dark:text-blue-400">{businessStats.totalMembers}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Active Members</span>
+                      <span className="text-lg font-bold text-green-600 dark:text-green-400">{businessStats.activeMemberships}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Pending Applications</span>
+                      <span className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{businessStats.pendingApplications}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</span>
+                      <span className="text-lg font-bold text-purple-600 dark:text-purple-400">{formatCurrency(businessStats.totalRevenue)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Monthly Revenue</span>
+                      <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(businessStats.monthlyRevenue)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Rating</span>
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 text-yellow-500 dark:text-yellow-400 fill-yellow-500 dark:fill-yellow-400" />
+                        <span className="text-lg font-bold text-gray-800 dark:text-white">{businessStats.averageRating}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">({businessStats.totalReviews})</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Business Achievements */}
+                <div className="bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-white/20 dark:border-gray-700 rounded-2xl p-5 shadow-lg border">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-sky-600 dark:text-blue-400" />
+                      <h3 className="font-semibold text-gray-800 dark:text-white">Business Achievements</h3>
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{completedAchievements}/{totalAchievements}</span>
+                  </div>
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+                    {achievements.map((achievement) => (
+                      <div key={achievement.id} className="group">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <div className={`p-1.5 rounded-lg ${
+                              achievement.completed 
+                                ? 'bg-sky-100 dark:bg-blue-900/50 text-sky-600 dark:text-blue-400' 
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500'
+                            }`}>
+                              {achievement.icon}
+                            </div>
+                            <div>
+                              <p className={`text-xs font-medium ${
+                                achievement.completed 
+                                  ? 'text-gray-800 dark:text-white' 
+                                  : 'text-gray-500 dark:text-gray-500'
+                              }`}>
+                                {achievement.title}
+                              </p>
+                              <p className="text-xs text-gray-400 dark:text-gray-400">{achievement.description}</p>
+                            </div>
+                          </div>
+                          {achievement.completed && <Check className="w-3 h-3 text-green-500" />}
+                        </div>
+                        <div className="w-full rounded-full h-1.5 bg-gray-200 dark:bg-gray-700">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${achievement.progress}%` }}
+                            transition={{ duration: 1 }}
+                            className={`h-1.5 rounded-full ${achievement.completed ? 'bg-sky-500' : 'bg-sky-300'}`}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Profile Card - Centered */}
+            <div className="flex-1 min-w-0 max-w-4xl mx-auto xl:mx-0">
+              <motion.div
+                initial={{ opacity: 0, y: 30, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: "spring", stiffness: 100, damping: 20 }}
+                className="relative bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-white/20 dark:border-gray-700 rounded-3xl shadow-2xl overflow-hidden border"
+              >
+                {/* Cover Image */}
+                <div className="relative h-48 overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600" />
+                  <div className="absolute inset-0 bg-black/20" />
+                </div>
+
+                {/* Avatar Section */}
+                <div className="relative px-8 sm:px-12">
+                  <motion.div
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
+                    className="absolute -top-20 left-8 sm:left-12"
+                  >
+                    <div className="relative group">
+                      <motion.div
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-32 h-32 rounded-full bg-gradient-to-r from-sky-500 to-blue-500 p-1 shadow-2xl"
+                      >
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt={fullName} className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          <div className={`w-full h-full rounded-full bg-gradient-to-br ${roleGradient} flex items-center justify-center`}>
+                            <span className="text-4xl font-bold text-white">{initials}</span>
+                          </div>
+                        )}
+                      </motion.div>
+                      <motion.label
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        htmlFor="avatar-upload"
+                        className="absolute bottom-1 right-1 p-2 bg-white rounded-full cursor-pointer shadow-lg border-2 border-gray-200 hover:shadow-xl transition-all"
+                      >
+                        <Camera className="w-4 h-4 text-gray-600" />
+                        <input id="avatar-upload" type="file" accept="image/*" onChange={uploadAvatar} disabled={uploading} className="hidden" />
+                      </motion.label>
+                      {uploading && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center"
+                        >
+                          <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity }} className="w-8 h-8 border-4 border-white border-t-transparent rounded-full" />
+                        </motion.div>
+                      )}
+                    </div>
+                  </motion.div>
+
+                  {/* Profile Info */}
+                  <div className="pt-24 pb-8">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 }}
+                      >
+                        <div className="flex items-center gap-3 mb-3 flex-wrap">
+                          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white">
+                            {fullName}
+                          </h1>
+                          <motion.span
+                            whileHover={{ scale: 1.05 }}
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium text-white shadow-lg bg-gradient-to-r ${roleGradient} flex items-center gap-2`}
+                          >
+                            {roleIcon}
+                            <span>{userRole}</span>
+                          </motion.span>
+                        </div>
+                        
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.3 }}
+                          className="space-y-2"
+                        >
+                          <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
+                            <Mail className="w-4 h-4" />
+                            <span>{userData.email}</span>
+                          </div>
+                          {userData.mobile && (
+                            <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
+                              <Phone className="w-4 h-4" />
+                              <span>{userData.mobile}</span>
+                            </div>
+                          )}
+                          {selectedBusiness && (
+                            <div className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
+                              <Store className="w-4 h-4" />
+                              <span className="font-medium">{selectedBusiness.name}</span>
+                              {selectedBusiness.verification_status === "verified" && (
+                                <span className="px-2 py-0.5 text-xs rounded-full flex items-center gap-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">
+                                  <CheckCircle className="w-3 h-3" /> Verified
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                            <Calendar className="w-4 h-4" />
+                            <span>Owner since {user?.created_at ? formatDate(user.created_at) : "N/A"}</span>
+                          </div>
+                        </motion.div>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.25 }}
+                        className="flex gap-3"
+                      >
+                        {!isEditing ? (
+                          <>
+                            <motion.button
+                              whileHover={{ scale: 1.05, y: -2 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setIsEditing(true)}
+                              className="px-6 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                              <span>Edit Profile</span>
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.05, y: -2 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setIsChangingPassword(true)}
+                              className="px-6 py-2.5 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                            >
+                              <Lock className="w-4 h-4" />
+                              <span>Change Password</span>
+                            </motion.button>
+                          </>
+                        ) : (
+                          <>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={handleSaveProfile}
+                              disabled={saving}
+                              className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+                            >
+                              <Save className="w-4 h-4" />
+                              {saving ? "Saving..." : "Save Changes"}
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setIsEditing(false)}
+                              className="px-6 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+                            >
+                              <X className="w-4 h-4" />
+                              Cancel
+                            </motion.button>
+                          </>
+                        )}
+                      </motion.div>
+                    </div>
+
+                    {/* Edit Form */}
+                    <AnimatePresence>
+                      {isEditing && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700"
+                        >
+                          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+                            Edit Profile Information
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">First Name</label>
+                              <input
+                                type="text"
+                                name="first_name"
+                                value={userData.first_name}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                                placeholder="Enter your first name"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Last Name</label>
+                              <input
+                                type="text"
+                                name="last_name"
+                                value={userData.last_name}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                                placeholder="Enter your last name"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mobile Number</label>
+                              <input
+                                type="tel"
+                                name="mobile"
+                                value={userData.mobile}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                                placeholder="09171234567"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Business Name</label>
+                              <input
+                                type="text"
+                                name="business_name"
+                                value={userData.business_name}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                                placeholder="Your Business Name"
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+                              <input
+                                type="email"
+                                name="email"
+                                value={userData.email}
+                                className="w-full px-4 py-2 border rounded-xl bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                                disabled
+                              />
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Email cannot be changed</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Right Sidebar - Sticky */}
+            <div className="hidden xl:block w-80 flex-shrink-0">
+              <div className="sticky top-32 space-y-4">
+                {/* Recent Members */}
+                <div className="bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-white/20 dark:border-gray-700 rounded-2xl p-5 shadow-lg border">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Users className="w-5 h-5 text-sky-600 dark:text-blue-400" />
+                    <h3 className="font-semibold text-gray-800 dark:text-white">Newest Members</h3>
+                  </div>
+                  {loadingMembers ? (
+                    <div className="text-center py-4">
+                      <div className="w-8 h-8 border-2 border-sky-200 dark:border-blue-800 border-t-sky-600 dark:border-t-blue-400 rounded-full animate-spin mx-auto" />
+                    </div>
+                  ) : recentMembers.length > 0 ? (
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                      {recentMembers.map((member) => (
+                        <div key={member.id} className="flex items-center gap-2 p-2 rounded-lg transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-white text-sm font-bold">
+                            {member.name.charAt(0)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 dark:text-white truncate">{member.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{member.plan}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs font-semibold text-green-600 dark:text-green-400">{formatCurrency(member.amount)}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">{member.joined}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No members yet</p>
+                    </div>
                   )}
                 </div>
-                {loadingApplications ? (
-                  <div className="text-center py-4">
-                    <div className="w-8 h-8 border-2 border-sky-200 border-t-sky-600 rounded-full animate-spin mx-auto" />
-                  </div>
-                ) : recentApplications.length > 0 ? (
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                    {recentApplications.map((app) => (
-                      <div key={app.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                        onClick={() => navigate("/applications")}>
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center text-white text-sm font-bold">
-                          {app.name.charAt(0)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{app.name}</p>
-                          <p className="text-xs text-gray-500">{app.plan}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-semibold text-yellow-600">{formatCurrency(app.amount)}</p>
-                          <p className="text-xs text-gray-400">{app.timeAgo}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <CheckCircle className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No pending applications</p>
-                  </div>
-                )}
-              </div>
 
-              {/* Quick Tips for Owners */}
-              <div className="bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl p-5 shadow-lg text-white">
-                <div className="flex items-center gap-2 mb-3">
-                  <Rocket className="w-5 h-5" />
-                  <h3 className="font-semibold">Owner Tips</h3>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2 text-sm">
-                    <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>Review applications promptly to retain members</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-sm">
-                    <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>Update your business profile to attract more customers</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-sm">
-                    <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>Respond to reviews to build trust</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-sm">
-                    <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>Promote special offers to increase memberships</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Main Content - Centered */}
-          <div className="xl:mx-80">
-            {/* Profile Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 100, damping: 20 }}
-              className="relative bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/20"
-            >
-              {/* Animated Gradient Background */}
-              <motion.div
-                animate={{ backgroundPosition: ["0% 0%", "100% 100%"] }}
-                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 bg-gradient-to-r from-sky-600/10 via-blue-600/10 to-indigo-600/10"
-                style={{ backgroundSize: "200% 200%" }}
-              />
-
-              {/* Cover Image */}
-              <div className="relative h-48 overflow-hidden">
-                <motion.div
-                  animate={{ scale: [1, 1.05, 1] }}
-                  transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute inset-0 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600"
-                />
-                <div className="absolute inset-0 bg-black/20" />
-                
-                {/* Floating Particles */}
-                {[...Array(20)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{
-                      opacity: [0, 0.5, 0],
-                      scale: [0, 1, 0],
-                      x: [Math.random() * window.innerWidth, Math.random() * window.innerWidth],
-                      y: [Math.random() * 200, Math.random() * 200],
-                    }}
-                    transition={{ duration: 3 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 2 }}
-                    className="absolute w-2 h-2 bg-white/60 rounded-full"
-                    style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
-                  />
-                ))}
-              </div>
-
-              {/* Avatar Section */}
-              <div className="relative px-8 sm:px-12">
-                <motion.div
-                  initial={{ scale: 0, rotate: -180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
-                  className="absolute -top-20 left-8 sm:left-12"
-                >
-                  <div className="relative group">
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="w-32 h-32 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-500 p-1 shadow-2xl"
-                    >
-                      {avatarUrl ? (
-                        <img src={avatarUrl} alt={fullName} className="w-full h-full rounded-xl object-cover" />
-                      ) : (
-                        <div className={`w-full h-full rounded-xl bg-gradient-to-br ${roleGradient} flex items-center justify-center`}>
-                          <span className="text-4xl font-bold text-white">{initials}</span>
-                        </div>
-                      )}
-                    </motion.div>
-                    <motion.label
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.95 }}
-                      htmlFor="avatar-upload"
-                      className="absolute bottom-0 right-0 p-2 bg-white rounded-full cursor-pointer shadow-lg border-2 border-gray-200 hover:shadow-xl transition-all"
-                    >
-                      <Camera className="w-4 h-4 text-gray-600" />
-                      <input id="avatar-upload" type="file" accept="image/*" onChange={uploadAvatar} disabled={uploading} className="hidden" />
-                    </motion.label>
-                    {uploading && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center"
-                      >
-                        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity }} className="w-8 h-8 border-4 border-white border-t-transparent rounded-full" />
-                      </motion.div>
+                {/* Pending Applications */}
+                <div className="bg-white/80 dark:bg-gray-800/90 backdrop-blur-xl border-white/20 dark:border-gray-700 rounded-2xl p-5 shadow-lg border">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Clock className="w-5 h-5 text-sky-600 dark:text-blue-400" />
+                    <h3 className="font-semibold text-gray-800 dark:text-white">Pending Applications</h3>
+                    {businessStats.pendingApplications > 0 && (
+                      <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                        {businessStats.pendingApplications}
+                      </span>
                     )}
                   </div>
-                </motion.div>
-
-                {/* Profile Info */}
-                <div className="pt-24 pb-8">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-                      <div className="flex items-center gap-3 mb-3 flex-wrap">
-                        <motion.h1
-                          animate={{ backgroundPosition: ["0% 0%", "100% 100%"] }}
-                          transition={{ duration: 5, repeat: Infinity }}
-                          className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
-                        >
-                          {fullName}
-                        </motion.h1>
-                        <motion.span
-                          whileHover={{ scale: 1.05 }}
-                          className={`px-4 py-1.5 rounded-full text-sm font-medium text-white shadow-lg bg-gradient-to-r ${roleGradient} flex items-center gap-2`}
-                        >
-                          {roleIcon}
-                          <span>{userRole}</span>
-                        </motion.span>
-                      </div>
-                      
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-2">
-                        <div className="flex items-center gap-3 text-gray-600">
-                          <Mail className="w-4 h-4" />
-                          <span>{userData.email}</span>
-                        </div>
-                        {userData.mobile && (
-                          <div className="flex items-center gap-3 text-gray-600">
-                            <Phone className="w-4 h-4" />
-                            <span>{userData.mobile}</span>
+                  {loadingApplications ? (
+                    <div className="text-center py-4">
+                      <div className="w-8 h-8 border-2 border-sky-200 dark:border-blue-800 border-t-sky-600 dark:border-t-blue-400 rounded-full animate-spin mx-auto" />
+                    </div>
+                  ) : recentApplications.length > 0 ? (
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                      {recentApplications.map((app) => (
+                        <div key={app.id} className="flex items-center gap-2 p-2 rounded-lg transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                          onClick={() => navigate("/applications")}>
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center text-white text-sm font-bold">
+                            {app.name.charAt(0)}
                           </div>
-                        )}
-                        {selectedBusiness && (
-                          <div className="flex items-center gap-3 text-gray-600">
-                            <Store className="w-4 h-4" />
-                            <span className="font-medium">{selectedBusiness.name}</span>
-                            {selectedBusiness.verification_status === "verified" && (
-                              <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1">
-                                <CheckCircle className="w-3 h-3" /> Verified
-                              </span>
-                            )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 dark:text-white truncate">{app.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{app.plan}</p>
                           </div>
-                        )}
-                        <div className="flex items-center gap-3 text-gray-500 text-sm">
-                          <Calendar className="w-4 h-4" />
-                          <span>Owner since {user?.created_at ? formatDate(user.created_at) : "N/A"}</span>
+                          <div className="text-right">
+                            <p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">{formatCurrency(app.amount)}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">{app.timeAgo}</p>
+                          </div>
                         </div>
-                      </motion.div>
-                    </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <CheckCircle className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No pending applications</p>
+                    </div>
+                  )}
+                </div>
 
-                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }} className="flex gap-3">
-                      {!isEditing ? (
-                        <>
-                          <motion.button
-                            whileHover={{ scale: 1.05, y: -2 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setIsEditing(true)}
-                            className="group relative px-8 py-3 bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden"
-                          >
-                            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            <div className="relative flex items-center gap-3">
-                              <Edit2 className="w-5 h-5" />
-                              <span>Edit Profile</span>
-                            </div>
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.05, y: -2 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setIsChangingPassword(true)}
-                            className="group relative px-8 py-3 bg-white text-gray-700 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-gray-200 overflow-hidden"
-                          >
-                            <div className="absolute inset-0 bg-gradient-to-r from-gray-50 to-gray-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            <div className="relative flex items-center gap-3">
-                              <Lock className="w-5 h-5" />
-                              <span>Change Password</span>
-                            </div>
-                          </motion.button>
-                        </>
-                      ) : (
-                        <>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={handleSaveProfile}
-                            disabled={saving}
-                            className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-3"
-                          >
-                            <Save className="w-5 h-5" />
-                            {saving ? "Saving..." : "Save Changes"}
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setIsEditing(false)}
-                            className="px-8 py-3 bg-gray-100 text-gray-700 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-3"
-                          >
-                            <X className="w-5 h-5" />
-                            Cancel
-                          </motion.button>
-                        </>
-                      )}
-                    </motion.div>
+                {/* Quick Tips for Owners */}
+                <div className="bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl p-5 shadow-lg text-white">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Rocket className="w-5 h-5" />
+                    <h3 className="font-semibold">Owner Tips</h3>
                   </div>
-
-                  {/* Edit Form */}
-                  <AnimatePresence>
-                    {isEditing && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="mt-8 pt-8 border-t border-gray-200"
-                      >
-                        <motion.h3 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-lg font-semibold text-gray-800 mb-4">
-                          Edit Profile Information
-                        </motion.h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                            <input
-                              type="text"
-                              name="first_name"
-                              value={userData.first_name}
-                              onChange={handleInputChange}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
-                              placeholder="Enter your first name"
-                            />
-                          </motion.div>
-                          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                            <input
-                              type="text"
-                              name="last_name"
-                              value={userData.last_name}
-                              onChange={handleInputChange}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
-                              placeholder="Enter your last name"
-                            />
-                          </motion.div>
-                          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
-                            <input
-                              type="tel"
-                              name="mobile"
-                              value={userData.mobile}
-                              onChange={handleInputChange}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
-                              placeholder="09171234567"
-                            />
-                          </motion.div>
-                          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Business Name</label>
-                            <input
-                              type="text"
-                              name="business_name"
-                              value={userData.business_name}
-                              onChange={handleInputChange}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
-                              placeholder="Your Business Name"
-                            />
-                          </motion.div>
-                          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }} className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                            <input
-                              type="email"
-                              name="email"
-                              value={userData.email}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-xl bg-gray-50 text-gray-500"
-                              disabled
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-                          </motion.div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>Review applications promptly to retain members</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>Update your business profile to attract more customers</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>Respond to reviews to build trust</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>Promote special offers to increase memberships</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Mobile Bottom Bar */}
-      <div className="xl:hidden fixed bottom-6 left-4 right-4 z-20">
+      <div className="xl:hidden fixed bottom-6 left-4 right-4">
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/95 backdrop-blur-xl rounded-2xl p-4 shadow-lg border border-white/20 flex gap-4 overflow-x-auto"
+          className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-white/20 dark:border-gray-700 rounded-2xl p-4 shadow-lg border flex gap-4 overflow-x-auto"
         >
           <div className="flex-1 min-w-[100px] text-center">
-            <Users className="w-5 h-5 text-sky-600 mx-auto mb-1" />
-            <p className="text-xs text-gray-500">Members</p>
-            <p className="text-lg font-bold text-sky-600">{businessStats.totalMembers}</p>
+            <Users className="w-5 h-5 mx-auto mb-1 text-sky-600 dark:text-blue-400" />
+            <p className="text-xs text-gray-500 dark:text-gray-400">Members</p>
+            <p className="text-lg font-bold text-sky-600 dark:text-blue-400">{businessStats.totalMembers}</p>
           </div>
           <div className="flex-1 min-w-[100px] text-center">
-            <DollarSign className="w-5 h-5 text-green-600 mx-auto mb-1" />
-            <p className="text-xs text-gray-500">Revenue</p>
-            <p className="text-lg font-bold text-green-600">{formatCurrency(businessStats.monthlyRevenue)}</p>
+            <DollarSign className="w-5 h-5 mx-auto mb-1 text-green-600 dark:text-green-400" />
+            <p className="text-xs text-gray-500 dark:text-gray-400">Revenue</p>
+            <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(businessStats.monthlyRevenue)}</p>
           </div>
           <div className="flex-1 min-w-[100px] text-center">
-            <Trophy className="w-5 h-5 text-yellow-500 mx-auto mb-1" />
-            <p className="text-xs text-gray-500">Achievements</p>
-            <p className="text-lg font-bold text-yellow-500">{completedAchievements}/{totalAchievements}</p>
+            <Trophy className="w-5 h-5 mx-auto mb-1 text-yellow-500 dark:text-yellow-400" />
+            <p className="text-xs text-gray-500 dark:text-gray-400">Achievements</p>
+            <p className="text-lg font-bold text-yellow-500 dark:text-yellow-400">{completedAchievements}/{totalAchievements}</p>
           </div>
         </motion.div>
       </div>
@@ -1372,7 +1285,7 @@ const OwnerProfile = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+              className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="bg-gradient-to-r from-sky-600 to-blue-600 p-6">
@@ -1394,20 +1307,16 @@ const OwnerProfile = () => {
 
               <div className="p-6">
                 {passwordSuccess && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-center gap-2"
-                  >
+                  <div className="mb-4 p-3 rounded-xl text-sm flex items-center gap-2 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300">
                     <CheckCircle className="w-4 h-4" />
                     {passwordSuccess}
-                  </motion.div>
+                  </div>
                 )}
 
                 <form onSubmit={handlePasswordSubmit}>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+                      <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Current Password</label>
                       <div className="relative">
                         <input
                           type={showCurrentPassword ? "text" : "password"}
@@ -1415,25 +1324,23 @@ const OwnerProfile = () => {
                           value={passwordData.currentPassword}
                           onChange={handlePasswordChange}
                           className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all ${
-                            passwordErrors.currentPassword ? "border-red-500" : "border-gray-300"
+                            passwordErrors.currentPassword ? "border-red-500" : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
                           }`}
                           placeholder="Enter current password"
                         />
                         <button
                           type="button"
                           onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                         >
                           {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
-                      {passwordErrors.currentPassword && (
-                        <p className="text-red-500 text-xs mt-1">{passwordErrors.currentPassword}</p>
-                      )}
+                      {passwordErrors.currentPassword && <p className="text-red-500 text-xs mt-1">{passwordErrors.currentPassword}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                      <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">New Password</label>
                       <div className="relative">
                         <input
                           type={showNewPassword ? "text" : "password"}
@@ -1441,25 +1348,23 @@ const OwnerProfile = () => {
                           value={passwordData.newPassword}
                           onChange={handlePasswordChange}
                           className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all ${
-                            passwordErrors.newPassword ? "border-red-500" : "border-gray-300"
+                            passwordErrors.newPassword ? "border-red-500" : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
                           }`}
                           placeholder="Enter new password (min. 8 characters)"
                         />
                         <button
                           type="button"
                           onClick={() => setShowNewPassword(!showNewPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                         >
                           {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
-                      {passwordErrors.newPassword && (
-                        <p className="text-red-500 text-xs mt-1">{passwordErrors.newPassword}</p>
-                      )}
+                      {passwordErrors.newPassword && <p className="text-red-500 text-xs mt-1">{passwordErrors.newPassword}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+                      <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Confirm New Password</label>
                       <div className="relative">
                         <input
                           type={showConfirmPassword ? "text" : "password"}
@@ -1467,21 +1372,19 @@ const OwnerProfile = () => {
                           value={passwordData.confirmPassword}
                           onChange={handlePasswordChange}
                           className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all ${
-                            passwordErrors.confirmPassword ? "border-red-500" : "border-gray-300"
+                            passwordErrors.confirmPassword ? "border-red-500" : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
                           }`}
                           placeholder="Confirm new password"
                         />
                         <button
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                         >
                           {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
-                      {passwordErrors.confirmPassword && (
-                        <p className="text-red-500 text-xs mt-1">{passwordErrors.confirmPassword}</p>
-                      )}
+                      {passwordErrors.confirmPassword && <p className="text-red-500 text-xs mt-1">{passwordErrors.confirmPassword}</p>}
                     </div>
                   </div>
 
@@ -1499,7 +1402,7 @@ const OwnerProfile = () => {
                       whileTap={{ scale: 0.98 }}
                       type="button"
                       onClick={() => setIsChangingPassword(false)}
-                      className="flex-1 px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all"
+                      className="flex-1 px-4 py-2.5 border-2 rounded-xl font-medium transition-all border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                     >
                       Cancel
                     </motion.button>
@@ -1510,6 +1413,24 @@ const OwnerProfile = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Custom Scrollbar Styles */}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: ${isDarkMode ? "#1f2937" : "#f1f1f1"};
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: ${isDarkMode ? "#60a5fa" : "#3b82f6"};
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: ${isDarkMode ? "#93c5fd" : "#2563eb"};
+        }
+      `}</style>
     </div>
   );
 };
