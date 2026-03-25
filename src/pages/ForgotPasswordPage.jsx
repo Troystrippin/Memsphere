@@ -248,7 +248,7 @@ const ForgotPasswordPage = () => {
   };
 
   const startResendTimer = () => {
-    setResendTimer(30);
+    setResendTimer(60); // Changed from 30 to 60 seconds
     const timer = setInterval(() => {
       setResendTimer(prev => {
         if (prev <= 1) {
@@ -276,7 +276,7 @@ const ForgotPasswordPage = () => {
     {
       icon: Shield,
       text: "Secure OTP",
-      value: "30s",
+      value: "1 min", // Changed from "30s" to "1 min"
       color: "from-blue-500 to-cyan-500",
     },
     {
@@ -296,7 +296,7 @@ const ForgotPasswordPage = () => {
   const benefits = [
     "Secure OTP verification",
     "Quick email delivery",
-    "30-second OTP validity",
+    "1-minute OTP validity", // Changed from "30-second" to "1-minute"
     "Safe & encrypted",
   ];
 
@@ -536,7 +536,7 @@ const ForgotPasswordPage = () => {
                         ))}
                       </div>
                       <p className="text-xs text-gray-500 text-center mt-2">
-                        OTP expires in {resendTimer > 0 ? `${resendTimer}s` : '30s'}
+                        OTP expires in {resendTimer > 0 ? `${Math.floor(resendTimer / 60)}:${(resendTimer % 60).toString().padStart(2, '0')}` : '1:00'}
                       </p>
                     </div>
 
@@ -571,7 +571,7 @@ const ForgotPasswordPage = () => {
                             : 'text-blue-600 hover:text-blue-700'
                         }`}
                       >
-                        {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                        {resendTimer > 0 ? `Resend in ${Math.floor(resendTimer / 60)}:${(resendTimer % 60).toString().padStart(2, '0')}` : 'Resend OTP'}
                       </button>
                       <button
                         type="button"
