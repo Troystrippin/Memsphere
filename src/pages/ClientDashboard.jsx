@@ -528,8 +528,11 @@ const ClientDashboard = ({ initialUserData = null }) => {
   const activeMembership = getActiveMembership();
   const sortedMemberships = getSortedMemberships();
 
+  // Main wrapper class - apply dark-mode class for CSS
+  const mainWrapperClass = `dashboard-container ${isDarkMode ? "dark-mode" : ""}`;
+
   return (
-    <div className={`dashboard-container ${isDarkMode ? "dark-mode" : ""}`}>
+    <div className={mainWrapperClass}>
       <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
 
       <div className="dashboard-main">
@@ -1015,7 +1018,7 @@ const ClientDashboard = ({ initialUserData = null }) => {
           </motion.div>
         )}
 
-        {/* Recommended Section */}
+        {/* Recommended Section - EXACT SAME CARD STYLE AS BROWSE PAGE */}
         <div className="mb-8 select-none">
           <div className="flex justify-between items-center mb-6 select-none">
             <div className="flex items-center gap-2 select-none">
@@ -1047,95 +1050,115 @@ const ClientDashboard = ({ initialUserData = null }) => {
           ) : recommendedBusinesses.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
               {recommendedBusinesses.map((business, index) => (
-                <motion.div
+                <div
                   key={business.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -8, scale: 1.02 }}
+                  className={`business-card-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+                  style={{ animationDelay: `${index * 0.1}s` }}
                   onClick={() => handleBusinessClick(business)}
-                  className={`rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all cursor-pointer group select-none ${
-                    isDarkMode ? "bg-gray-800" : "bg-white"
-                  }`}
                 >
-                  <div
-                    className={`p-4 relative ${
-                      isDarkMode
-                        ? "bg-gradient-to-br from-gray-700 to-gray-800"
-                        : "bg-gradient-to-br from-blue-50 to-purple-50"
-                    }`}
-                  >
-                    <div className="text-5xl text-center py-4 select-none">
-                      {getBusinessIcon(business)}
-                    </div>
-                    <div className="absolute top-2 right-2 flex gap-1">
-                      <div className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-md select-none">
-                        <Star size={10} fill="currentColor" />
-                        <span>
-                          {business.rating !== null &&
-                          business.rating !== undefined
-                            ? Number(business.rating).toFixed(1)
-                            : "New"}
+                  <div className="card-gradient-bg"></div>
+                  <div className="card-content">
+                    <div className="card-header">
+                      <div className="business-image-wrapper">
+                        <span className="business-emoji-large">
+                          {getBusinessIcon(business)}
                         </span>
                       </div>
-                      {business.members_count > 0 && (
-                        <div className="bg-gray-800/80 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-md select-none">
-                          <Users size={10} />
-                          <span>{business.members_count}</span>
-                        </div>
-                      )}
+                      <div className="business-tags">
+                        <span
+                          className={`business-type-badge ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          {business.business_type}
+                        </span>
+                        <span
+                          className={`rating-badge ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          <Star size={12} fill="currentColor" />
+                          <span>
+                            {business.rating ? business.rating.toFixed(1) : "0.0"}
+                          </span>
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-4">
-                    <h4
-                      className={`font-semibold mb-1 truncate select-none ${isDarkMode ? "text-white" : "text-gray-900"}`}
-                    >
-                      {business.name}
-                    </h4>
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mb-2 select-none">
-                      <Crown size={12} className="text-yellow-500" />
-                      <span className="truncate select-none">
-                        {business.owner_name}
-                      </span>
-                    </div>
-                    {business.short_description && (
-                      <p
-                        className={`text-xs mb-3 line-clamp-2 select-none ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+
+                    <div className="business-details">
+                      <h3
+                        className={`business-title ${isDarkMode ? "dark-mode" : ""}`}
                       >
-                        {business.short_description}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-1 text-xs text-gray-500 select-none">
-                        <MapPin size={12} />
-                        <span className="truncate select-none">
-                          {business.city || business.location || "Location"}
+                        {business.name}
+                      </h3>
+
+                      <div
+                        className={`owner-highlight ${isDarkMode ? "dark-mode" : ""}`}
+                      >
+                        <Crown size={14} className="owner-icon" />
+                        <span
+                          className={`owner-name ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          {business.owner_name}
                         </span>
+                        <span className="owner-badge">Owner</span>
                       </div>
-                      <div className="text-right">
-                        <span className="text-sm font-bold text-blue-600 select-none">
+
+                      <p
+                        className={`business-description ${isDarkMode ? "dark-mode" : ""}`}
+                      >
+                        {business.short_description ||
+                          business.description?.substring(0, 80)}
+                        {!business.short_description &&
+                        business.description?.length > 80
+                          ? "..."
+                          : ""}
+                      </p>
+
+                      <div
+                        className={`business-stats ${isDarkMode ? "dark-mode" : ""}`}
+                      >
+                        <div
+                          className={`stat-item ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          <MapPin size={14} />
+                          <span>{business.location || "Location"}</span>
+                        </div>
+                        <div
+                          className={`stat-item ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          <Users size={14} />
+                          <span>{business.members_count || 0} members</span>
+                        </div>
+                        <div
+                          className={`stat-item ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          <MessageCircle size={14} />
+                          <span>{business.review_count || 0} reviews</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`card-footer ${isDarkMode ? "dark-mode" : ""}`}
+                    >
+                      <div className="price-tag">
+                        <span
+                          className={`price-amount ${isDarkMode ? "dark-mode" : ""}`}
+                        >
                           ₱{business.price?.toLocaleString()}
                         </span>
-                        <span className="text-xs text-gray-500 select-none">
-                          /{business.price_unit || "month"}
+                        <span
+                          className={`price-period ${isDarkMode ? "dark-mode" : ""}`}
+                        >
+                          /mo
                         </span>
                       </div>
+                      <button
+                        className={`view-details-btn-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+                      >
+                        <span>View</span>
+                        <ChevronRight size={16} className="btn-icon" />
+                      </button>
                     </div>
-                    <button
-                      className={`w-full py-2 text-sm rounded-lg transition-colors flex items-center justify-center gap-1 select-none ${
-                        isDarkMode
-                          ? "text-blue-400 border border-blue-500/50 hover:bg-blue-500/20"
-                          : "text-blue-600 border border-blue-200 hover:bg-blue-50"
-                      }`}
-                    >
-                      <span className="select-none">View Details</span>
-                      <ChevronRight
-                        size={14}
-                        className="group-hover:translate-x-0.5 transition-transform select-none"
-                      />
-                    </button>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
           ) : (
