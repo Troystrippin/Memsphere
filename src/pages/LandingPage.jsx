@@ -18,7 +18,7 @@ import {
   Settings,
   Rocket
 } from 'lucide-react';
-import logo from "../assets/logo3.png";
+import logo from "../assets/logo_final.png";
 
 const LandingPage = () => {
   const navigate = useNavigate();
