@@ -1959,3 +1959,281 @@ body {
   background: transparent;
 }
 
+/* Replace the dashboard-main section with this */
+.dashboard-main {
+  max-width: 100% !important;
+  margin: 0 auto;
+  padding: 1.5rem 2rem 2rem !important;
+  width: 100%;
+}
+
+/* Update container max-width for full width */
+.dashboard-container {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Remove any max-width restrictions on containers */
+.container,
+.enhanced-stats-grid,
+.membership-card-enhanced,
+.recommended-grid-enhanced {
+  max-width: 100% !important;
+}
+
+/* Make stats cards full width with proper spacing */
+.enhanced-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  width: 100%;
+}
+
+/* Make membership table full width */
+.memberships-table-container {
+  margin-bottom: 3rem;
+  width: 100%;
+}
+
+/* Make recommended grid full width with proper gaps */
+.recommended-grid-enhanced {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1.5rem;
+  margin-top: 1rem;
+  width: 100%;
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 1400px) {
+  .recommended-grid-enhanced {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 1200px) {
+  .recommended-grid-enhanced {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .recommended-grid-enhanced {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .recommended-grid-enhanced {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Ensure tables are full width */
+.memberships-table {
+  background: white;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+}
+
+/* Make table cells responsive but full width */
+.table-header {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr 1fr;
+  padding: 1rem 1.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  width: 100%;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr 1fr;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--gray-200);
+  transition: all 0.3s ease;
+  align-items: center;
+  width: 100%;
+}
+
+/* For mobile, make tables scrollable horizontally */
+@media (max-width: 768px) {
+  .memberships-table-container {
+    overflow-x: auto;
+  }
+  
+  .table-header,
+  .table-row {
+    min-width: 600px;
+  }
+}
+
+/* Remove any container max-width from other elements */
+.dashboard-container {
+  max-width: 100%;
+  padding: 0;
+}
+
+/* Update responsive padding */
+@media (max-width: 768px) {
+  .dashboard-main {
+    padding: 1rem 1rem 1rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-main {
+    padding: 0.75rem 0.75rem 0.75rem !important;
+  }
+}
+
+
+/* Fix: Add proper spacing to prevent navbar overlap */
+.dashboard-container {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow-x: hidden;
+  padding-top: 0 !important; /* Remove any conflicting padding */
+}
+
+.dashboard-main {
+  max-width: 100% !important;
+  margin: 0 auto;
+  padding: 5rem 2rem 2rem !important; /* Increased top padding to clear navbar */
+  width: 100%;
+}
+
+/* Fix: Business Cards Dark Mode Styles */
+.dashboard-container.dark-mode .business-card-enhanced {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%) !important;
+  border: 1px solid #374151 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dashboard-container.dark-mode .business-card-enhanced:hover {
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4) !important;
+  border-color: #4b5563 !important;
+}
+
+.dashboard-container.dark-mode .card-gradient-bg {
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%) !important;
+  opacity: 0.3 !important;
+}
+
+.dashboard-container.dark-mode .business-title {
+  color: #f3f4f6 !important;
+}
+
+.dashboard-container.dark-mode .business-description {
+  color: #9ca3af !important;
+}
+
+.dashboard-container.dark-mode .owner-highlight {
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%) !important;
+  border-color: #4b5563 !important;
+}
+
+.dashboard-container.dark-mode .owner-name {
+  color: #e5e7eb !important;
+}
+
+.dashboard-container.dark-mode .owner-badge {
+  background: rgba(59, 130, 246, 0.3) !important;
+  color: #60a5fa !important;
+}
+
+.dashboard-container.dark-mode .business-stats {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+.dashboard-container.dark-mode .stat-item {
+  color: #9ca3af !important;
+}
+
+.dashboard-container.dark-mode .business-type-badge {
+  background: #374151 !important;
+  color: #9ca3af !important;
+  border: 1px solid #4b5563 !important;
+}
+
+.dashboard-container.dark-mode .rating-badge {
+  background: #374151 !important;
+  color: #fbbf24 !important;
+  border: 1px solid #4b5563 !important;
+}
+
+.dashboard-container.dark-mode .price-tag {
+  background: #1f2937 !important;
+}
+
+.dashboard-container.dark-mode .price-amount {
+  color: #f3f4f6 !important;
+}
+
+.dashboard-container.dark-mode .price-period {
+  color: #9ca3af !important;
+}
+
+.dashboard-container.dark-mode .view-details-btn-enhanced {
+  background: #374151 !important;
+  color: #f3f4f6 !important;
+  border: 1px solid #4b5563 !important;
+}
+
+.dashboard-container.dark-mode .view-details-btn-enhanced:hover {
+  background: #2563eb !important;
+  color: white !important;
+  border-color: #3b82f6 !important;
+}
+
+.dashboard-container.dark-mode .business-emoji-large {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+  color: white !important;
+}
+
+.dashboard-container.dark-mode .business-card-enhanced .card-content {
+  background: transparent !important;
+}
+
+.dashboard-container.dark-mode .business-details {
+  background: transparent !important;
+}
+
+.dashboard-container.dark-mode .card-footer {
+  background: transparent !important;
+  border-top-color: #374151 !important;
+}
+
+/* Ensure stats cards have proper spacing */
+.enhanced-stats-grid {
+  margin-top: 0.5rem;
+}
+
+/* Fix for user greeting positioning */
+.flex.justify-end.mb-6 {
+  margin-bottom: 1.5rem !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .dashboard-main {
+    padding: 4.5rem 1rem 1rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-main {
+    padding: 4rem 0.75rem 0.75rem !important;
+  }
+}

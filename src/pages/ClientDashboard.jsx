@@ -537,7 +537,7 @@ const ClientDashboard = ({ initialUserData = null }) => {
 
       <div className="dashboard-main">
         {/* Header Section - Greeting on Right */}
-        <div className="flex justify-end mb-8">
+        <div className="flex justify-end mb-6">
           <div
             className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-sm transition-colors duration-300 select-none ${
               isDarkMode ? "bg-gray-800" : "bg-white"
@@ -933,7 +933,7 @@ const ClientDashboard = ({ initialUserData = null }) => {
                     >
                       Status
                     </th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody
                   className={`divide-y select-none ${isDarkMode ? "divide-gray-700" : "divide-gray-100"}`}
@@ -968,7 +968,7 @@ const ClientDashboard = ({ initialUserData = null }) => {
                               {membership.businesses?.name}
                             </span>
                           </div>
-                        </td>
+                         </td>
                         <td className="px-6 py-4 select-none">
                           <span
                             className={`px-2 py-1 text-xs rounded-full select-none ${
@@ -979,17 +979,17 @@ const ClientDashboard = ({ initialUserData = null }) => {
                           >
                             {membership.membership_plans?.name || "Membership"}
                           </span>
-                        </td>
+                         </td>
                         <td
                           className={`px-6 py-4 select-none ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
                         >
                           {formatDate(membership.created_at)}
-                        </td>
+                         </td>
                         <td
                           className={`px-6 py-4 select-none ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
                         >
                           {formatDate(membership.end_date)}
-                        </td>
+                          </td>
                         <td className="px-6 py-4 select-none">
                           {timeData && !timeData.expired ? (
                             <div
@@ -1018,7 +1018,7 @@ const ClientDashboard = ({ initialUserData = null }) => {
           </motion.div>
         )}
 
-        {/* Recommended Section - EXACT SAME CARD STYLE AS BROWSE PAGE */}
+        {/* Recommended Section - FIXED DARK MODE CARDS */}
         <div className="mb-8 select-none">
           <div className="flex justify-between items-center mb-6 select-none">
             <div className="flex items-center gap-2 select-none">
