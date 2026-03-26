@@ -120,6 +120,7 @@ const Browse = () => {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [userMemberships, setUserMemberships] = useState([]);
   const [hasMembership, setHasMembership] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -323,15 +324,6 @@ const Browse = () => {
         ...prev,
         [businessId]: data || [],
       }));
-
-      if (data && data.length > 0) {
-        const avgRating =
-          data.reduce((sum, r) => sum + r.rating, 0) / data.length;
-        await supabase
-          .from("businesses")
-          .update({ rating: avgRating })
-          .eq("id", businessId);
-      }
     } catch (error) {
       console.error("Error fetching reviews:", error);
     }
@@ -357,63 +349,107 @@ const Browse = () => {
       if (businessesError) throw businessesError;
 
       if (businessesData && businessesData.length > 0) {
-        for (let business of businessesData) {
-          const { count, error } = await supabase
-            .from("memberships")
-            .select("*", { count: "exact", head: true })
-            .eq("business_id", business.id)
-            .eq("status", "approved");
+        // Process each business to get real-time data using Promise.all
+        const businessesWithStats = await Promise.all(
+          businessesData.map(async (business) => {
+            // Get member count (approved memberships)
+            const { count: memberCount, error: memberError } = await supabase
+              .from("memberships")
+              .select("*", { count: "exact", head: true })
+              .eq("business_id", business.id)
+              .eq("status", "approved");
 
-          if (!error) {
-            business.members_count = count || 0;
-          }
+            if (memberError) {
+              console.error("Error fetching member count:", memberError);
+            }
 
-          const { count: reviewCount, error: reviewError } = await supabase
-            .from("reviews")
-            .select("*", { count: "exact", head: true })
-            .eq("business_id", business.id);
+            // Get all reviews to calculate average rating and count
+            const { data: reviews, error: ratingError } = await supabase
+              .from("reviews")
+              .select("rating")
+              .eq("business_id", business.id);
 
-          if (!reviewError) {
-            business.review_count = reviewCount || 0;
-          }
-        }
-      }
+            let avgRating = 0;
+            let reviewCount = 0;
+            
+            if (!ratingError && reviews && reviews.length > 0) {
+              const totalRating = reviews.reduce((sum, r) => sum + r.rating, 0);
+              avgRating = totalRating / reviews.length;
+              reviewCount = reviews.length;
+            }
 
-      // Sort businesses by rating (highest first)
-      const sortedBusinesses = (businessesData || []).sort((a, b) => {
-        const ratingA = a.rating || 0;
-        const ratingB = b.rating || 0;
-        return ratingB - ratingA;
-      });
+            console.log(`Business: ${business.name}`, {
+              members: memberCount || 0,
+              rating: avgRating,
+              reviews: reviewCount
+            });
 
-      setBusinesses(sortedBusinesses);
-      setLoading(false);
+            return {
+              ...business,
+              members_count: memberCount || 0,
+              review_count: reviewCount,
+              rating: avgRating,
+            };
+          })
+        );
 
-      if (businessesData && businessesData.length > 0) {
-        const businessIds = businessesData.map((b) => b.id);
-
-        const { data: plansData, error: plansError } = await supabase
-          .from("membership_plans")
-          .select("*")
-          .in("business_id", businessIds)
-          .eq("is_active", true);
-
-        if (plansError) throw plansError;
-
-        const plansByBusiness = {};
-        plansData.forEach((plan) => {
-          if (!plansByBusiness[plan.business_id]) {
-            plansByBusiness[plan.business_id] = [];
-          }
-          plansByBusiness[plan.business_id].push(plan);
+        // Sort businesses by rating (highest first)
+        const sortedBusinesses = businessesWithStats.sort((a, b) => {
+          const ratingA = a.rating || 0;
+          const ratingB = b.rating || 0;
+          return ratingB - ratingA;
         });
 
-        setMembershipPlans(plansByBusiness);
+        console.log("Businesses with real data:", sortedBusinesses.map(b => ({
+          name: b.name,
+          rating: b.rating,
+          members: b.members_count,
+          reviews: b.review_count
+        })));
+
+        setBusinesses(sortedBusinesses);
+
+        // Fetch membership plans
+        const businessIds = sortedBusinesses.map((b) => b.id);
+        if (businessIds.length > 0) {
+          const { data: plansData, error: plansError } = await supabase
+            .from("membership_plans")
+            .select("*")
+            .in("business_id", businessIds)
+            .eq("is_active", true);
+
+          if (!plansError && plansData) {
+            const plansByBusiness = {};
+            plansData.forEach((plan) => {
+              if (!plansByBusiness[plan.business_id]) {
+                plansByBusiness[plan.business_id] = [];
+              }
+              plansByBusiness[plan.business_id].push(plan);
+            });
+            setMembershipPlans(plansByBusiness);
+          }
+        }
+      } else {
+        setBusinesses([]);
       }
+
+      setLoading(false);
     } catch (error) {
       console.error("Error fetching businesses:", error);
       setLoading(false);
     }
+  };
+
+  // Helper function to refresh all business data
+  const refreshBusinessData = async () => {
+    console.log("Refreshing business data...");
+    setRefreshing(true);
+    await fetchBusinesses();
+    if (selectedBusiness && selectedBusiness.id) {
+      await fetchBusinessReviews(selectedBusiness.id);
+    }
+    await fetchUserMemberships();
+    setRefreshing(false);
   };
 
   const fetchMembershipPlansForBusiness = async (businessId) => {
@@ -632,6 +668,9 @@ const Browse = () => {
       });
 
       setShowSuccessModal(true);
+      
+      // Refresh all business data to update member count
+      await refreshBusinessData();
     } catch (error) {
       console.error("Error submitting payment:", error);
       console.error("Error message:", error.message);
@@ -727,9 +766,11 @@ const Browse = () => {
             comment: reviewFormData.comment.trim(),
             updated_at: new Date().toISOString(),
           })
-          .eq("id", existingReview.id).select(`
+          .eq("id", existingReview.id)
+          .select(`
             *,
             profiles:user_id (
+              id,
               first_name,
               last_name,
               avatar_url
@@ -740,18 +781,22 @@ const Browse = () => {
         result = data[0];
         alert("Your review has been updated!");
       } else {
-        const { data, error } = await supabase.from("reviews").insert([
-          {
-            business_id: selectedBusinessForReview.id,
-            user_id: user.id,
-            rating: reviewFormData.rating,
-            comment: reviewFormData.comment.trim(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]).select(`
+        const { data, error } = await supabase
+          .from("reviews")
+          .insert([
+            {
+              business_id: selectedBusinessForReview.id,
+              user_id: user.id,
+              rating: reviewFormData.rating,
+              comment: reviewFormData.comment.trim(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ])
+          .select(`
             *,
             profiles:user_id (
+              id,
               first_name,
               last_name,
               avatar_url
@@ -763,36 +808,8 @@ const Browse = () => {
         alert("Review submitted successfully!");
       }
 
-      setBusinessReviews((prev) => ({
-        ...prev,
-        [selectedBusinessForReview.id]: [
-          result,
-          ...(prev[selectedBusinessForReview.id]?.filter(
-            (r) => r.id !== result.id,
-          ) || []),
-        ],
-      }));
-
-      const allReviews = businessReviews[selectedBusinessForReview.id] || [];
-      const newReviews = [
-        result,
-        ...allReviews.filter((r) => r.id !== result.id),
-      ];
-      const avgRating =
-        newReviews.reduce((sum, r) => sum + r.rating, 0) / newReviews.length;
-
-      await supabase
-        .from("businesses")
-        .update({ rating: avgRating })
-        .eq("id", selectedBusinessForReview.id);
-
-      setBusinesses((prev) =>
-        prev.map((b) =>
-          b.id === selectedBusinessForReview.id
-            ? { ...b, rating: avgRating, review_count: newReviews.length }
-            : b,
-        ),
-      );
+      // Refresh all business data to update rating
+      await refreshBusinessData();
 
       setShowReviewModal(false);
       setSelectedBusinessForReview(null);
@@ -1151,13 +1168,13 @@ const Browse = () => {
                         className={`stat-item ${isDarkMode ? "dark-mode" : ""}`}
                       >
                         <Users size={14} />
-                        <span>{business.members_count || 0} members</span>
+                        <span>{business.members_count !== undefined ? business.members_count : 0} members</span>
                       </div>
                       <div
                         className={`stat-item ${isDarkMode ? "dark-mode" : ""}`}
                       >
                         <MessageCircle size={14} />
-                        <span>{business.review_count || 0} reviews</span>
+                        <span>{business.review_count !== undefined ? business.review_count : 0} reviews</span>
                       </div>
                     </div>
                   </div>
