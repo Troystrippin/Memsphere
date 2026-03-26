@@ -183,7 +183,7 @@ const AdminSidebarNav = ({ children }) => {
 
           {/* Footer Section - Blue Gradient Footer */}
           <div
-            className={`bg-gradient-to-r from-blue-600 to-blue-700 ${collapsed ? "flex justify-center py-4" : "py-4 px-3"}`}
+            className={`bg-white ${collapsed ? "flex justify-center py-4" : "py-4 px-3"}`}
           >
             {!collapsed ? (
               <div className="flex items-center justify-between gap-3">
@@ -202,19 +202,19 @@ const AdminSidebarNav = ({ children }) => {
                   )}
                   <div className="flex flex-col">
                     <p
-                      className="text-white font-semibold text-sm truncate max-w-[140px]"
-                      style={{ color: "white" }}
+                      className="text-blue-500 font-semibold text-sm truncate max-w-[140px] : text-white"
+                      style={{ color: "blue" }}
                     >
                       {profile?.first_name || "Admin"}{" "}
                       {profile?.last_name || ""}
                     </p>
                     <p
-                      className="text-white text-xs truncate flex items-center gap-1"
-                      style={{ color: "white" }}
+                      className="text-blue-500 text-xs truncate flex items-center gap-1 : text-white"
+                      style={{ color: "blue" }}
                     >
                       <Shield
-                        className="w-3 h-3 text-white"
-                        style={{ color: "white" }}
+                        className="w-3 h-3 text-blue-400"
+                        style={{ color: "blue" }}
                       />
                       Administrator
                     </p>
