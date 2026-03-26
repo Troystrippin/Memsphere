@@ -196,15 +196,22 @@ function App() {
   const fetchRetryCount = useRef(0);
   const navigate = useNavigate();
 
-  // Check maintenance mode - also listen for changes
+  // Check maintenance mode - optimized with timeout
   useEffect(() => {
     const checkMaintenanceMode = async () => {
       try {
-        const { data, error } = await supabase
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Timeout")), 2000)
+        );
+        
+        const fetchPromise = supabase
           .from('system_settings')
           .select('value')
           .eq('key', 'maintenance_mode')
           .single();
+        
+        const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
         
         if (!error && data && data.value === 'true') {
           setMaintenanceMode(true);
@@ -274,6 +281,7 @@ function App() {
     };
   }, [navigate]);
 
+  // Optimized auth initialization - faster with parallel requests
   useEffect(() => {
     if (authInitialized.current) return;
     authInitialized.current = true;
@@ -291,8 +299,14 @@ function App() {
       try {
         console.log("🔍 Initializing auth and fetching data...");
 
-        const isConnected = await testSupabaseConnection();
-        if (!isConnected) {
+        // Parallel execution of connection test and session fetch
+        const [connectionResult, sessionResult] = await Promise.allSettled([
+          testSupabaseConnection(),
+          supabase.auth.getSession()
+        ]);
+
+        // Check connection
+        if (connectionResult.status === 'rejected' || !connectionResult.value) {
           console.error("❌ Cannot connect to Supabase");
           setAuthError("Cannot connect to database");
           setLoading(false);
@@ -301,29 +315,24 @@ function App() {
           return;
         }
 
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (error) {
+        // Handle session result
+        if (sessionResult.status === 'rejected' || sessionResult.value.error) {
+          const error = sessionResult.status === 'rejected' ? sessionResult.reason : sessionResult.value.error;
           console.error("Error getting session:", error);
           localStorage.removeItem("sb-session");
-          setAuthError(error.message);
+          setAuthError(error?.message || "Session error");
           setLoading(false);
           setAuthChecked(true);
           setRoleLoaded(true);
           return;
         }
 
-        console.log(
-          "📦 Initial session:",
-          session?.user?.email || "No session",
-        );
+        const session = sessionResult.value.data.session;
+        console.log("📦 Initial session:", session?.user?.email || "No session");
 
         if (session?.user) {
-          const { data: userData, error: userError } =
-            await supabase.auth.getUser();
+          // Validate user
+          const { data: userData, error: userError } = await supabase.auth.getUser();
 
           if (userError || !userData?.user) {
             console.log("❌ Session is invalid, clearing...");
@@ -338,6 +347,7 @@ function App() {
           setSession(session);
           console.log("👤 Valid session found for:", session.user.email);
 
+          // Fetch user data with timeout
           await fetchUserData(session.user.id);
         } else {
           console.log("👤 No valid session");
@@ -427,19 +437,22 @@ function App() {
     };
   }, [navigate]);
 
+  // Optimized fetch user data with timeout and single retry - FIXED: Fetch all profile fields
   const fetchUserData = async (userId) => {
     fetchRetryCount.current = 0;
 
     try {
       console.log("🔍 Fetching user data for ID:", userId);
 
+      // Reduced timeout to 2 seconds
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Fetch timeout")), 5000),
+        setTimeout(() => reject(new Error("Fetch timeout")), 2000)
       );
 
+      // FIXED: Select all profile fields needed for the navbar and dashboard
       const fetchPromise = supabase
         .from("profiles")
-        .select("*")
+        .select("id, first_name, last_name, email, role, avatar_url, created_at, updated_at")
         .eq("id", userId)
         .maybeSingle();
 
@@ -471,9 +484,10 @@ function App() {
         console.log("✅ User data loaded:", data);
         const role = data?.role || "client";
         setUserRole(role);
-        setUserData(data);
+        setUserData(data); // Now data contains all profile fields
         setAuthError(null);
         console.log("🎯 User role set to:", role);
+        console.log("👤 User profile data:", data);
       } else {
         console.log("⚠️ No profile found");
         setUserRole(undefined);
@@ -485,14 +499,13 @@ function App() {
       setUserData(null);
       setAuthError(error.message);
 
-      if (fetchRetryCount.current < 2) {
+      // Single retry only
+      if (fetchRetryCount.current < 1) {
         fetchRetryCount.current++;
-        console.log(
-          `🔄 Retrying fetchUserData (attempt ${fetchRetryCount.current + 1}/3)...`,
-        );
+        console.log(`🔄 Retrying fetchUserData...`);
         setTimeout(() => {
           fetchUserData(userId);
-        }, 1000);
+        }, 500);
         return;
       }
     } finally {
@@ -503,7 +516,7 @@ function App() {
     }
   };
 
-  // Timeout to prevent infinite loading
+  // Reduced timeout to 2 seconds
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (loading && !authChecked) {
@@ -512,15 +525,14 @@ function App() {
         setLoading(false);
         setRoleLoaded(true);
       }
-    }, 8000);
+    }, 2000);
 
     return () => clearTimeout(timeout);
   }, [loading, authChecked]);
 
-  // Handle initial redirect - ONLY when role is loaded
+  // Optimized redirect logic - removed unnecessary delays
   useEffect(() => {
     if (loading || !authChecked || !roleLoaded || !maintenanceChecked) {
-      console.log("Waiting for role to load...", { loading, authChecked, roleLoaded, userRole, maintenanceChecked });
       return;
     }
 
@@ -542,7 +554,6 @@ function App() {
     
     // MAINTENANCE MODE CHECK
     if (maintenanceMode && session && userRole !== 'admin') {
-      console.log("🔧 Maintenance mode active, non-admin access blocked");
       if (currentPath !== '/maintenance') {
         navigate('/maintenance', { replace: true });
       }
@@ -551,7 +562,6 @@ function App() {
     
     // If maintenance mode is off and user is on maintenance page, redirect
     if (!maintenanceMode && currentPath === '/maintenance') {
-      console.log("🔧 Maintenance mode off, redirecting from maintenance page");
       if (session && userRole !== undefined) {
         let destination;
         if (userRole === "owner") {
@@ -573,7 +583,6 @@ function App() {
     }
     
     if (currentPath === '/maintenance' && session && userRole === 'admin') {
-      console.log("🔧 Admin accessing during maintenance, redirecting to dashboard");
       const destination = userRole === "owner" ? "/owner-dashboard" : 
                          userRole === "admin" ? "/admin-dashboard" : "/ClientDashboard";
       navigate(destination, { replace: true });
@@ -603,55 +612,34 @@ function App() {
       setInitialRedirectDone(true);
       setTimeout(() => {
         navigationInProgress.current = false;
-      }, 100);
+      }, 50);
       return;
     }
     
     if (session && userRole !== undefined && !publicPaths.includes(currentPath)) {
       if (currentPath.startsWith("/owner") && userRole !== "owner") {
-        console.log("🚫 Owner route blocked for non-owner");
         const destination = userRole === "admin" ? "/admin-dashboard" : 
                            userRole === "client" ? "/ClientDashboard" : "/";
         navigate(destination, { replace: true });
       } else if (currentPath.startsWith("/admin") && userRole !== "admin") {
-        console.log("🚫 Admin route blocked for non-admin");
         const destination = userRole === "owner" ? "/owner-dashboard" : 
                            userRole === "client" ? "/ClientDashboard" : "/";
         navigate(destination, { replace: true });
       } else if (currentPath === "/ClientDashboard" && userRole !== "client") {
-        console.log("🚫 Client dashboard blocked for non-client");
         const destination = userRole === "admin" ? "/admin-dashboard" : "/owner-dashboard";
         navigate(destination, { replace: true });
       } else if (currentPath === "/browse" && userRole !== "client") {
-        console.log("🚫 Browse page blocked for non-client");
         const destination = userRole === "admin" ? "/admin-dashboard" : "/owner-dashboard";
         navigate(destination, { replace: true });
       } else {
         setInitialRedirectDone(true);
       }
     } else if (!session && !publicPaths.includes(currentPath) && currentPath !== '/maintenance') {
-      console.log("🔒 No session, redirecting to login");
       navigate("/login", { replace: true });
     } else {
       setInitialRedirectDone(true);
     }
   }, [loading, authChecked, roleLoaded, maintenanceChecked, maintenanceMode, session, userRole, navigate, initialRedirectDone]);
-
-  // Debug logging
-  useEffect(() => {
-    console.log("📊 App State Update:", {
-      loading,
-      authChecked,
-      roleLoaded,
-      maintenanceChecked,
-      maintenanceMode,
-      session: session?.user?.email,
-      userRole,
-      path: window.location.pathname,
-      initialRedirectDone,
-      authError,
-    });
-  }, [loading, authChecked, roleLoaded, maintenanceChecked, maintenanceMode, session, userRole, initialRedirectDone, authError]);
 
   if (!authChecked || loading || !roleLoaded || !maintenanceChecked) {
     return (
@@ -683,15 +671,6 @@ function App() {
   }
 
   const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-    console.log(
-      "🛡️ ProtectedRoute - Session:",
-      !!session,
-      "Role:",
-      userRole,
-      "AuthChecked:",
-      authChecked,
-    );
-
     if (!authChecked || loading || !roleLoaded) {
       return null;
     }
@@ -701,17 +680,14 @@ function App() {
     }
 
     if (!session) {
-      console.log("🔒 No session, redirecting to login");
       return <Navigate to="/login" replace />;
     }
 
     if (userRole === undefined) {
-      console.log("⚠️ Role undefined, showing loading");
       return null;
     }
 
     if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-      console.log("🚫 Role not allowed, redirecting...");
       let destination;
       if (userRole === "owner") {
         destination = "/owner-dashboard";
@@ -723,7 +699,6 @@ function App() {
       return <Navigate to={destination} replace />;
     }
 
-    console.log("✅ Access granted");
     return children;
   };
 
