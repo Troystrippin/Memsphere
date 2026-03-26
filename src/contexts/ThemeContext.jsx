@@ -1,4 +1,3 @@
-// contexts/ThemeContext.jsx
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 const ThemeContext = createContext();
@@ -17,15 +16,16 @@ export const ThemeProvider = ({ children }) => {
     if (savedTheme) {
       return savedTheme === "dark";
     }
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    // Default to light mode
+    return false;
   });
 
   useEffect(() => {
     if (isDarkMode) {
-      document.documentElement.classList.add("dark"); // Changed from "dark-mode" to "dark"
+      document.documentElement.classList.add("dark");
       localStorage.setItem("theme", "dark");
     } else {
-      document.documentElement.classList.remove("dark"); // Changed from "dark-mode" to "dark"
+      document.documentElement.classList.remove("dark");
       localStorage.setItem("theme", "light");
     }
   }, [isDarkMode]);

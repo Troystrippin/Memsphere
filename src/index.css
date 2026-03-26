@@ -87,57 +87,57 @@
 }
 
 /* Force dark background on everything when dark mode is active */
-html.dark-mode,
-html.dark-mode body,
-html.dark-mode #root,
-html.dark-mode .dashboard-container,
-html.dark-mode .dashboard-main {
+html.dark,
+html.dark body,
+html.dark #root,
+html.dark .dashboard-container,
+html.dark .dashboard-main {
   background: #111827 !important;
 }
 
 /* But keep gradients where they should be */
-html.dark-mode .dashboard-container {
+html.dark .dashboard-container {
   background: linear-gradient(135deg, #111827 0%, #1f2937 100%) !important;
 }
 
 /* Fix the timeline/dates section in dark mode */
-html.dark-mode .dates-timeline {
+html.dark .dates-timeline {
   background: transparent !important;
 }
 
 /* Fix the timeline items */
-html.dark-mode .timeline-item {
+html.dark .timeline-item {
   background: transparent !important;
 }
 
 /* Fix the timeline labels (Applied, Started, Valid Until) */
-html.dark-mode .timeline-label {
+html.dark .timeline-label {
   color: #9ca3af !important;
   background: transparent !important;
 }
 
 /* Fix the timeline values (dates) */
-html.dark-mode .timeline-value {
+html.darke .timeline-value {
   color: #f3f4f6 !important;
   background: transparent !important;
 }
 
 /* Fix the timeline marker dots */
-html.dark-mode .timeline-marker {
+html.dark .timeline-marker {
   background: #1f2937 !important;
   border-color: #3b82f6 !important;
 }
 
 /* Fix the timeline connecting line */
-html.dark-mode .dates-timeline::before {
+html.dark .dates-timeline::before {
   background: linear-gradient(to bottom, #3b82f6, #60a5fa) !important;
 }
 
 /* Ensure the entire membership card content is dark */
-html.dark-mode .membership-card-enhanced .card-header-enhanced,
-html.dark-mode .membership-card-enhanced .timer-section,
-html.dark-mode .membership-card-enhanced .dates-timeline,
-html.dark-mode .membership-card-enhanced .features-container {
+html.dark .membership-card-enhanced .card-header-enhanced,
+html.dark .membership-card-enhanced .timer-section,
+html.dark .membership-card-enhanced .dates-timeline,
+html.dark .membership-card-enhanced .features-container {
   background: transparent !important;
 }
 
