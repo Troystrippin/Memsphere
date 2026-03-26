@@ -263,7 +263,7 @@ const About = () => {
 
       {/* Mobile Welcome */}
       <div
-        className={`md:hidden ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b px-6 py-3 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+        className={`md:hidden ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b px-6 py-3 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"} select-none`}
       >
         <p>Welcome, {firstName}!</p>
       </div>
@@ -312,20 +312,20 @@ const About = () => {
         <div className="absolute top-3/4 right-1/4 w-4 h-4 bg-white rounded-full animate-ping opacity-30 animation-delay-1000"></div>
 
         {/* Main content */}
-        <div className="relative max-w-6xl mx-auto text-center text-white z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-sm font-medium mb-8 animate-fadeIn">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-            <span>Welcome to Memsphere</span>
+        <div className="relative max-w-6xl mx-auto text-center text-white z-10 select-none">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-sm font-medium mb-8 animate-fadeIn select-none">
+            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse select-none"></span>
+            <span className="select-none">Welcome to Memsphere</span>
           </div>
 
-          <h1 className="hero-title text-6xl md:text-7xl font-bold mb-6 animate-fadeIn">
+          <h1 className="hero-title text-6xl md:text-7xl font-bold mb-6 animate-fadeIn select-none">
             About{" "}
-            <span className="bg-gradient-to-r from-blue-200 to-white bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-blue-200 to-white bg-clip-text text-transparent select-none">
               Memsphere
             </span>
           </h1>
 
-          <p className="hero-subtitle text-xl md:text-2xl max-w-3xl mx-auto leading-relaxed mb-10 animate-fadeIn animation-delay-200">
+          <p className="hero-subtitle text-xl md:text-2xl max-w-3xl mx-auto leading-relaxed mb-10 animate-fadeIn animation-delay-200 select-none">
             We're on a mission to transform how businesses connect with their
             customers, creating meaningful relationships that drive growth and
             foster community.
@@ -342,20 +342,20 @@ const About = () => {
               },
               { emoji: "⭐", text: "4.8 Rating" },
             ].map((badge, idx) => (
-              <div key={idx} className="group relative">
+              <div key={idx} className="group relative select-none">
                 <div className="absolute inset-0 bg-white/20 rounded-full blur-lg group-hover:blur-xl transition-all"></div>
-                <div className="relative px-6 py-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center gap-2 hover:bg-white/20 transition-all">
-                  <span className="text-2xl">{badge.emoji}</span>
-                  <span className="text-sm font-medium">{badge.text}</span>
+                <div className="relative px-6 py-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center gap-2 hover:bg-white/20 transition-all select-none">
+                  <span className="text-2xl select-none">{badge.emoji}</span>
+                  <span className="text-sm font-medium select-none">{badge.text}</span>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Scroll indicator */}
-          <div className="absolute bottom-[-80px] left-1/2 transform -translate-x-1/2 animate-bounce">
-            <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center">
-              <div className="w-1 h-3 bg-white/50 rounded-full mt-2 animate-scroll"></div>
+          <div className="absolute bottom-[-80px] left-1/2 transform -translate-x-1/2 animate-bounce select-none">
+            <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center select-none">
+              <div className="w-1 h-3 bg-white/50 rounded-full mt-2 animate-scroll select-none"></div>
             </div>
           </div>
         </div>
@@ -387,17 +387,17 @@ const About = () => {
             return (
               <div
                 key={stat.id}
-                className={`stat-card-enhanced ${statClass} ${isDarkMode ? "dark-mode" : ""}`}
+                className={`stat-card-enhanced ${statClass} ${isDarkMode ? "dark-mode" : ""} select-none`}
               >
-                <div className="stat-icon">
+                <div className="stat-icon select-none">
                   <Icon size={28} />
                 </div>
-                <div className="stat-value">
+                <div className="stat-value select-none">
                   {typeof stat.value === "number"
                     ? stat.value.toLocaleString()
                     : stat.value}
                 </div>
-                <div className="stat-label">{stat.label}</div>
+                <div className="stat-label select-none">{stat.label}</div>
               </div>
             );
           })}
@@ -408,19 +408,19 @@ const About = () => {
       <div
         className={`max-w-4xl mx-auto px-4 py-20 ${isDarkMode ? "dark-mode" : ""}`}
       >
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 select-none">
           <span
-            className={`inline-block px-4 py-2 ${isDarkMode ? "bg-blue-900 text-blue-300" : "bg-blue-100 text-blue-600"} rounded-full text-sm font-semibold mb-4`}
+            className={`inline-block px-4 py-2 ${isDarkMode ? "bg-blue-900 text-blue-300" : "bg-blue-100 text-blue-600"} rounded-full text-sm font-semibold mb-4 select-none`}
           >
             Our Mission
           </span>
           <h2
-            className={`text-4xl md:text-5xl font-bold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+            className={`text-4xl md:text-5xl font-bold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"} select-none`}
           >
             Connecting Businesses & Communities
           </h2>
           <p
-            className={`mission-text text-xl leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+            className={`mission-text text-xl leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-600"} select-none`}
           >
             Memsphere is more than just a platform – it's a community where
             businesses thrive and customers find exactly what they're looking
@@ -436,18 +436,18 @@ const About = () => {
             return (
               <div
                 key={value.id}
-                className={`value-card-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+                className={`value-card-enhanced ${isDarkMode ? "dark-mode" : ""} select-none`}
               >
-                <div className="value-icon">
+                <div className="value-icon select-none">
                   <Icon size={24} className="text-white" />
                 </div>
                 <h3
-                  className={`value-title ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                  className={`value-title ${isDarkMode ? "text-white" : "text-gray-900"} select-none`}
                 >
                   {value.title}
                 </h3>
                 <p
-                  className={`value-description ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+                  className={`value-description ${isDarkMode ? "text-gray-400" : "text-gray-600"} select-none`}
                 >
                   {value.description}
                 </p>
@@ -459,19 +459,19 @@ const About = () => {
 
       {/* Team Section */}
       <div className={`team-container ${isDarkMode ? "dark-mode" : ""}`}>
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 select-none">
           <span
-            className={`inline-block px-4 py-2 ${isDarkMode ? "bg-purple-900 text-purple-300" : "bg-purple-100 text-purple-600"} rounded-full text-sm font-semibold mb-4`}
+            className={`inline-block px-4 py-2 ${isDarkMode ? "bg-purple-900 text-purple-300" : "bg-purple-100 text-purple-600"} rounded-full text-sm font-semibold mb-4 select-none`}
           >
             The Team
           </span>
           <h2
-            className={`text-4xl md:text-5xl font-bold mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}
+            className={`text-4xl md:text-5xl font-bold mb-4 ${isDarkMode ? "text-white" : "text-gray-900"} select-none`}
           >
             Meet Our Team
           </h2>
           <p
-            className={`text-xl ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+            className={`text-xl ${isDarkMode ? "text-gray-400" : "text-gray-600"} select-none`}
           >
             BSIT2-02 | 5 Passionate Members
           </p>
@@ -482,21 +482,21 @@ const About = () => {
           {teamMembers.map((member) => (
             <div
               key={member.id}
-              className={`team-card-enhanced ${isDarkMode ? "dark-mode" : ""}`}
+              className={`team-card-enhanced ${isDarkMode ? "dark-mode" : ""} select-none`}
             >
-              <div className="team-avatar-enhanced">{member.avatar}</div>
+              <div className="team-avatar-enhanced select-none">{member.avatar}</div>
               <h3
-                className={`team-name-enhanced ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                className={`team-name-enhanced ${isDarkMode ? "text-white" : "text-gray-900"} select-none`}
               >
                 {member.name}
               </h3>
               <p
-                className={`team-role-enhanced ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                className={`team-role-enhanced ${isDarkMode ? "text-gray-400" : "text-gray-500"} select-none`}
               >
                 {member.role}
               </p>
               <p
-                className={`team-bio-enhanced ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                className={`team-bio-enhanced ${isDarkMode ? "text-gray-500" : "text-gray-400"} select-none`}
               >
                 {member.bio}
               </p>
@@ -504,17 +504,17 @@ const About = () => {
               {/* Social Links */}
               <div className="team-social">
                 <div
-                  className={`team-social-link ${isDarkMode ? "dark-mode" : ""}`}
+                  className={`team-social-link ${isDarkMode ? "dark-mode" : ""} select-none`}
                 >
                   <Linkedin size={16} />
                 </div>
                 <div
-                  className={`team-social-link ${isDarkMode ? "dark-mode" : ""}`}
+                  className={`team-social-link ${isDarkMode ? "dark-mode" : ""} select-none`}
                 >
                   <Twitter size={16} />
                 </div>
                 <div
-                  className={`team-social-link ${isDarkMode ? "dark-mode" : ""}`}
+                  className={`team-social-link ${isDarkMode ? "dark-mode" : ""} select-none`}
                 >
                   <Mail size={16} />
                 </div>
@@ -528,19 +528,19 @@ const About = () => {
       <div
         className={`${isDarkMode ? "bg-gradient-to-br from-gray-800 to-gray-900" : "bg-gradient-to-br from-gray-900 to-gray-800"} text-white py-20 px-4 mt-12`}
       >
-        <div className="max-w-4xl mx-auto text-center">
-          <Sparkles className="w-16 h-16 mx-auto mb-6 text-yellow-400 animate-pulse" />
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+        <div className="max-w-4xl mx-auto text-center select-none">
+          <Sparkles className="w-16 h-16 mx-auto mb-6 text-yellow-400 animate-pulse select-none" />
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 select-none">
             Get the Memsphere App
           </h2>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto select-none">
             Download our mobile app for a better experience! Browse businesses,
             manage memberships, and connect on the go.
           </p>
-          <button className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full text-white font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transform hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-xl">
-            <Download size={24} />
-            <span>Download the App</span>
-            <ChevronRight size={20} />
+          <button className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full text-white font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transform hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-xl select-none">
+            <Download size={24} className="select-none" />
+            <span className="select-none">Download the App</span>
+            <ChevronRight size={20} className="select-none" />
           </button>
         </div>
       </div>
@@ -549,9 +549,9 @@ const About = () => {
       <footer
         className={`${isDarkMode ? "bg-gray-900 border-gray-800" : "bg-gray-900 border-gray-800"} text-gray-400 py-8 px-4 border-t`}
       >
-        <div className="max-w-6xl mx-auto text-center">
-          <p>© 2026 Memsphere. All rights reserved.</p>
-          <p className="text-sm mt-2">Built with ❤️ by BSIT2-02</p>
+        <div className="max-w-6xl mx-auto text-center select-none">
+          <p className="select-none">© 2026 Memsphere. All rights reserved.</p>
+          <p className="text-sm mt-2 select-none">Built with ❤️ by BSIT2-02</p>
         </div>
       </footer>
     </div>

@@ -350,3 +350,157 @@
     padding-left: 0;
   }
 }
+
+/* Dark Mode Styles */
+.business-reviews-container.dark-mode {
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+}
+
+.business-reviews-container.dark-mode .reviews-main {
+  background: transparent;
+}
+
+.business-reviews-container.dark-mode .back-btn {
+  background: #1f2937;
+  border-color: #374151;
+  color: #f0f2f5;
+}
+
+.business-reviews-container.dark-mode .back-btn:hover {
+  background: #374151;
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+
+.business-reviews-container.dark-mode .reviews-header-section {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.business-reviews-container.dark-mode .business-info h1 {
+  color: #f3f4f6;
+}
+
+.business-reviews-container.dark-mode .business-location {
+  color: #9ca3af;
+}
+
+.business-reviews-container.dark-mode .big-rating {
+  color: #f3f4f6;
+}
+
+.business-reviews-container.dark-mode .total-reviews {
+  color: #1ddf0c;
+}
+
+.business-reviews-container.dark-mode .rating-bar-container {
+  background: #374151;
+}
+
+.business-reviews-container.dark-mode .stars-label {
+  color: #ffee00;
+}
+
+.business-reviews-container.dark-mode .rating-count {
+  color: #9ca3af;
+}
+
+.business-reviews-container.dark-mode .reviews-list-section {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.business-reviews-container.dark-mode .reviews-list-section h2 {
+  color: #f3f4f6;
+  border-bottom-color: #374151;
+}
+
+.business-reviews-container.dark-mode .review-card {
+  background: #111827;
+  border-color: #374151;
+}
+
+.business-reviews-container.dark-mode .review-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
+.business-reviews-container.dark-mode .reviewer-name {
+  color: #f3f4f6;
+}
+
+.business-reviews-container.dark-mode .review-date {
+  color: #9ca3af;
+}
+
+.business-reviews-container.dark-mode .review-text {
+  color: #d1d5db;
+}
+
+.business-reviews-container.dark-mode .star.empty {
+  color: #4b5563;
+}
+
+.business-reviews-container.dark-mode .no-reviews-section h3 {
+  color: #f3f4f6;
+}
+
+.business-reviews-container.dark-mode .no-reviews-section p {
+  color: #9ca3af;
+}
+
+/* Modal Dark Mode */
+.review-modal-overlay.dark-mode {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.review-modal-content.dark-mode {
+  background: #1f2937;
+}
+
+.review-modal-content.dark-mode .review-modal-header h2 {
+  color: #f3f4f6;
+}
+
+.review-modal-content.dark-mode .review-business-info {
+  background: #111827;
+  border-color: #374151;
+}
+
+.review-modal-content.dark-mode .review-business-details h3 {
+  color: #f3f4f6;
+}
+
+.review-modal-content.dark-mode .review-business-details p {
+  color: #9ca3af;
+}
+
+.review-modal-content.dark-mode .rating-section label {
+  color: #f3f4f6;
+}
+
+.review-modal-content.dark-mode .comment-section label {
+  color: #f3f4f6;
+}
+
+.review-modal-content.dark-mode .comment-section textarea {
+  background: #111827;
+  border-color: #374151;
+  color: #f3f4f6;
+}
+
+.review-modal-content.dark-mode .comment-section textarea:focus {
+  border-color: #3b82f6;
+}
+
+.review-modal-content.dark-mode .comment-counter {
+  color: #9ca3af;
+}
+
+.review-modal-content.dark-mode .review-guidelines h4 {
+  color: #f3f4f6;
+}
+
+.review-modal-content.dark-mode .review-guidelines li {
+  color: #9ca3af;
+}

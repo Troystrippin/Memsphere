@@ -2,12 +2,14 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ClientNavbar from "../components/client/ClientNavbar";
+import { useTheme } from "../contexts/ThemeContext";
 import "../styles/BusinessReviews.css";
 
 const BusinessReviews = () => {
   const { businessId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
   
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -24,6 +26,7 @@ const BusinessReviews = () => {
     hoverRating: 0
   });
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewerAvatars, setReviewerAvatars] = useState({});
 
   useEffect(() => {
     checkUser();
@@ -90,6 +93,38 @@ const BusinessReviews = () => {
     }
   };
 
+  const downloadReviewerAvatar = async (userId, avatarPath) => {
+    if (!avatarPath) return null;
+    
+    // Check if we already have this avatar cached
+    if (reviewerAvatars[userId]) return reviewerAvatars[userId];
+    
+    try {
+      console.log(`Downloading avatar for user ${userId}: ${avatarPath}`);
+      
+      const { data, error } = await supabase.storage
+        .from("avatars")
+        .download(avatarPath);
+
+      if (error) {
+        console.error(`Error downloading avatar for user ${userId}:`, error);
+        return null;
+      }
+
+      if (data) {
+        const url = URL.createObjectURL(data);
+        setReviewerAvatars(prev => ({ ...prev, [userId]: url }));
+        console.log(`Successfully downloaded avatar for user ${userId}`);
+        return url;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Exception downloading avatar for user ${userId}:`, error);
+      return null;
+    }
+  };
+
   const fetchBusinessDetails = async () => {
     try {
       const { data, error } = await supabase
@@ -113,6 +148,7 @@ const BusinessReviews = () => {
         .select(`
           *,
           profiles:user_id (
+            id,
             first_name,
             last_name,
             avatar_url
@@ -122,7 +158,31 @@ const BusinessReviews = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setReviews(data || []);
+      
+      console.log("Fetched reviews:", data?.length || 0);
+      
+      // Download avatars for each reviewer
+      const reviewsWithAvatars = await Promise.all((data || []).map(async (review) => {
+        let downloadedAvatarUrl = null;
+        
+        if (review.profiles?.avatar_url) {
+          console.log(`Processing avatar for: ${review.profiles.first_name} ${review.profiles.last_name}`);
+          downloadedAvatarUrl = await downloadReviewerAvatar(
+            review.profiles.id, 
+            review.profiles.avatar_url
+          );
+        }
+        
+        return {
+          ...review,
+          profiles: {
+            ...review.profiles,
+            downloaded_avatar_url: downloadedAvatarUrl
+          }
+        };
+      }));
+      
+      setReviews(reviewsWithAvatars);
     } catch (error) {
       console.error("Error fetching reviews:", error);
     } finally {
@@ -227,6 +287,7 @@ const BusinessReviews = () => {
           .select(`
             *,
             profiles:user_id (
+              id,
               first_name,
               last_name,
               avatar_url
@@ -249,6 +310,7 @@ const BusinessReviews = () => {
           .select(`
             *,
             profiles:user_id (
+              id,
               first_name,
               last_name,
               avatar_url
@@ -257,6 +319,19 @@ const BusinessReviews = () => {
 
         if (error) throw error;
         result = data[0];
+      }
+
+      // Download avatar for the new review
+      let downloadedAvatarUrl = null;
+      if (result?.profiles?.avatar_url) {
+        downloadedAvatarUrl = await downloadReviewerAvatar(
+          result.profiles.id,
+          result.profiles.avatar_url
+        );
+      }
+      
+      if (downloadedAvatarUrl) {
+        result.profiles.downloaded_avatar_url = downloadedAvatarUrl;
       }
 
       // Update reviews list
@@ -332,7 +407,7 @@ const BusinessReviews = () => {
 
   if (loading) {
     return (
-      <div className="reviews-loading">
+      <div className={`reviews-loading ${isDarkMode ? "dark-mode" : ""}`}>
         <div className="loading-spinner"></div>
         <p>Loading reviews...</p>
       </div>
@@ -342,8 +417,10 @@ const BusinessReviews = () => {
   const ratingDistribution = getRatingDistribution();
   const averageRating = calculateAverageRating();
 
+  const mainWrapperClass = `business-reviews-container ${isDarkMode ? "dark-mode" : ""}`;
+
   return (
-    <div className="business-reviews-container">
+    <div className={mainWrapperClass}>
       <ClientNavbar profile={profile} avatarUrl={avatarUrl} />
 
       <div className="reviews-main">
@@ -419,11 +496,19 @@ const BusinessReviews = () => {
                     <div key={review.id} className="review-card">
                       <div className="review-card-header">
                         <div className="reviewer-avatar">
-                          {review.profiles?.avatar_url ? (
-                            <img src={review.profiles.avatar_url} alt="avatar" />
+                          {review.profiles?.downloaded_avatar_url ? (
+                            <img 
+                              src={review.profiles.downloaded_avatar_url} 
+                              alt={review.profiles?.first_name || "Avatar"}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                const placeholder = e.target.parentElement.querySelector('.avatar-placeholder');
+                                if (placeholder) placeholder.style.display = 'flex';
+                              }}
+                            />
                           ) : (
                             <span className="avatar-placeholder">
-                              {review.profiles?.first_name?.[0] || "U"}
+                              {(review.profiles?.first_name?.[0] || "U").toUpperCase()}
                             </span>
                           )}
                         </div>
@@ -472,11 +557,11 @@ const BusinessReviews = () => {
       {/* Review Modal */}
       {showReviewModal && selectedBusinessForReview && (
         <div
-          className="review-modal-overlay"
+          className={`review-modal-overlay ${isDarkMode ? "dark-mode" : ""}`}
           onClick={() => setShowReviewModal(false)}
         >
           <div
-            className="review-modal-content"
+            className={`review-modal-content ${isDarkMode ? "dark-mode" : ""}`}
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -491,7 +576,7 @@ const BusinessReviews = () => {
               <h2>{reviewFormData.rating > 0 ? "Edit Your Review" : "Write a Review"}</h2>
             </div>
 
-            <div className="review-business-info">
+            <div className={`review-business-info ${isDarkMode ? "dark-mode" : ""}`}>
               <span className="review-business-icon">
                 {getBusinessIcon(selectedBusinessForReview)}
               </span>

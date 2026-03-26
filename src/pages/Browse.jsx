@@ -1174,7 +1174,7 @@ const Browse = () => {
                       <span
                         className={`price-period ${isDarkMode ? "dark-mode" : ""}`}
                       >
-                        /mo
+                        /month
                       </span>
                     </div>
                     <button
