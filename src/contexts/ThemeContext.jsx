@@ -11,14 +11,35 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme) {
-      return savedTheme === "dark";
+  // Theme version - increment this to force reset all users' theme preferences
+  const THEME_VERSION = "2.0.0";
+  
+  const [isDarkMode, setIsDarkMode] = useState(false); // Start with light mode
+
+  useEffect(() => {
+    // Check if theme version has changed
+    const savedVersion = localStorage.getItem("theme_version");
+    
+    // If version mismatch or no saved theme, reset to light mode
+    if (savedVersion !== THEME_VERSION) {
+      localStorage.removeItem("theme");
+      localStorage.setItem("theme_version", THEME_VERSION);
+      localStorage.setItem("theme", "light");
+      document.documentElement.classList.remove("dark");
+      setIsDarkMode(false);
+      return;
     }
-    // Default to light mode
-    return false;
-  });
+    
+    // Check for saved theme preference
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "dark") {
+      setIsDarkMode(true);
+      document.documentElement.classList.add("dark");
+    } else {
+      setIsDarkMode(false);
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
 
   useEffect(() => {
     if (isDarkMode) {
